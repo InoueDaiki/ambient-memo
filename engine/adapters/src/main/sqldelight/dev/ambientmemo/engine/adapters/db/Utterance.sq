@@ -1,0 +1,26 @@
+-- 文字起こしの最小単位。時刻は UNIX エポックからのミリ秒
+CREATE TABLE utterance (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  started_at_ms INTEGER NOT NULL,
+  ended_at_ms INTEGER NOT NULL,
+  body TEXT NOT NULL,
+  confidence REAL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (ended_at_ms >= started_at_ms),
+  CHECK (confidence IS NULL OR confidence BETWEEN 0.0 AND 1.0)
+);
+
+CREATE INDEX utterance_started_at ON utterance (started_at_ms);
+
+insert:
+INSERT INTO utterance (started_at_ms, ended_at_ms, body, confidence, created_at_ms)
+VALUES (?, ?, ?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+listOverlapping:
+SELECT *
+FROM utterance
+WHERE started_at_ms < :toMillis AND ended_at_ms > :fromMillis
+ORDER BY started_at_ms, id;
