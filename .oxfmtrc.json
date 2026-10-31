@@ -1,0 +1,14 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "ignorePatterns": [
+    "tools/**",
+    "engine/**",
+    "docs/**",
+    "**/android/**",
+    "**/.expo/**",
+    "*.md",
+    "mise.toml",
+    "pnpm-lock.yaml",
+    "pnpm-workspace.yaml"
+  ]
+}

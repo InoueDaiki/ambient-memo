@@ -1,0 +1,94 @@
+# 署名済みの arm64 Release APK をビルドし、GitHub Releases に置く。
+# - バージョンタグ(v1.2.3): 普段使いの版。タグの版を versionName にする
+# - workflow_dispatch: 任意のブランチの開発版(.dev)。dev-<実行番号> のプレリリースにする
+# versionCode は実行番号。このファイルの名前を変えると番号が振り直されるので変えない
+name: Release
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  release:
+    name: Release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    env:
+      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+      ANDROID_VERSION_CODE: ${{ github.run_number }}
+    steps:
+      - name: 署名の Secrets を確かめる
+        run: |
+          missing=()
+          for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            [ -n "${!name}" ] || missing+=("$name")
+          done
+          if [ "${#missing[@]}" -gt 0 ]; then
+            echo "::error title=署名の Secrets が足りません::${missing[*]} を設定してください。手順は README の「署名鍵」を参照"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: ./.github/actions/setup
+        with:
+          android-packages: platforms;android-37.0 build-tools;37.0.0 ndk;27.1.12297006 cmake;3.22.1
+
+      - name: 版と鍵を用意する
+        run: |
+          if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_EVENT_NAME" = push ]; then
+            version="${GITHUB_REF_NAME#v}"
+            {
+              echo "APP_VARIANT=production"
+              echo "RELEASE_TAG=$GITHUB_REF_NAME"
+              echo "RELEASE_FLAGS=--latest"
+            } >> "$GITHUB_ENV"
+          else
+            version="0.0.0-dev.$GITHUB_RUN_NUMBER"
+            {
+              echo "APP_VARIANT=dev"
+              echo "RELEASE_TAG=dev-$GITHUB_RUN_NUMBER"
+              echo "RELEASE_FLAGS=--prerelease"
+            } >> "$GITHUB_ENV"
+          fi
+          keystore="$RUNNER_TEMP/release.keystore"
+          base64 --decode <<< "$ANDROID_KEYSTORE_BASE64" > "$keystore"
+          {
+            echo "APP_VERSION=$version"
+            echo "ANDROID_KEYSTORE_PATH=$keystore"
+            echo "APK_PATH=$RUNNER_TEMP/ambient-memo-$version-arm64.apk"
+          } >> "$GITHUB_ENV"
+
+      - run: mise run build:android:release
+
+      - name: 署名を確かめる
+        run: |
+          cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$APK_PATH"
+          "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK_PATH"
+
+      - name: GitHub Releases に置く
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 再実行のときはリリースが既にあるので、APK だけを置き換える
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            gh release upload "$RELEASE_TAG" "$APK_PATH" --clobber --repo "$GITHUB_REPOSITORY"
+          else
+            gh release create "$RELEASE_TAG" "$APK_PATH" --repo "$GITHUB_REPOSITORY" \
+              --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes $RELEASE_FLAGS
+          fi

@@ -1,0 +1,21 @@
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
+
+group = 'dev.ambientmemo'
+version = '0.1.0'
+
+android {
+  namespace "dev.ambientmemo.bridge"
+  defaultConfig {
+    versionCode 1
+    versionName "0.1.0"
+  }
+}
+
+dependencies {
+  // engine/ は app.plugin.js が includeBuild で読み込む
+  implementation 'dev.ambientmemo.engine:android'
+  implementation 'com.facebook.react:react-android'
+}

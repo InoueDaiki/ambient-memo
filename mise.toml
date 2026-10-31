@@ -5,3 +5,63 @@ node = "24.21.0"
 pnpm = "12.10.1"
 # Android のビルド(Gradle)。Android SDK は Android Studio が入れたものを使う
 java = "temurin-17.0.14+7"
+
+[env]
+# CI のランナーでは ANDROID_HOME が設定済み。手元では Android Studio の場所を使う
+ANDROID_HOME = "{{ get_env(name='ANDROID_HOME', default=env.HOME ~ '/Library/Android/sdk') }}"
+EXPO_NO_TELEMETRY = "1"
+
+[tasks.setup]
+description = "依存関係をインストールする"
+run = "pnpm install"
+
+[tasks.lint]
+description = "lint と型検査(oxlint、oxfmt の確認、tsc、detekt、禁止する依存関係)"
+run = [
+  "pnpm lint",
+  "pnpm fmt:check",
+  "pnpm -r typecheck",
+  "engine/gradlew -p engine detekt",
+  "scripts/check-forbidden-deps.sh",
+]
+
+[tasks.fmt]
+description = "整形"
+run = "pnpm fmt"
+
+[tasks.test]
+description = "テスト(Vitest と JUnit)"
+depends = ["test:js", "test:engine"]
+
+[tasks."test:js"]
+description = "JS のテスト(Vitest)"
+run = "pnpm -r --if-present test"
+
+[tasks."test:engine"]
+description = "Kotlin のテスト(engine/ の JUnit)"
+dir = "engine"
+run = "./gradlew test"
+
+[tasks.mobile]
+description = "Metro を起動する。ビルドは mobile:android"
+run = "pnpm --dir apps/mobile start"
+
+[tasks."mobile:android"]
+description = "開発版をビルドして、エミュレーターか実機に入れる"
+run = "pnpm --dir apps/mobile exec expo run:android"
+
+[tasks."mobile:prebuild"]
+description = "apps/mobile/android を生成し直す(手で編集しない)"
+run = "pnpm --dir apps/mobile exec expo prebuild --platform android --clean --no-install"
+
+[tasks."build:android:debug"]
+description = "Debug の APK をビルドする(arm64)"
+depends = ["mobile:prebuild"]
+dir = "apps/mobile/android"
+run = "./gradlew :app:assembleDebug -PreactNativeArchitectures=arm64-v8a"
+
+[tasks."build:android:release"]
+description = "署名済みの Release APK をビルドする(arm64)。署名の環境変数は README の「署名鍵」を参照"
+depends = ["mobile:prebuild"]
+dir = "apps/mobile/android"
+run = "./gradlew :app:assembleRelease -PreactNativeArchitectures=arm64-v8a"

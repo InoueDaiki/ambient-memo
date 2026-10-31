@@ -4,7 +4,7 @@
 
 クラウドに頼らないエッジ完結の構成を試すことも、このプロジェクトの目的の1つ。
 
-> 状態: 構想段階。コードはまだない。決定事項は [docs/設計メモ.md](docs/設計メモ.md) を参照。
+> 状態: モノレポの骨組みと CI まで。機能はまだない。決定事項は [docs/設計メモ.md](docs/設計メモ.md) を参照。
 
 ## やりたいこと
 
@@ -60,7 +60,7 @@ flowchart LR
 - ローカル LLM の日本語での要約・抽出の品質
 - 1日動かしたときの電池消費と発熱
 
-## ディレクトリ構成(予定)
+## ディレクトリ構成
 
 ```text
 apps/mobile/              画面(React Native)
@@ -83,9 +83,70 @@ docs/                     設計メモ、テスト戦略
 
 ```bash
 mise install
+mise run setup
 ```
 
-Android SDK は Android Studio が入れたものを使う。
+Android SDK は Android Studio が入れたものを使う。`~/Library/Android/sdk` にない場合は `ANDROID_HOME` を設定する。
+
+| コマンド | 内容 |
+|---|---|
+| `mise run lint` | oxlint、oxfmt の確認、型検査、detekt、禁止する依存関係の確認 |
+| `mise run fmt` | JS / TS の整形 |
+| `mise run test` | Vitest と JUnit |
+| `mise run mobile` | Metro を起動する |
+| `mise run mobile:android` | 開発版をビルドして、エミュレーターか実機に入れる |
+| `mise run mobile:prebuild` | `apps/mobile/android` を生成し直す |
+| `mise run build:android:debug` | Debug の APK をビルドする(arm64) |
+| `mise run build:android:release` | 署名済みの Release APK をビルドする(arm64)。下の環境変数が要る |
+
+`apps/mobile/android` は生成物なのでコミットしない。ネイティブの設定は `apps/mobile/app.config.ts` と config plugin に書く。
+
+`engine/gradle/libs.versions.toml` の AGP と Kotlin は、React Native の版に揃える。
+
+## 配布
+
+| きっかけ | アプリ ID | 版 | 置き場所 |
+|---|---|---|---|
+| `v1.2.3` のタグを push | `dev.ambientmemo.app` | `1.2.3` | GitHub Releases |
+| Release のワークフローを `workflow_dispatch` で実行 | `dev.ambientmemo.app.dev` | `0.0.0-dev.<実行番号>` | GitHub Releases のプレリリース(`dev-<実行番号>`) |
+| 手元のビルド | `dev.ambientmemo.app.dev` | `0.1.0` | なし |
+
+`versionCode` は Release のワークフローの実行番号を使う。ワークフローのファイル名を変えると番号が振り直されるので変えない。
+
+### 署名鍵
+
+鍵が変わると上書きインストールできず、アンインストールすると端末内のメモも消える。鍵は一度だけ作り、GitHub Secrets とは別の場所(パスワードマネージャーなど)にも保管する。リポジトリにはコミットしない。
+
+GitHub Actions には次の Secrets を設定する。足りないと Release のワークフローは、足りない名前を表示して失敗する。
+
+| Secret | 内容 |
+|---|---|
+| `ANDROID_KEYSTORE_BASE64` | キーストアのファイルを base64 にしたもの |
+| `ANDROID_KEYSTORE_PASSWORD` | キーストアのパスワード |
+| `ANDROID_KEY_ALIAS` | 鍵の別名 |
+| `ANDROID_KEY_PASSWORD` | 鍵のパスワード |
+
+鍵の作り方と設定の例(パスワードは `keytool` の入力に従う。PKCS12 では鍵とキーストアのパスワードは同じになる):
+
+```bash
+mise exec -- keytool -genkeypair -v \
+  -keystore ambient-memo-release.keystore \
+  -alias ambient-memo -keyalg RSA -keysize 4096 -validity 36500
+
+base64 -i ambient-memo-release.keystore | gh secret set ANDROID_KEYSTORE_BASE64
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS --body ambient-memo
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+手元で Release をビルドするときは、次の環境変数を渡す。無ければ Release のビルドは失敗する(debug の鍵には切り替えない)。
+
+- `ANDROID_KEYSTORE_PATH`(キーストアのファイルの絶対パス)
+- `ANDROID_KEYSTORE_PASSWORD`
+- `ANDROID_KEY_ALIAS`
+- `ANDROID_KEY_PASSWORD`
+
+普段使いの版を手元でビルドするときは `APP_VARIANT=production` も渡す。
 
 ## プライバシー
 

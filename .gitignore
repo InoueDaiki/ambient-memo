@@ -31,3 +31,13 @@ apps/*/ios/
 *.litertlm
 *.wav
 *.m4a
+
+# Gradle
+.gradle/
+.kotlin/
+build/
+local.properties
+
+# 署名鍵
+*.jks
+*.keystore

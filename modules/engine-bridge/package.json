@@ -1,0 +1,22 @@
+{
+  "name": "@ambient-memo/engine-bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Expo Module。React Native と Kotlin のエンジンをつなぐ",
+  "main": "src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ambient-memo/engine-client": "workspace:*"
+  },
+  "devDependencies": {
+    "expo": "58.0.22",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "expo": "*"
+  }
+}

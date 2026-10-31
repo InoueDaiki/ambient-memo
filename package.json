@@ -1,0 +1,14 @@
+{
+  "name": "ambient-memo",
+  "private": true,
+  "scripts": {
+    "lint": "oxlint",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "devDependencies": {
+    "oxfmt": "0.75.0",
+    "oxlint": "1.90.0"
+  },
+  "packageManager": "pnpm@12.10.1"
+}
