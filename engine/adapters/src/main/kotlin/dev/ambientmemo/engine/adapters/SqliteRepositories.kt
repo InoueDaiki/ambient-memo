@@ -39,7 +39,7 @@ class SqliteUtteranceRepository(
     override suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance> =
         withContext(ioContext) {
             database.utteranceQueries
-                .listOverlapping(toMillis, fromMillis) { id, startedAt, endedAt, body, confidence, createdAt ->
+                .listOverlapping(toMillis, fromMillis) { id, startedAt, endedAt, body, confidence, createdAt, _ ->
                     Utterance(id, startedAt, endedAt, body, confidence, createdAt)
                 }
                 .executeAsList()
@@ -47,7 +47,7 @@ class SqliteUtteranceRepository(
 
     override suspend fun listRecent(limit: Int): List<Utterance> = withContext(ioContext) {
         database.utteranceQueries
-            .listRecent(limit.toLong()) { id, startedAt, endedAt, body, confidence, createdAt ->
+            .listRecent(limit.toLong()) { id, startedAt, endedAt, body, confidence, createdAt, _ ->
                 Utterance(id, startedAt, endedAt, body, confidence, createdAt)
             }
             .executeAsList()

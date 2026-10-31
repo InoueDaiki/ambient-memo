@@ -6,6 +6,7 @@ import dev.ambientmemo.engine.domain.CaptureGap
 import dev.ambientmemo.engine.domain.CaptureGapReason
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.testing.CaptureGapRepositoryContract
+import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
 import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -39,6 +40,22 @@ class SqliteCaptureGapRepositoryContractTest : CaptureGapRepositoryContract() {
     override fun repository(): SqliteCaptureGapRepository {
         driver = openTestDriver(dir.resolve("test.db"))
         return SqliteCaptureGapRepository(AmbientMemoDatabase(driver))
+    }
+
+    @AfterEach
+    fun closeDriver() = driver.close()
+}
+
+class SqliteMemoRepositoryContractTest : MemoRepositoryContract() {
+    @TempDir
+    lateinit var dir: Path
+
+    private lateinit var driver: JdbcSqliteDriver
+
+    override fun stores(): Stores {
+        driver = openTestDriver(dir.resolve("test.db"))
+        val database = AmbientMemoDatabase(driver)
+        return Stores(SqliteUtteranceRepository(database), SqliteMemoRepository(database))
     }
 
     @AfterEach

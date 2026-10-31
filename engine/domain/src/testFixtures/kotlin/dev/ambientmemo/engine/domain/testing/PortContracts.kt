@@ -5,6 +5,8 @@ package dev.ambientmemo.engine.domain.testing
 import dev.ambientmemo.engine.domain.AudioFrame
 import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.Clock
+import dev.ambientmemo.engine.domain.Llm
+import dev.ambientmemo.engine.domain.LlmRequest
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.Transcriber
@@ -210,5 +212,25 @@ abstract class SpeakerEmbedderContract {
         embedder().embed(segment)
 
         assertFalse(segment.isReleased)
+    }
+}
+
+/** [Llm] の契約テスト。 */
+abstract class LlmContract {
+    protected abstract fun llm(): Llm
+
+    private val request = LlmRequest("あなたは整理係です。", "「はい」とだけ答えてください。", maxOutputTokens = 16)
+
+    @Test
+    fun `モデルの版を持つ`() {
+        assertTrue(llm().modelVersion.isNotBlank())
+    }
+
+    @Test
+    fun `同じインスタンスで続けて生成できる`() = runTest {
+        val llm = llm()
+
+        llm.generate(request)
+        llm.generate(request)
     }
 }

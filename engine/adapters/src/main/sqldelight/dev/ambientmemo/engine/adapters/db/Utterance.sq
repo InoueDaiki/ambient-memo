@@ -6,11 +6,15 @@ CREATE TABLE utterance (
   body TEXT NOT NULL,
   confidence REAL,
   created_at_ms INTEGER NOT NULL,
+  organized_at_ms INTEGER,
   CHECK (ended_at_ms >= started_at_ms),
   CHECK (confidence IS NULL OR confidence BETWEEN 0.0 AND 1.0)
 );
 
 CREATE INDEX utterance_started_at ON utterance (started_at_ms);
+
+-- 整理ジョブが未処理の発話だけを読む。organized_at_ms が NULL の行が未処理
+CREATE INDEX utterance_unorganized ON utterance (started_at_ms, id) WHERE organized_at_ms IS NULL;
 
 insert:
 INSERT INTO utterance (started_at_ms, ended_at_ms, body, confidence, created_at_ms)
@@ -30,3 +34,19 @@ SELECT *
 FROM utterance
 ORDER BY started_at_ms DESC, id DESC
 LIMIT :limit;
+
+listUnorganized:
+SELECT *
+FROM utterance
+WHERE organized_at_ms IS NULL
+ORDER BY started_at_ms, id;
+
+countUnorganized:
+SELECT count(*)
+FROM utterance
+WHERE id = :id AND organized_at_ms IS NULL;
+
+markOrganized:
+UPDATE utterance
+SET organized_at_ms = :organizedAtMillis
+WHERE id = :id AND organized_at_ms IS NULL;

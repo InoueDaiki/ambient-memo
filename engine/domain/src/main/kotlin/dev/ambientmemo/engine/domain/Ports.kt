@@ -61,3 +61,36 @@ interface CaptureGapRepository {
     /** `[fromMillis, toMillis)` と重なる欠落を、開始時刻の順に返す。 */
     suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<CaptureGap>
 }
+
+/** プロンプトから文章を生成する。出力の形式は保証しない。解析と検証は `domain` で行う。 */
+interface Llm {
+    /** 出力を作るモデルの版。メモに残し、モデルを変えたときに比べられるようにする。 */
+    val modelVersion: String
+
+    /** 実行基盤が動かないときは例外を投げる。入力に問題がないのに出力が空のときは、空文字列を返す。 */
+    suspend fun generate(request: LlmRequest): String
+}
+
+/** 整理の結果の記録。DB に書くのはエンジンだけなので、書き込みはこの境界に閉じる。 */
+interface MemoRepository {
+    /** 処理済みの印がない発話を、開始時刻、id の順に返す。 */
+    suspend fun listUnorganizedUtterances(): List<Utterance>
+
+    /**
+     * メモ、ToDo、根拠の発話の処理済みの印を、1つのトランザクションで記録する。
+     * 根拠の発話に、存在しないものか処理済みのものがあれば、何も書かずに null を返す。
+     */
+    suspend fun recordMemo(memo: NewMemo): Memo?
+
+    /** 発話を、メモを作らずに処理済みにする。処理済みの発話はそのままにする。 */
+    suspend fun markOrganized(utteranceIds: List<Long>, organizedAtMillis: Long)
+
+    /** メモを開始時刻、id の順に返す。 */
+    suspend fun listMemos(): List<Memo>
+
+    /** [memoId] の根拠の発話の id を、開始時刻、id の順に返す。 */
+    suspend fun listUtteranceIds(memoId: Long): List<Long>
+
+    /** [memoId] の ToDo を、記録した順に返す。 */
+    suspend fun listTodos(memoId: Long): List<Todo>
+}
