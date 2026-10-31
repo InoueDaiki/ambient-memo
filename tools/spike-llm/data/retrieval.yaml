@@ -1,0 +1,35 @@
+# 検索の小実験用の質問。文書は eval.yaml の test の会話。
+# kind:
+#   direct      会話と同じ言葉を使う質問
+#   paraphrase  言い換え。会話の言葉をほとんど使わない
+#   asr         文書側の表記が ASR の誤りで崩れている
+- {q: 青葉商事の見積もりはどうなった, id: c01, kind: asr}
+- {q: 来週の怪奇の場所が変わった話, id: c01, kind: direct}
+- {q: 週末のアウトドアの予定を中止した話, id: c02, kind: paraphrase}
+- {q: 義母の誕生日のお祝いの準備, id: c02, kind: paraphrase}
+- {q: 車の定期点検の期限, id: c03, kind: paraphrase}
+- {q: 血液検査の前に食事を抜く指示, id: c04, kind: paraphrase}
+- {q: 子どものピクニックの持ち物, id: c06, kind: paraphrase}
+- {q: 検証用サーバーが何度も止まった原因, id: c07, kind: paraphrase}
+- {q: 亡くなった父の法事の日程, id: c08, kind: paraphrase}
+- {q: 新幹線の切符を取る話, id: c08, kind: direct}
+- {q: 荷物を運ぶ業者の料金, id: c09, kind: paraphrase}
+- {q: 来期の目標シートの締切, id: c10, kind: direct}
+- {q: 手作りのお菓子の担当, id: c11, kind: paraphrase}
+- {q: 家電の購入を検討した話, id: c12, kind: paraphrase}
+- {q: 地域の避難の練習の日程, id: c13, kind: paraphrase}
+- {q: ぼうさいくんれんはいつ, id: c13, kind: asr}
+- {q: 賃貸の契約の延長に必要なお金, id: c15, kind: paraphrase}
+- {q: 研究室の輪読の発表の順番, id: c16, kind: direct}
+- {q: 物流会社のシステム入れ替えの要望, id: c18, kind: paraphrase}
+- {q: 髪を切る予約をずらした件, id: c19, kind: paraphrase}
+- {q: 車の保険料を安くする相談, id: c20, kind: paraphrase}
+- {q: 確定申告の相談に持っていくもの, id: c21, kind: paraphrase}
+- {q: 親知らずの抜歯の紹介先, id: c24, kind: direct}
+- {q: カタログの価格の間違い, id: c25, kind: direct}
+- {q: 親の介護サービスを増やす費用, id: c26, kind: paraphrase}
+- {q: 中途採用の候補者を次の選考に進める判断, id: c27, kind: paraphrase}
+- {q: 年末年始の家族旅行の行き先, id: c28, kind: direct}
+- {q: 冬用のタイヤ交換, id: c28, kind: paraphrase}
+- {q: 新入社員向けの教育の教材と人数, id: c30, kind: paraphrase}
+- {q: 結婚祝いの現金を用意する話, id: c23, kind: paraphrase}

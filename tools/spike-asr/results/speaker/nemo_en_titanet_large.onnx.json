@@ -1,0 +1,50 @@
+{
+ "model": "nemo_en_titanet_large.onnx",
+ "dim": 192,
+ "load_s": 0.13,
+ "by": {
+  "clean/full": {
+   "eer_pct": 0.3,
+   "eer_samegender_eval_pct": 0.76,
+   "th_far1": 0.62,
+   "eval_far_pct": 3.7,
+   "eval_frr_pct": 0.2,
+   "trials": 21000
+  },
+  "clean/3s": {
+   "eer_pct": 0.5,
+   "eer_samegender_eval_pct": 0.79,
+   "th_far1": 0.605,
+   "eval_far_pct": 3.42,
+   "eval_frr_pct": 0.0,
+   "trials": 21000
+  },
+  "clean/1.5s": {
+   "eer_pct": 2.89,
+   "eer_samegender_eval_pct": 4.6,
+   "th_far1": 0.566,
+   "eval_far_pct": 2.88,
+   "eval_frr_pct": 4.0,
+   "trials": 21000
+  },
+  "snr10/3s": {
+   "eer_pct": 1.7,
+   "eer_samegender_eval_pct": 2.95,
+   "th_far1": 0.588,
+   "eval_far_pct": 3.13,
+   "eval_frr_pct": 1.2,
+   "trials": 21000
+  },
+  "far/3s": {
+   "eer_pct": 6.6,
+   "eer_samegender_eval_pct": 8.8,
+   "th_far1": 0.536,
+   "eval_far_pct": 1.63,
+   "eval_frr_pct": 18.2,
+   "trials": 21000
+  }
+ },
+ "rtf": 0.0183,
+ "size_mb": 101.4,
+ "rss_peak_mb": 4345.4
+}

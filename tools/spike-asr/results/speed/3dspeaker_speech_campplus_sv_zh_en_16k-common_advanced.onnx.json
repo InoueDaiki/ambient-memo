@@ -1,0 +1,9 @@
+{
+ "kind": "speaker",
+ "model": "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+ "audio_s": 313.4,
+ "rtf_1thread": 0.00526,
+ "rss_base_mb": 74.4,
+ "rss_peak_mb": 206.8,
+ "rss_added_mb": 132.4
+}

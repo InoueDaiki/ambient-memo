@@ -1,0 +1,13 @@
+[project]
+name = "spike-llm"
+version = "0"
+description = "ローカル LLM の検証。アプリには含めない"
+requires-python = "==3.12.*"
+dependencies = [
+  "litert-lm-api==0.19.0",
+  "numpy",
+  "pyyaml",
+]
+
+[tool.uv]
+package = false

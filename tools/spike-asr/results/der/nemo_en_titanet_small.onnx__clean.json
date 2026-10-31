@@ -1,0 +1,60 @@
+{
+ "embed": "nemo_en_titanet_small.onnx",
+ "cond": "clean",
+ "n_conv": 30,
+ "n_dev": 10,
+ "offline": {
+  "cluster_th": 0.7,
+  "nocollar": {
+   "der_pct": 28.41,
+   "miss_pct": 1.46,
+   "fa_pct": 11.5,
+   "conf_pct": 15.44
+  },
+  "collar025": {
+   "der_pct": 15.51,
+   "miss_pct": 0.07,
+   "fa_pct": 0.2,
+   "conf_pct": 15.25
+  },
+  "rtf": 0.0435
+ },
+ "app": {
+  "cluster_th": 0.5,
+  "th_self": 0.6,
+  "min_silence": 0.5,
+  "nocollar": {
+   "der_pct": 31.39,
+   "miss_pct": 2.24,
+   "fa_pct": 16.76,
+   "conf_pct": 12.39
+  },
+  "collar025": {
+   "der_pct": 17.67,
+   "miss_pct": 0.22,
+   "fa_pct": 5.16,
+   "conf_pct": 12.29
+  },
+  "self_recall_pct": 88.9,
+  "other_as_self_pct": 6.56
+ },
+ "app_sil02": {
+  "cluster_th": 0.5,
+  "th_self": 0.6,
+  "min_silence": 0.2,
+  "nocollar": {
+   "der_pct": 16.42,
+   "miss_pct": 3.58,
+   "fa_pct": 5.05,
+   "conf_pct": 7.79
+  },
+  "collar025": {
+   "der_pct": 7.31,
+   "miss_pct": 0.48,
+   "fa_pct": 0.0,
+   "conf_pct": 6.84
+  },
+  "self_recall_pct": 84.0,
+  "other_as_self_pct": 1.02
+ }
+}

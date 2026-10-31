@@ -1,0 +1,31 @@
+{
+ "model": "zipformer-multi-streaming",
+ "kind": "online",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 14.58,
+  "ci95": [
+   11.44,
+   18.25
+  ]
+ },
+ "cer_kana": {
+  "cer": 7.89,
+  "ci95": [
+   5.43,
+   10.67
+  ]
+ },
+ "rtf": 0.0504,
+ "latency_p50_s": 0.272,
+ "latency_p95_s": 0.499,
+ "load_s": 1.24,
+ "disk_mb": 339.3,
+ "rss_base_mb": 78.2,
+ "rss_after_load_mb": 842.8,
+ "rss_peak_mb": 902.5,
+ "first_partial_s_mean": 1.17
+}

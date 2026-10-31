@@ -1,0 +1,272 @@
+{
+ "c01": {
+  "A": "gemma-e2b-gguf",
+  "B": "gemma-e4b-think",
+  "C": "gemma-e2b",
+  "D": "qwen3-4b",
+  "E": "gemma-e2b-think",
+  "F": "gemma-e4b",
+  "G": "lfm-jp"
+ },
+ "c02": {
+  "A": "gemma-e2b-gguf",
+  "B": "lfm-jp",
+  "C": "gemma-e2b",
+  "D": "gemma-e2b-think",
+  "E": "qwen3-4b",
+  "F": "gemma-e4b",
+  "G": "gemma-e4b-think"
+ },
+ "c03": {
+  "A": "gemma-e2b-think",
+  "B": "gemma-e2b",
+  "C": "lfm-jp",
+  "D": "gemma-e2b-gguf",
+  "E": "gemma-e4b",
+  "F": "qwen3-4b",
+  "G": "gemma-e4b-think"
+ },
+ "c04": {
+  "A": "gemma-e2b-gguf",
+  "B": "gemma-e4b-think",
+  "C": "gemma-e2b-think",
+  "D": "gemma-e2b",
+  "E": "lfm-jp",
+  "F": "qwen3-4b",
+  "G": "gemma-e4b"
+ },
+ "c05": {
+  "A": "lfm-jp",
+  "B": "gemma-e2b",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b-think",
+  "E": "gemma-e4b",
+  "F": "gemma-e4b-think",
+  "G": "gemma-e2b-gguf"
+ },
+ "c06": {
+  "A": "gemma-e4b",
+  "B": "gemma-e2b-gguf",
+  "C": "gemma-e2b",
+  "D": "gemma-e4b-think",
+  "E": "lfm-jp",
+  "F": "gemma-e2b-think",
+  "G": "qwen3-4b"
+ },
+ "c07": {
+  "A": "gemma-e2b",
+  "B": "gemma-e4b",
+  "C": "gemma-e4b-think",
+  "D": "gemma-e2b-think",
+  "E": "lfm-jp",
+  "F": "qwen3-4b",
+  "G": "gemma-e2b-gguf"
+ },
+ "c08": {
+  "A": "gemma-e4b",
+  "B": "gemma-e2b-think",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b-gguf",
+  "E": "gemma-e4b-think",
+  "F": "lfm-jp",
+  "G": "gemma-e2b"
+ },
+ "c09": {
+  "A": "gemma-e2b-think",
+  "B": "gemma-e4b",
+  "C": "qwen3-4b",
+  "D": "gemma-e4b-think",
+  "E": "gemma-e2b",
+  "F": "lfm-jp",
+  "G": "gemma-e2b-gguf"
+ },
+ "c10": {
+  "A": "gemma-e4b",
+  "B": "gemma-e2b-gguf",
+  "C": "gemma-e2b-think",
+  "D": "gemma-e2b",
+  "E": "lfm-jp",
+  "F": "qwen3-4b",
+  "G": "gemma-e4b-think"
+ },
+ "c11": {
+  "A": "gemma-e4b",
+  "B": "gemma-e4b-think",
+  "C": "lfm-jp",
+  "D": "qwen3-4b",
+  "E": "gemma-e2b-think",
+  "F": "gemma-e2b-gguf",
+  "G": "gemma-e2b"
+ },
+ "c12": {
+  "A": "gemma-e4b-think",
+  "B": "gemma-e2b",
+  "C": "lfm-jp",
+  "D": "qwen3-4b",
+  "E": "gemma-e2b-think",
+  "F": "gemma-e4b",
+  "G": "gemma-e2b-gguf"
+ },
+ "c13": {
+  "A": "qwen3-4b",
+  "B": "gemma-e2b-think",
+  "C": "gemma-e2b",
+  "D": "lfm-jp",
+  "E": "gemma-e4b-think",
+  "F": "gemma-e2b-gguf",
+  "G": "gemma-e4b"
+ },
+ "c14": {
+  "A": "gemma-e2b-think",
+  "B": "gemma-e2b-gguf",
+  "C": "gemma-e4b-think",
+  "D": "lfm-jp",
+  "E": "gemma-e2b",
+  "F": "qwen3-4b",
+  "G": "gemma-e4b"
+ },
+ "c15": {
+  "A": "lfm-jp",
+  "B": "gemma-e2b-gguf",
+  "C": "gemma-e4b",
+  "D": "qwen3-4b",
+  "E": "gemma-e2b",
+  "F": "gemma-e2b-think",
+  "G": "gemma-e4b-think"
+ },
+ "c16": {
+  "A": "gemma-e4b",
+  "B": "gemma-e2b-think",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b-gguf",
+  "E": "gemma-e4b-think",
+  "F": "gemma-e2b",
+  "G": "lfm-jp"
+ },
+ "c17": {
+  "A": "gemma-e2b",
+  "B": "gemma-e2b-gguf",
+  "C": "lfm-jp",
+  "D": "qwen3-4b",
+  "E": "gemma-e4b",
+  "F": "gemma-e4b-think",
+  "G": "gemma-e2b-think"
+ },
+ "c18": {
+  "A": "gemma-e4b-think",
+  "B": "gemma-e4b",
+  "C": "gemma-e2b-think",
+  "D": "qwen3-4b",
+  "E": "gemma-e2b",
+  "F": "lfm-jp",
+  "G": "gemma-e2b-gguf"
+ },
+ "c19": {
+  "A": "lfm-jp",
+  "B": "gemma-e2b",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b-think",
+  "E": "gemma-e4b-think",
+  "F": "gemma-e4b",
+  "G": "gemma-e2b-gguf"
+ },
+ "c20": {
+  "A": "gemma-e2b-gguf",
+  "B": "gemma-e4b-think",
+  "C": "qwen3-4b",
+  "D": "gemma-e4b",
+  "E": "gemma-e2b-think",
+  "F": "lfm-jp",
+  "G": "gemma-e2b"
+ },
+ "c21": {
+  "A": "lfm-jp",
+  "B": "qwen3-4b",
+  "C": "gemma-e4b-think",
+  "D": "gemma-e2b-think",
+  "E": "gemma-e2b-gguf",
+  "F": "gemma-e4b",
+  "G": "gemma-e2b"
+ },
+ "c22": {
+  "A": "gemma-e2b",
+  "B": "gemma-e2b-think",
+  "C": "lfm-jp",
+  "D": "gemma-e4b",
+  "E": "gemma-e2b-gguf",
+  "F": "qwen3-4b",
+  "G": "gemma-e4b-think"
+ },
+ "c23": {
+  "A": "lfm-jp",
+  "B": "gemma-e4b",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b-think",
+  "E": "gemma-e2b",
+  "F": "gemma-e4b-think",
+  "G": "gemma-e2b-gguf"
+ },
+ "c24": {
+  "A": "gemma-e2b-think",
+  "B": "gemma-e2b-gguf",
+  "C": "qwen3-4b",
+  "D": "gemma-e2b",
+  "E": "gemma-e4b-think",
+  "F": "gemma-e4b",
+  "G": "lfm-jp"
+ },
+ "c25": {
+  "A": "lfm-jp",
+  "B": "gemma-e2b-think",
+  "C": "gemma-e4b",
+  "D": "gemma-e2b-gguf",
+  "E": "gemma-e4b-think",
+  "F": "qwen3-4b",
+  "G": "gemma-e2b"
+ },
+ "c26": {
+  "A": "lfm-jp",
+  "B": "qwen3-4b",
+  "C": "gemma-e2b-gguf",
+  "D": "gemma-e2b",
+  "E": "gemma-e2b-think",
+  "F": "gemma-e4b-think",
+  "G": "gemma-e4b"
+ },
+ "c27": {
+  "A": "lfm-jp",
+  "B": "gemma-e2b-gguf",
+  "C": "gemma-e4b",
+  "D": "gemma-e4b-think",
+  "E": "gemma-e2b",
+  "F": "gemma-e2b-think",
+  "G": "qwen3-4b"
+ },
+ "c28": {
+  "A": "gemma-e2b-gguf",
+  "B": "gemma-e4b-think",
+  "C": "qwen3-4b",
+  "D": "lfm-jp",
+  "E": "gemma-e4b",
+  "F": "gemma-e2b",
+  "G": "gemma-e2b-think"
+ },
+ "c29": {
+  "A": "gemma-e2b-think",
+  "B": "gemma-e2b",
+  "C": "lfm-jp",
+  "D": "gemma-e4b",
+  "E": "qwen3-4b",
+  "F": "gemma-e4b-think",
+  "G": "gemma-e2b-gguf"
+ },
+ "c30": {
+  "A": "gemma-e4b",
+  "B": "qwen3-4b",
+  "C": "lfm-jp",
+  "D": "gemma-e2b-gguf",
+  "E": "gemma-e2b-think",
+  "F": "gemma-e2b",
+  "G": "gemma-e4b-think"
+ }
+}

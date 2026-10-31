@@ -1,0 +1,50 @@
+{
+ "model": "wespeaker_en_voxceleb_CAM++_LM.onnx",
+ "dim": 512,
+ "load_s": 0.52,
+ "by": {
+  "clean/full": {
+   "eer_pct": 44.71,
+   "eer_samegender_eval_pct": 46.42,
+   "th_far1": 0.887,
+   "eval_far_pct": 1.49,
+   "eval_frr_pct": 97.2,
+   "trials": 21000
+  },
+  "clean/3s": {
+   "eer_pct": 46.78,
+   "eer_samegender_eval_pct": 49.2,
+   "th_far1": 0.769,
+   "eval_far_pct": 5.51,
+   "eval_frr_pct": 89.6,
+   "trials": 21000
+  },
+  "clean/1.5s": {
+   "eer_pct": 49.9,
+   "eer_samegender_eval_pct": 50.24,
+   "th_far1": 0.531,
+   "eval_far_pct": 0.56,
+   "eval_frr_pct": 99.8,
+   "trials": 21000
+  },
+  "snr10/3s": {
+   "eer_pct": 48.41,
+   "eer_samegender_eval_pct": 50.82,
+   "th_far1": 0.714,
+   "eval_far_pct": 3.42,
+   "eval_frr_pct": 94.0,
+   "trials": 21000
+  },
+  "far/3s": {
+   "eer_pct": 48.7,
+   "eer_samegender_eval_pct": 49.4,
+   "th_far1": 0.699,
+   "eval_far_pct": 2.71,
+   "eval_frr_pct": 96.0,
+   "trials": 21000
+  }
+ },
+ "rtf": 0.0146,
+ "size_mb": 29.3,
+ "rss_peak_mb": 4077.2
+}

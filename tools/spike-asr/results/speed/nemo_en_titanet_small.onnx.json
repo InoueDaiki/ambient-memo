@@ -1,0 +1,9 @@
+{
+ "kind": "speaker",
+ "model": "nemo_en_titanet_small.onnx",
+ "audio_s": 313.4,
+ "rtf_1thread": 0.00364,
+ "rss_base_mb": 74.4,
+ "rss_peak_mb": 381.9,
+ "rss_added_mb": 307.5
+}
