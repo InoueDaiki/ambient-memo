@@ -1,0 +1,31 @@
+{
+ "model": "nemotron35-160ms",
+ "kind": "online",
+ "cond": "clean",
+ "threads": 2,
+ "n": 300,
+ "audio_s": 1769.5,
+ "cer_surface": {
+  "cer": 12.42,
+  "ci95": [
+   11.22,
+   13.68
+  ]
+ },
+ "cer_kana": {
+  "cer": 7.0,
+  "ci95": [
+   6.01,
+   8.09
+  ]
+ },
+ "rtf": 2.2457,
+ "latency_p50_s": 9.17,
+ "latency_p95_s": 37.351,
+ "load_s": 3.27,
+ "disk_mb": 682.2,
+ "rss_base_mb": 174.0,
+ "rss_after_load_mb": 1979.0,
+ "rss_peak_mb": 1979.0,
+ "first_partial_s_mean": 1.18
+}

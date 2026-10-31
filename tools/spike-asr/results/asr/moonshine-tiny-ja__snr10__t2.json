@@ -1,0 +1,31 @@
+{
+ "model": "moonshine-tiny-ja",
+ "kind": "offline",
+ "cond": "snr10",
+ "threads": 2,
+ "n": 300,
+ "audio_s": 1769.5,
+ "cer_surface": {
+  "cer": 10.06,
+  "ci95": [
+   8.62,
+   11.4
+  ]
+ },
+ "cer_kana": {
+  "cer": 4.31,
+  "ci95": [
+   3.42,
+   5.19
+  ]
+ },
+ "rtf": 0.3048,
+ "latency_p50_s": 1.538,
+ "latency_p95_s": 3.38,
+ "load_s": 4.12,
+ "disk_mb": 72.1,
+ "rss_base_mb": 1205.6,
+ "rss_after_load_mb": 1205.6,
+ "rss_peak_mb": 1205.6,
+ "first_partial_s_mean": null
+}

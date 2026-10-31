@@ -1,0 +1,26 @@
+{
+ "model": "nemotron35-1120ms",
+ "vad": "silero_vad.onnx",
+ "ctx": 0.0,
+ "zero": 0.0,
+ "min_silence": 0.5,
+ "e2e": {
+  "clean": {
+   "segments": 134,
+   "utts": 80,
+   "cer_surface": 39.43,
+   "cer_kana": 35.6
+  },
+  "snr10": {
+   "segments": 88,
+   "utts": 80,
+   "cer_surface": 35.64,
+   "cer_kana": 32.47
+  }
+ },
+ "noise_only": {
+  "segments": 225,
+  "with_text_pct": 0.0,
+  "mean_chars": 0.0
+ }
+}

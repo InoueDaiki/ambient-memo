@@ -1,0 +1,26 @@
+{
+ "model": "zipformer-multi-streaming",
+ "vad": "silero_vad.onnx",
+ "ctx": 0.3,
+ "zero": 0.3,
+ "min_silence": 0.5,
+ "e2e": {
+  "clean": {
+   "segments": 134,
+   "utts": 80,
+   "cer_surface": 13.2,
+   "cer_kana": 6.27
+  },
+  "snr10": {
+   "segments": 88,
+   "utts": 80,
+   "cer_surface": 11.22,
+   "cer_kana": 5.64
+  }
+ },
+ "noise_only": {
+  "segments": 225,
+  "with_text_pct": 70.7,
+  "mean_chars": 1.3
+ }
+}

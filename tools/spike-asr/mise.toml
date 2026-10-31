@@ -1,0 +1,8 @@
+# ASR 検証の専用ツール。java はルートの mise.toml を引き継ぐ
+[tools]
+python = "3.12.16"
+uv = "0.13.6"
+kotlin = "2.4.21"
+
+[env]
+UV_PROJECT_ENVIRONMENT = ".venv"

@@ -1,0 +1,257 @@
+{
+ "sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-ar_en_id_ja_ru_th_vi_zh-2025-02-10.tar.bz2",
+  "bytes": 258999581,
+  "sha256": "28044b67324f7f831689f0a3761473dd2ade380e93aa53f1dbcd479ef71c40d4"
+ },
+ "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-160ms-int8-2026-06-11": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-160ms-int8-2026-06-11.tar.bz2",
+  "bytes": 475273363,
+  "sha256": "a81909a1780d84cff16d73c15e13e67d9d81d8839faf14870d507d8499f7a61a"
+ },
+ "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-560ms-int8-2026-06-11.tar.bz2",
+  "bytes": 475271763,
+  "sha256": "c6bf5e0df765f9d5b43bc9e0536d4b4b3e7d40bdf5ecf13e45f134c51c05ae3a"
+ },
+ "sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemotron-3.5-asr-streaming-0.6b-1120ms-int8-2026-06-11.tar.bz2",
+  "bytes": 475276334,
+  "sha256": "adbdd5e9fef87300c37cebfcfc4f1ebe56845c860c8a760af0a1dd65ce9beed3"
+ },
+ "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17.tar.bz2",
+  "bytes": 163002883,
+  "sha256": "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e"
+ },
+ "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2025-09-09.tar.bz2",
+  "bytes": 165783878,
+  "sha256": "7305f7905bfcf77fa0b39388a313f3da35c68d971661a65475b56fb2162c8e63"
+ },
+ "sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01.tar.bz2",
+  "bytes": 713097333,
+  "sha256": "e0981d0d5d7b446d41010831b59091ebf57d2aa7b79980f67ca37af460b5842d"
+ },
+ "sherpa-onnx-zipformer-ja-en-reazonspeech-2025-01-17": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-zipformer-ja-en-reazonspeech-2025-01-17.tar.bz2",
+  "bytes": 437969761,
+  "sha256": "dc03758608c0280e2cbcaac4597467ffcf846ae0b06436f1706738a11da86f5d"
+ },
+ "sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-parakeet-tdt_ctc-0.6b-ja-35000-int8.tar.bz2",
+  "bytes": 489389564,
+  "sha256": "4b0a800ef29f4f4c8667339bf6f60d5bfdc2852ddc9dc5741aea65b6f8d1306b"
+ },
+ "sherpa-onnx-moonshine-tiny-ja-quantized-2026-02-27": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-tiny-ja-quantized-2026-02-27.tar.bz2",
+  "bytes": 47889565,
+  "sha256": "880305c9a6c33572ab269ff9731977ea42ca34c8cffcdd5d99558a9ea2b47cc2"
+ },
+ "sherpa-onnx-moonshine-base-ja-quantized-2026-02-27": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-moonshine-base-ja-quantized-2026-02-27.tar.bz2",
+  "bytes": 104162109,
+  "sha256": "c66eb87d229a52d43bbe3b7c52a1d23f6208c0fd7c2e81802ecbda83b192798a"
+ },
+ "sherpa-onnx-whisper-tiny": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.tar.bz2",
+  "bytes": 116204861,
+  "sha256": "c46116994e539aa165266d96b325252728429c12535eb9d8b6a2b10f129e66b1"
+ },
+ "sherpa-onnx-whisper-base": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-base.tar.bz2",
+  "bytes": 207557382,
+  "sha256": "911b2083efd7c0dca2ac3b358b75222660dc09fb716d64fbfc417ba6c99ff3de"
+ },
+ "sherpa-onnx-whisper-small": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-small.tar.bz2",
+  "bytes": 639387718,
+  "sha256": "486a46afbb7ba798507190ffe02fea2dd726049af212e774537efac6afb210a6"
+ },
+ "sherpa-onnx-whisper-turbo": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-turbo.tar.bz2",
+  "bytes": 563790207,
+  "sha256": "b11acbbcd660b44a8e0df33724feb5aaa709cf65668f2823d59f656312544f22"
+ },
+ "sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-qwen3-asr-0.6B-int8-2026-03-25.tar.bz2",
+  "bytes": 878702423,
+  "sha256": "393f8a14e2f5fb96746aaab342997a40641001fbd5bf9592a080a8329178ee96"
+ },
+ "sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-cohere-transcribe-14-lang-int8-2026-04-01.tar.bz2",
+  "bytes": 1699791751,
+  "sha256": "bd582588d50685a795dcd2807ab77e11361b8312d96c53884682def45ab4206d"
+ },
+ "sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-int8-2026-02-05": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-omnilingual-asr-1600-languages-300M-ctc-v2-int8-2026-02-05.tar.bz2",
+  "bytes": 292313120,
+  "sha256": "951b32409aade32bd525310bb39e9666773ba3fc611a39e817f620936d76c631"
+ },
+ "silero_vad.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.onnx",
+  "bytes": 643854,
+  "sha256": "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6"
+ },
+ "silero_vad.int8.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad.int8.onnx",
+  "bytes": 212860,
+  "sha256": "c36d490aff5ab924ca6c7aeec4d8f6bd3d22db6fa17611b9c5b17eae58ac3a20"
+ },
+ "silero_vad_v5.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad_v5.onnx",
+  "bytes": 2313101,
+  "sha256": "6b99cbfd39246b6706f98ec13c7c50c6b299181f2474fa05cbc8046acc274396"
+ },
+ "silero_vad_v4.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/silero_vad_v4.onnx",
+  "bytes": 1807522,
+  "sha256": "a35ebf52fd3ce5f1469b2a36158dba761bc47b973ea3382b3186ca15b1f5af28"
+ },
+ "ten-vad.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.onnx",
+  "bytes": 332211,
+  "sha256": "718cb7eef47e3cf5ddbe7e967a7503f46b8b469c0706872f494dfa921b486206"
+ },
+ "ten-vad.int8.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/ten-vad.int8.onnx",
+  "bytes": 129534,
+  "sha256": "880c072f188efa169ea028b2159d1b3a438e153d080b87eac31b74ecad511e61"
+ },
+ "wespeaker_en_voxceleb_CAM++_LM.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_CAM++_LM.onnx",
+  "bytes": 29292687,
+  "sha256": "e197af7e9d473030cf486b3124149a19bf37014d0e4485e4c70c483b0ec10cb2"
+ },
+ "wespeaker_en_voxceleb_resnet34_LM.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet34_LM.onnx",
+  "bytes": 26530550,
+  "sha256": "e9848563da86f263117134dfd7ad63c92355b37de492b55e325400c9d9c39012"
+ },
+ "wespeaker_en_voxceleb_resnet152_LM.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_resnet152_LM.onnx",
+  "bytes": 79158470,
+  "sha256": "3e1c2c7a02097bdddc27c1cf7382237399abdc3b5b682e59455830673c6686e7"
+ },
+ "wespeaker_zh_cnceleb_resnet34_LM.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_zh_cnceleb_resnet34_LM.onnx",
+  "bytes": 26530548,
+  "sha256": "87d1d5068397f3792c730570b53d66cd8be1da7ea22dd04f5b6706d96a3cd168"
+ },
+ "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+  "bytes": 28281164,
+  "sha256": "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2"
+ },
+ "3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx",
+  "bytes": 71441526,
+  "sha256": "bf1a75b9930474cf3389ef415e6e5d38ca96fea4a3a00f7e301d080a58ee2239"
+ },
+ "3dspeaker_speech_eres2net_base_200k_sv_zh-cn_16k-common.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/3dspeaker_speech_eres2net_base_200k_sv_zh-cn_16k-common.onnx",
+  "bytes": 39593765,
+  "sha256": "e2d2048292e055f7b61cdec3db010503f35369b245bf0b3bbad021c9a91e4053"
+ },
+ "nemo_en_titanet_small.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_small.onnx",
+  "bytes": 40257283,
+  "sha256": "ad4a1802485d8b34c722d2a9d04249662f2ece5d28a7a039063ca22f515a789e"
+ },
+ "nemo_en_titanet_large.onnx": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/nemo_en_titanet_large.onnx",
+  "bytes": 101405493,
+  "sha256": "d51abcf31717ef28162f26acb9d44dd4127c3d44c9b8624f699f3425daca8e77"
+ },
+ "sherpa-onnx-pyannote-segmentation-3-0": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-segmentation-models/sherpa-onnx-pyannote-segmentation-3-0.tar.bz2",
+  "bytes": 6958444,
+  "sha256": "24615ee884c897d9d2ba09bb4d30da6bb1b15e685065962db5b02e76e4996488"
+ },
+ "DKITCHEN": {
+  "url": "https://zenodo.org/api/records/1227121/files/DKITCHEN_16k.zip/content",
+  "bytes": 110501049,
+  "sha256": "9d68e46d2709847c59580770e2f8aa160607ebff7475788174aa1080332cc845"
+ },
+ "DLIVING": {
+  "url": "https://zenodo.org/api/records/1227121/files/DLIVING_16k.zip/content",
+  "bytes": 80170627,
+  "sha256": "2b1726fe06e41551ce2397f2aaf3e4fb692c912d81914b04708df0bbb5252338"
+ },
+ "DWASHING": {
+  "url": "https://zenodo.org/api/records/1227121/files/DWASHING_16k.zip/content",
+  "bytes": 102343250,
+  "sha256": "f687c0806b0e9731b71a9c01c6134a21330efc5fa4aa7ee97cf4df276ad1dae1"
+ },
+ "OOFFICE": {
+  "url": "https://zenodo.org/api/records/1227121/files/OOFFICE_16k.zip/content",
+  "bytes": 88995191,
+  "sha256": "7570c952f621990d0d71b8398107d9a78066254f883a5569abec9c233ffda358"
+ },
+ "OMEETING": {
+  "url": "https://zenodo.org/api/records/1227121/files/OMEETING_16k.zip/content",
+  "bytes": 82703355,
+  "sha256": "512016cad3a42511a0fb7e3c74d6924e6efde4921a6101361f1306bf90bf2e5a"
+ },
+ "PCAFETER": {
+  "url": "https://zenodo.org/api/records/1227121/files/PCAFETER_16k.zip/content",
+  "bytes": 107431494,
+  "sha256": "89be7194b83cd583c4b12f4bf7c19e9cf0e612b95312e9f4aedc968cd811bcd5"
+ },
+ "PSTATION": {
+  "url": "https://zenodo.org/api/records/1227121/files/PSTATION_16k.zip/content",
+  "bytes": 119441094,
+  "sha256": "f19565b7b1d089bd89cb0d7178af77b052b59a15502229424fe36ddc9d379f1b"
+ },
+ "PRESTO": {
+  "url": "https://zenodo.org/api/records/1227121/files/PRESTO_16k.zip/content",
+  "bytes": 111292815,
+  "sha256": "cfd2e13998fac36aa5628070e08261deb7993dada302dc00a76aaf4e02ee4166"
+ },
+ "SPSQUARE": {
+  "url": "https://zenodo.org/api/records/1227121/files/SPSQUARE_16k.zip/content",
+  "bytes": 110928528,
+  "sha256": "82e90754aff6720d3d0dfb5ad076b972750b5e79c797f945e242aaa1de259eec"
+ },
+ "STRAFFIC": {
+  "url": "https://zenodo.org/api/records/1227121/files/STRAFFIC_16k.zip/content",
+  "bytes": 118572691,
+  "sha256": "2df9b444afb3b789df92d96cb6f58a50653cdbbbe7e7e74fcd9de2af6385fbea"
+ },
+ "TBUS": {
+  "url": "https://zenodo.org/api/records/1227121/files/TBUS_16k.zip/content",
+  "bytes": 128916709,
+  "sha256": "82e79983c91c69acbabf76d56b3fc75ab06e0f1c539eadaaf21d297987a97a5a"
+ },
+ "TCAR": {
+  "url": "https://zenodo.org/api/records/1227121/files/TCAR_16k.zip/content",
+  "bytes": 130045975,
+  "sha256": "6b48e45f273ea8d401b5ec97d22c864169684b0ad231bef4a1758922aa5daedc"
+ },
+ "sherpa-onnx-jvm-2.0.1.jar": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-jvm-2.0.1.jar",
+  "bytes": 192880,
+  "sha256": "8320e2457b6e38dd624fb619d3552e11ef78ffeb394622056126b16f2fd99d12"
+ },
+ "sherpa-onnx-native-lib-osx-aarch64-2.0.1.jar": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-native-lib-osx-aarch64-2.0.1.jar",
+  "bytes": 9422230,
+  "sha256": "718a4ea4799341146ef9a0cc15daa70e6622ae4a16911952604035f396703499"
+ },
+ "ESC-50": {
+  "url": "https://github.com/karoldvl/ESC-50/archive/master.zip",
+  "bytes": 645695005,
+  "sha256": "805afc618aff80eff0641d51311647871fead5807da68bb18e43a27db47a79ce"
+ },
+ "jvs_ver1": {
+  "url": "(JVS の Drive 公開リンク)",
+  "bytes": 3536595425,
+  "sha256": "37180e2f87bd1a3e668d7c020378f77cebf61dd57d4d74c71eb0114f386a3999"
+ },
+ "sherpa-onnx-2.0.1.aar": {
+  "url": "https://github.com/k2-fsa/sherpa-onnx/releases/download/v2.0.1/sherpa-onnx-2.0.1.aar",
+  "bytes": 49441341,
+  "sha256": "a8d09d1d32f3eb8520482c6d3d43fae674681c5b050385967c70a3c2c9bf0ee7"
+ }
+}

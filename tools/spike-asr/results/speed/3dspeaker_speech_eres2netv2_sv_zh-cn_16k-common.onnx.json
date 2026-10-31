@@ -1,0 +1,9 @@
+{
+ "kind": "speaker",
+ "model": "3dspeaker_speech_eres2netv2_sv_zh-cn_16k-common.onnx",
+ "audio_s": 313.4,
+ "rtf_1thread": 0.02739,
+ "rss_base_mb": 74.4,
+ "rss_peak_mb": 583.1,
+ "rss_added_mb": 508.7
+}

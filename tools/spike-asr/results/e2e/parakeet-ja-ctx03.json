@@ -1,0 +1,26 @@
+{
+ "model": "parakeet-ja",
+ "vad": "silero_vad.onnx",
+ "ctx": 0.3,
+ "zero": 0.3,
+ "min_silence": 0.5,
+ "e2e": {
+  "clean": {
+   "segments": 134,
+   "utts": 80,
+   "cer_surface": 7.37,
+   "cer_kana": 2.64
+  },
+  "snr10": {
+   "segments": 88,
+   "utts": 80,
+   "cer_surface": 6.46,
+   "cer_kana": 2.15
+  }
+ },
+ "noise_only": {
+  "segments": 225,
+  "with_text_pct": 66.2,
+  "mean_chars": 1.7
+ }
+}
