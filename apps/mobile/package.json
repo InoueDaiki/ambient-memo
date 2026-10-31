@@ -7,18 +7,29 @@
   "scripts": {
     "start": "expo start",
     "android": "expo run:android",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "jest"
   },
   "dependencies": {
+    "@ambient-memo/design-tokens": "workspace:*",
     "@ambient-memo/engine-bridge": "workspace:*",
     "@ambient-memo/engine-client": "workspace:*",
     "@ambient-memo/ui-native": "workspace:*",
     "expo": "58.0.22",
+    "expo-system-ui": "58.0.7",
     "react": "19.3.0",
-    "react-native": "0.88.1"
+    "react-native": "0.88.1",
+    "react-native-safe-area-context": "5.10.1"
   },
   "devDependencies": {
+    "@jest/globals": "30.5.2",
+    "@react-native/jest-preset": "0.88.1",
+    "@testing-library/react-native": "14.1.0",
     "@types/react": "19.3.0",
+    "babel-preset-expo": "58.0.23",
+    "jest": "30.5.2",
+    "jest-expo": "58.0.13",
+    "test-renderer": "1.3.1",
     "typescript": "7.0.2"
   }
 }

@@ -25,6 +25,8 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   slug: "ambient-memo",
   version: process.env.APP_VERSION ?? "0.1.0",
   orientation: "portrait",
+  // 画面の明暗を端末の設定に合わせる
+  userInterfaceStyle: "automatic",
   android: {
     package: isProduction ? baseId : `${baseId}.dev`,
     versionCode: versionCode(),
