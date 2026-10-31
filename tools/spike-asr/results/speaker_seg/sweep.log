@@ -1,0 +1,30 @@
+     0s A 区間全体 ok=True hi=0.6 lo=None args=(True,) f=0.5 d=0.0 clean 91.4/30.4 snr15 88.9/36.7
+     0s A' 区間全体(後ろの無音なし) ok=True hi=0.6 lo=None args=(False,) f=0.5 d=0.0 clean 91.1/29.5 snr15 90.9/38.7
+     0s B1 部分/時刻 s10 ok=True hi=0.65 lo=None args=('s10', None) f=0.5 d=0.0 clean 92.7/0.0 snr15 87.9/5.8
+     2s B2 部分/多数決 s10 ok=True hi=0.35 lo=None args=('s10', None) f=0.5 d=0.0 clean 91.1/67.6 snr15 93.9/64.5
+     2s B1 部分/時刻 s15 ok=True hi=0.65 lo=None args=('s15', None) f=0.5 d=0.0 clean 92.7/0.0 snr15 88.4/6.1
+     4s B2 部分/多数決 s15 ok=True hi=0.35 lo=None args=('s15', None) f=0.5 d=0.0 clean 91.9/67.8 snr15 94.7/65.8
+     4s B1 部分/時刻 s20 ok=True hi=0.65 lo=None args=('s20', 0.7) f=0.5 d=0.0 clean 93.4/0.0 snr15 87.6/7.7
+     5s B2 部分/多数決 s20 ok=True hi=0.35 lo=None args=('s20', None) f=0.5 d=0.0 clean 91.1/69.3 snr15 94.7/68.1
+     6s B1 部分/時刻 s30 ok=True hi=0.65 lo=None args=('s30', 0.7) f=0.5 d=0.0 clean 94.4/0.0 snr15 86.8/8.4
+     7s B2 部分/多数決 s30 ok=True hi=0.4 lo=None args=('s30', 0.6) f=0.5 d=0.0 clean 90.5/59.9 snr15 91.4/57.2
+     7s B1 部分/時刻 h10 ok=True hi=0.65 lo=None args=('h10', None) f=0.5 d=0.0 clean 92.4/0.0 snr15 81.2/3.8
+     9s B2 部分/多数決 h10 ok=True hi=0.35 lo=None args=('h10', None) f=0.5 d=0.0 clean 90.6/67.2 snr15 93.0/60.0
+     9s B1 部分/時刻 h20 ok=True hi=0.65 lo=None args=('h20', None) f=0.5 d=0.0 clean 93.2/0.0 snr15 85.5/4.4
+    10s B2 部分/多数決 h20 ok=True hi=0.35 lo=None args=('h20', None) f=0.5 d=0.0 clean 90.6/67.2 snr15 93.0/62.6
+    11s B1 部分/時刻 d6 ok=True hi=0.65 lo=None args=('d6', 0.6) f=0.5 d=0.05 clean 97.5/0.9 snr15 81.8/0.4
+    12s B2 部分/多数決 d6 ok=True hi=0.35 lo=None args=('d6', None) f=0.5 d=0.0 clean 91.8/68.1 snr15 86.2/51.2
+    13s B1 部分/時刻 d10 ok=True hi=0.6 lo=None args=('d10', None) f=0.5 d=0.1 clean 99.3/1.6 snr15 82.5/0.5
+    14s B2 部分/多数決 d10 ok=True hi=0.4 lo=None args=('d10', 0.7) f=0.5 d=0.1 clean 90.0/58.5 snr15 83.9/39.9
+    16s D1 窓/多数決平滑 w10h05 ok=True hi=0.5 lo=None args=('w10h05', 5) f=0.5 d=0.0 clean 98.5/1.4 snr15 83.1/0.0
+    17s D2 窓/ヒステリシス w10h05 ok=True hi=0.55 lo=0.45 args=('w10h05',) f=0.5 d=0.0 clean 95.5/1.3 snr15 82.5/0.1
+    18s D1 窓/多数決平滑 w15h05 ok=True hi=0.6 lo=None args=('w15h05', 5) f=0.5 d=0.0 clean 98.2/0.0 snr15 81.6/0.0
+    19s D2 窓/ヒステリシス w15h05 ok=True hi=0.6 lo=0.55 args=('w15h05',) f=0.5 d=0.0 clean 98.1/0.9 snr15 85.6/0.2
+    20s D1 窓/多数決平滑 w15h075 ok=True hi=0.6 lo=None args=('w15h075', 3) f=0.5 d=0.0 clean 96.4/0.4 snr15 80.2/0.0
+    21s D2 窓/ヒステリシス w15h075 ok=True hi=0.6 lo=0.55 args=('w15h075',) f=0.5 d=0.0 clean 98.1/1.0 snr15 85.4/0.1
+    21s C1 変化点 w10h05 ok=True hi=0.65 lo=None args=('w10h05', 0.7) f=0.5 d=0.0 clean 97.0/0.0 snr15 82.3/0.0
+    22s C2 区切り+変化点 s20 w10h05 ok=True hi=0.65 lo=None args=('w10h05', 0.7, 's20') f=0.5 d=0.0 clean 91.8/0.0 snr15 82.1/0.0
+    22s C2 区切り+変化点 s30 w10h05 ok=True hi=0.65 lo=None args=('w10h05', 0.7, 's30') f=0.5 d=0.0 clean 92.6/0.0 snr15 83.5/0.0
+    22s C1 変化点 w15h05 ok=True hi=0.7 lo=None args=('w15h05', 0.6) f=0.5 d=0.0 clean 98.0/0.1 snr15 82.4/0.3
+    22s C2 区切り+変化点 s20 w15h05 ok=True hi=0.65 lo=None args=('w15h05', 0.3, 's20') f=0.5 d=0.0 clean 91.5/0.0 snr15 80.4/0.0
+    23s C2 区切り+変化点 s30 w15h05 ok=True hi=0.65 lo=None args=('w15h05', 0.3, 's30') f=0.5 d=0.0 clean 91.8/0.0 snr15 82.0/0.1
