@@ -1,0 +1,1532 @@
+{
+ "c01": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "B": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 4
+  },
+  "G": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 2
+  }
+ },
+ "c02": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 1
+  },
+  "C": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "E": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 3
+  }
+ },
+ "c03": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  }
+ },
+ "c04": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  },
+  "F": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 1
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  }
+ },
+ "c05": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 4
+  },
+  "E": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c06": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 2
+  },
+  "G": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 2
+  }
+ },
+ "c07": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  },
+  "F": {
+   "fidelity": 4,
+   "coverage": 2,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c08": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 1
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  }
+ },
+ "c09": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 5
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c10": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "E": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  }
+ },
+ "c11": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 1
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 2
+  }
+ },
+ "c12": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  }
+ },
+ "c13": {
+  "A": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 1
+  },
+  "B": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 1
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 2,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 1
+  },
+  "G": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 2
+  }
+ },
+ "c14": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 4,
+   "overall": 3
+  },
+  "C": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "D": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 3,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 1
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  }
+ },
+ "c15": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 4,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  }
+ },
+ "c16": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "B": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 2,
+   "coverage": 2,
+   "concise": 2,
+   "japanese": 1,
+   "overall": 1
+  }
+ },
+ "c17": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  }
+ },
+ "c18": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 2,
+   "coverage": 5,
+   "concise": 3,
+   "japanese": 5,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 1
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 4
+  }
+ },
+ "c19": {
+  "A": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 2,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  }
+ },
+ "c20": {
+  "A": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 3
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 5,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  }
+ },
+ "c21": {
+  "A": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 2,
+   "overall": 3
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 5
+  }
+ },
+ "c22": {
+  "A": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 1
+  },
+  "B": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c23": {
+  "A": {
+   "fidelity": 1,
+   "coverage": 2,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 3,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c24": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 3,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  }
+ },
+ "c25": {
+  "A": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "C": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 5
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  }
+ },
+ "c26": {
+  "A": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 2,
+   "japanese": 3,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  }
+ },
+ "c27": {
+  "A": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 2,
+   "japanese": 2,
+   "overall": 2
+  },
+  "B": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 2
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "E": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 2
+  },
+  "F": {
+   "fidelity": 2,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 2
+  },
+  "G": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 3,
+   "japanese": 3,
+   "overall": 3
+  }
+ },
+ "c28": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "C": {
+   "fidelity": 4,
+   "coverage": 3,
+   "concise": 5,
+   "japanese": 3,
+   "overall": 3
+  },
+  "D": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 1
+  },
+  "E": {
+   "fidelity": 5,
+   "coverage": 4,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 4
+  },
+  "F": {
+   "fidelity": 3,
+   "coverage": 3,
+   "concise": 3,
+   "japanese": 2,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  }
+ },
+ "c29": {
+  "A": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 5
+  },
+  "B": {
+   "fidelity": 2,
+   "coverage": 3,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 2
+  },
+  "C": {
+   "fidelity": 3,
+   "coverage": 4,
+   "concise": 1,
+   "japanese": 1,
+   "overall": 1
+  },
+  "D": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "E": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 2,
+   "overall": 3
+  },
+  "F": {
+   "fidelity": 5,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 5,
+   "overall": 5
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 4
+  }
+ },
+ "c30": {
+  "A": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 4
+  },
+  "B": {
+   "fidelity": 1,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 1
+  },
+  "C": {
+   "fidelity": 1,
+   "coverage": 3,
+   "concise": 1,
+   "japanese": 2,
+   "overall": 1
+  },
+  "D": {
+   "fidelity": 2,
+   "coverage": 4,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "E": {
+   "fidelity": 2,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 3,
+   "overall": 3
+  },
+  "F": {
+   "fidelity": 2,
+   "coverage": 5,
+   "concise": 4,
+   "japanese": 4,
+   "overall": 3
+  },
+  "G": {
+   "fidelity": 4,
+   "coverage": 5,
+   "concise": 5,
+   "japanese": 4,
+   "overall": 4
+  }
+ }
+}
