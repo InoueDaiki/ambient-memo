@@ -2,6 +2,8 @@
 // 変換の対象から外す範囲を jest-expo の既定より狭める
 module.exports = {
   preset: "jest-expo",
+  // 最初のテストは React Native の変換と読み込みを待つので、CI では 5 秒の既定を超える
+  testTimeout: 30000,
   roots: ["<rootDir>/src"],
   setupFiles: ["<rootDir>/jest.setup.js"],
   transformIgnorePatterns: [
