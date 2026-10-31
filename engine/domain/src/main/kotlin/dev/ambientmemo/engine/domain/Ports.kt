@@ -101,8 +101,34 @@ interface Llm {
     /** 出力を作るモデルの版。メモに残し、モデルを変えたときに比べられるようにする。 */
     val modelVersion: String
 
-    /** 実行基盤が動かないときは例外を投げる。入力に問題がないのに出力が空のときは、空文字列を返す。 */
+    /**
+     * 実行基盤が動かないときは例外を投げる。入力に問題がないのに出力が空のときは、空文字列を返す。
+     *
+     * @throws LlmInputTooLongException 入力が文脈長に収まらないとき
+     */
     suspend fun generate(request: LlmRequest): String
+}
+
+/**
+ * 入力が LLM の文脈長に収まらない。同じ入力では何度やっても失敗するので、呼び出し側は入力を変える。
+ *
+ * 実行基盤の文言に文字起こしが混ざるかもしれないので、元の例外を持たない。
+ */
+class LlmInputTooLongException : Exception("入力が文脈長に収まりません")
+
+/**
+ * まとまりごとの、LLM の処理を始めた回数の記録。プロセスの強制終了を越えて残す。
+ *
+ * 例外にならない失敗(実行基盤のネイティブのクラッシュ)も数えるために、処理の前に増やす。
+ * [firstUtteranceId] はまとまりの最初の発話の id。発話の中身は渡さない。
+ */
+interface OrganizeAttempts {
+    fun count(firstUtteranceId: Long): Int
+
+    fun set(firstUtteranceId: Long, count: Int)
+
+    /** まとまりの記録が終わったら呼ぶ。 */
+    fun clear(firstUtteranceId: Long)
 }
 
 /** 整理の結果の記録。DB に書くのはエンジンだけなので、書き込みはこの境界に閉じる。 */

@@ -29,6 +29,7 @@ apps/*/ios/
 *.gguf
 *.task
 *.litertlm
+*.litertlm
 *.wav
 *.m4a
 engine/.cache/

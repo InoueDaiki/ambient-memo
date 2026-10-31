@@ -98,7 +98,8 @@ class Engine private constructor(context: Context) {
     )
 
     /** モデルの取得。聞き取りとは別に動く。 */
-    val modelDownloads = ModelDownloads(this.context, modelStore, ModelCatalog.DOWNLOADS)
+    val modelDownloads =
+        ModelDownloads(this.context, modelStore, ModelCatalog.DOWNLOADS, ModelCatalog.ORGANIZER_DOWNLOADS)
 
     /**
      * メモか ToDo が変わると、書いたスレッドで呼ぶ。書き込みが戻る前に届くので、
@@ -112,6 +113,11 @@ class Engine private constructor(context: Context) {
         memoListeners -= listener
     }
 
+    /** 別のプロセスの整理が書いた変更を、画面へ伝える。 */
+    internal fun notifyMemoChanged(change: MemoChange) {
+        memoListeners.forEach { it(change) }
+    }
+
     val captureState: StateFlow<CaptureState> = runner.state
 
     /** 発話が保存されるたびに流れる。 */
@@ -119,6 +125,10 @@ class Engine private constructor(context: Context) {
 
     val transcriptionMode: TranscriptionMode
         get() = if (modelStore.isInstalled(models)) TranscriptionMode.READY else TranscriptionMode.UNAVAILABLE
+
+    init {
+        OrganizeSchedule.ensureScheduled(this.context)
+    }
 
     /**
      * ネイティブのメモリは聞き取りの間だけ持つ。パイプラインは文字起こしが終わってから戻るので、ここで解放できる。

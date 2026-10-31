@@ -11,6 +11,7 @@ import {
   type MemoEngineClient,
   type MemoMode,
   type ModelDownloadStatus,
+  type OrganizerModelStatus,
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
   type Todo,
@@ -258,6 +259,59 @@ export function useModelDownload(): UseModelDownloadResult {
 
   const start = useCallback(() => {
     client.startModelDownload().catch(() => {
+      setStatus({
+        state: "failed",
+        failure: "unknown",
+        shortageBytes: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      });
+    });
+  }, [client]);
+
+  const cancel = useCallback(() => {
+    client.cancelModelDownload().catch(() => undefined);
+  }, [client]);
+
+  return { status, start, cancel };
+}
+
+export interface UseOrganizerModelResult {
+  // 最初の取得が終わるまでは undefined
+  status: OrganizerModelStatus | undefined;
+  // 利用者の操作でだけ呼ぶ
+  start: () => void;
+  cancel: () => void;
+}
+
+// 開いただけでは取得を始めない
+export function useOrganizerModel(): UseOrganizerModelResult {
+  const client = useEngineClient();
+  const [status, setStatus] = useState<OrganizerModelStatus>();
+
+  useEffect(() => {
+    let active = true;
+    let hasEvent = false;
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type !== "organizer-model-changed") return;
+      hasEvent = true;
+      setStatus(event.status);
+    });
+    client
+      .getOrganizerModelStatus()
+      .then((current) => {
+        if (active && !hasEvent) setStatus(current);
+      })
+      // 案内が出ないだけで、聞き取りには影響しない
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [client]);
+
+  const start = useCallback(() => {
+    client.startOrganizerModelDownload().catch(() => {
       setStatus({
         state: "failed",
         failure: "unknown",

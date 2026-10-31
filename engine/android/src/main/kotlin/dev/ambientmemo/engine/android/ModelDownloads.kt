@@ -20,8 +20,16 @@ import java.util.concurrent.Executors
 private const val TAG = "AmbientMemoEngine"
 private const val WORK_DIRECTORY = "model-downloads"
 
+/** ModelDownloader は渡されなかったパッケージの途中のファイルを消すので、組ごとに作業の場所を分ける。 */
+private const val ORGANIZER_WORK_DIRECTORY = "model-downloads-organizer"
+
+/** 一緒に取得するモデルの組。数 GB の [ORGANIZER] は、聞き取りに要る [SPEECH] とは別に利用者が選ぶ。 */
+enum class ModelGroup { SPEECH, ORGANIZER }
+
 /**
  * モデルの取得の入口。通信を始めるのは [start] だけで、利用者の操作からだけ呼ぶ。
+ *
+ * 取得は組をまたいで同時に1本だけ。どの組の状態かは [activeGroup] で見る。
  *
  * 聞き取りとは別のスコープと、優先度の低い専用のスレッドで動かす。bzip2 の展開は CPU を使い続けるので、
  * 聞き取りの文字起こしを遅らせないようにする。
@@ -29,14 +37,22 @@ private const val WORK_DIRECTORY = "model-downloads"
 class ModelDownloads internal constructor(
     context: Context,
     store: ModelStore,
-    private val packages: List<ModelPackage>,
+    speech: List<ModelPackage>,
+    organizer: List<ModelPackage>,
 ) {
+    private class Group(val packages: List<ModelPackage>, val downloader: ModelDownloader)
+
     private val context = context.applicationContext
-    private val downloader = ModelDownloader(
-        store = store,
-        workRoot = File(this.context.filesDir, WORK_DIRECTORY),
-        transport = HttpModelTransport(),
+    private val groups = mapOf(
+        ModelGroup.SPEECH to group(store, speech, WORK_DIRECTORY),
+        ModelGroup.ORGANIZER to group(store, organizer, ORGANIZER_WORK_DIRECTORY),
     )
+
+    /** 動いている取得か、最後に動いた取得の組。 */
+    @Volatile
+    var activeGroup: ModelGroup = ModelGroup.SPEECH
+        private set
+
     private val runner = ModelDownloadRunner(
         scope = CoroutineScope(
             SupervisorJob() +
@@ -45,20 +61,34 @@ class ModelDownloads internal constructor(
                 }.asCoroutineDispatcher(),
         ),
         onFailure = { Log.e(TAG, "モデルを取得できません: ${it.javaClass.simpleName}") },
-        download = { onProgress -> downloader.download(packages, onProgress) },
+        download = { onProgress ->
+            val group = groupOf(activeGroup)
+            group.downloader.download(group.packages, onProgress)
+        },
     )
 
     val state: StateFlow<ModelDownloadState> = runner.state
 
+    private fun group(store: ModelStore, packages: List<ModelPackage>, directory: String) = Group(
+        packages,
+        ModelDownloader(store, File(context.filesDir, directory), HttpModelTransport()),
+    )
+
+    private fun groupOf(group: ModelGroup): Group = groups.getValue(group)
+
     /** 止まっているときの、取得するものの量。 */
-    fun plan(): ModelDownloadPlan = downloader.plan(packages)
+    fun plan(group: ModelGroup = ModelGroup.SPEECH): ModelDownloadPlan = groupOf(group).let {
+        it.downloader.plan(it.packages)
+    }
+
 
     /**
      * Foreground Service を開始するので、アプリが前面にある間に呼ぶ。
      * 動いている間と、モデルが揃っているときは何もしない。
      */
-    fun start() {
-        if (plan().isComplete || !runner.markStarting()) return
+    fun start(group: ModelGroup = ModelGroup.SPEECH) {
+        if (plan(group).isComplete || !runner.markStarting()) return
+        activeGroup = group
         val intent = ModelDownloadService.startIntent(context)
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {

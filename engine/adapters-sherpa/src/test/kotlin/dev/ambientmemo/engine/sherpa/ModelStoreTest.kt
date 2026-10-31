@@ -62,12 +62,43 @@ class ModelStoreTest {
 
     @Test
     fun `アプリが使うモデルは、すべて固定の https の URL から取得できる`() {
-        ModelCatalog.DOWNLOADS.forEach { modelPackage ->
+        (ModelCatalog.DOWNLOADS + ModelCatalog.ORGANIZER_DOWNLOADS).forEach { modelPackage ->
             val source = checkNotNull(modelPackage.source) { modelPackage.id }
             assertTrue(isModelHost(URL(source.url)), source.url)
             assertTrue(source.sizeBytes > 0, source.url)
             assertTrue(source.sha256.matches(Regex("[0-9a-f]{64}")), source.url)
         }
+    }
+
+    @Test
+    fun `Gemma は固定のリビジョンの単一ファイルで、聞き取りのモデルと別に持つ`() {
+        val model = ModelCatalog.ACTIVE_LLM.modelPackage
+        val source = model.source as ModelSource.SingleFile
+
+        assertTrue(source.url.startsWith("https://huggingface.co/litert-community/"))
+        assertTrue("/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b/" in source.url)
+        assertEquals(listOf(source.file), model.files)
+        assertTrue(ModelCatalog.ACTIVE.packages.none { it.id == model.id })
+    }
+
+    @Test
+    fun `認める取得先は https の許可した場所だけ`() {
+        val allowed = listOf(
+            "https://huggingface.co/litert-community/x",
+            "https://us.aws.cdn.hf.co/xet-bridge-us/x",
+            "https://github.com/k2-fsa/x",
+        )
+        val refused = listOf(
+            "http://huggingface.co/x",
+            "http://us.aws.cdn.hf.co/x",
+            "https://hf.co/x",
+            "https://evilhf.co/x",
+            "https://hf.co.example.com/x",
+            "https://huggingface.co.example.com/x",
+        )
+
+        allowed.forEach { assertTrue(isModelHost(URL(it)), it) }
+        refused.forEach { assertFalse(isModelHost(URL(it)), it) }
     }
 
     @Test

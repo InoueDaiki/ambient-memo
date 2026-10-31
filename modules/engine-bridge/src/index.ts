@@ -10,6 +10,7 @@ import {
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
   type ModelDownloadStatus,
+  type OrganizerModelStatus,
   type MemoEngineClient,
   type TranscriptEngineClient,
 } from "@ambient-memo/engine-client";
@@ -36,6 +37,8 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   getModelDownloadStatus(): Promise<ModelDownloadStatus>;
   startModelDownload(): Promise<void>;
   cancelModelDownload(): Promise<void>;
+  getOrganizerModelStatus(): Promise<OrganizerModelStatus>;
+  startOrganizerModelDownload(): Promise<void>;
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): EventSubscription;
 }
 
@@ -90,6 +93,8 @@ export function createEngineClient(): TranscriptEngineClient {
     getModelDownloadStatus: () => native.getModelDownloadStatus(),
     startModelDownload: () => native.startModelDownload(),
     cancelModelDownload: () => native.cancelModelDownload(),
+    getOrganizerModelStatus: () => native.getOrganizerModelStatus(),
+    startOrganizerModelDownload: () => native.startOrganizerModelDownload(),
     subscribe: (listener: EngineListener) => {
       const subscription = native.addListener("engine", listener);
       return () => subscription.remove();
