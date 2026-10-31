@@ -321,12 +321,12 @@ class CapturePipelineTest {
         val failingOnce = object : UtteranceRepository by utterances {
             private var failed = false
 
-            override suspend fun insert(utterance: NewUtterance): Utterance {
+            override suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance> {
                 if (!failed) {
                     failed = true
                     throw IOException("書き込めない")
                 }
-                return utterances.insert(utterance)
+                return this@CapturePipelineTest.utterances.insertAll(utterances)
             }
         }
         val transcriber = FakeTranscriber()

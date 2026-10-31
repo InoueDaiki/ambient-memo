@@ -25,4 +25,14 @@ class ObservableUtteranceRepositoryTest {
 
         assertEquals(1, changes)
     }
+
+    @Test
+    fun `まとめて保存しても 1 回だけ知らせる`() = runTest {
+        var changes = 0
+        val repository = ObservableUtteranceRepository(InMemoryUtteranceRepository()) { changes++ }
+
+        repository.insertAll(listOf(NewUtterance(0, 100, "前", null, 100), NewUtterance(100, 200, "後", null, 200)))
+
+        assertEquals(1, changes)
+    }
 }

@@ -15,29 +15,32 @@ class SqliteUtteranceRepository(
     private val database: AmbientMemoDatabase,
     private val ioContext: CoroutineContext = Dispatchers.IO,
 ) : UtteranceRepository {
-    override suspend fun insert(utterance: NewUtterance): Utterance = withContext(ioContext) {
-        val id = database.transactionWithResult {
-            database.utteranceQueries.insert(
-                utterance.startedAtMillis,
-                utterance.endedAtMillis,
-                utterance.text,
-                utterance.confidence,
-                utterance.createdAtMillis,
-                utterance.speakerId,
-                utterance.speakerConfidence,
-            )
-            database.utteranceQueries.lastInsertedId().executeAsOne()
+    override suspend fun insert(utterance: NewUtterance): Utterance = insertAll(listOf(utterance)).single()
+
+    override suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance> = withContext(ioContext) {
+        database.transactionWithResult {
+            utterances.map { utterance ->
+                database.utteranceQueries.insert(
+                    utterance.startedAtMillis,
+                    utterance.endedAtMillis,
+                    utterance.text,
+                    utterance.confidence,
+                    utterance.createdAtMillis,
+                    utterance.speakerId,
+                    utterance.speakerConfidence,
+                )
+                Utterance(
+                    id = database.utteranceQueries.lastInsertedId().executeAsOne(),
+                    startedAtMillis = utterance.startedAtMillis,
+                    endedAtMillis = utterance.endedAtMillis,
+                    text = utterance.text,
+                    confidence = utterance.confidence,
+                    createdAtMillis = utterance.createdAtMillis,
+                    speakerId = utterance.speakerId,
+                    speakerConfidence = utterance.speakerConfidence,
+                )
+            }
         }
-        Utterance(
-            id = id,
-            startedAtMillis = utterance.startedAtMillis,
-            endedAtMillis = utterance.endedAtMillis,
-            text = utterance.text,
-            confidence = utterance.confidence,
-            createdAtMillis = utterance.createdAtMillis,
-            speakerId = utterance.speakerId,
-            speakerConfidence = utterance.speakerConfidence,
-        )
     }
 
     override suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance> =

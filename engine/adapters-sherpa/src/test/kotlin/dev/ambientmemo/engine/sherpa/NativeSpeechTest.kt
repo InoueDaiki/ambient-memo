@@ -4,6 +4,7 @@ package dev.ambientmemo.engine.sherpa
 
 import dev.ambientmemo.engine.domain.AudioFrame
 import dev.ambientmemo.engine.domain.SpeechSegment
+import dev.ambientmemo.engine.domain.TranscriptToken
 import dev.ambientmemo.engine.domain.testing.TEST_SAMPLE_RATE_HZ
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -34,15 +35,19 @@ private class RecordingVad : NativeVad {
     }
 }
 
-private class RecordingRecognizer(private val text: String = " こんにちは ") : NativeRecognizer {
+private class RecordingRecognizer(
+    private val text: String = " こんにちは ",
+    private val tokens: List<String> = emptyList(),
+    private val timestamps: List<Float> = emptyList(),
+) : NativeRecognizer {
     var received: FloatArray? = null
     var kept: FloatArray? = null
     var closed = false
 
-    override fun decode(samples: FloatArray, sampleRateHz: Int): String {
+    override fun decode(samples: FloatArray, sampleRateHz: Int): NativeRecognition {
         received = samples.copyOf()
         kept = samples
-        return text
+        return NativeRecognition(text, tokens, timestamps)
     }
 
     override fun close() {
@@ -113,6 +118,28 @@ class SherpaTranscriberTest {
         assertTrue(received.take(padding).all { it == 0f })
         assertEquals(listOf(0.5f, 0.5f, 0.5f, 0.5f), received.drop(padding).take(4))
         assertTrue(received.takeLast(padding).all { it == 0f })
+    }
+
+    @Test
+    fun `トークンの時刻から足した無音を引いて、区間の先頭からの時刻にする`() = runTest {
+        val recognizer = RecordingRecognizer("あいう", listOf("あ", "い", "う"), listOf(0.1f, 0.3f, 1.25f))
+
+        val result = SherpaTranscriber(paddingMillis = 300) { recognizer }.transcribe(segment(ShortArray(4)))
+
+        assertEquals(
+            listOf(TranscriptToken("あ", 0), TranscriptToken("い", 0), TranscriptToken("う", 950)),
+            result.tokens,
+        )
+    }
+
+    @Test
+    fun `トークンと時刻の数が揃わなければ、時刻がないものとして扱う`() = runTest {
+        val recognizer = RecordingRecognizer("あい", listOf("あ", "い"), listOf(0.1f))
+
+        val result = SherpaTranscriber(paddingMillis = 0) { recognizer }.transcribe(segment(ShortArray(4)))
+
+        assertEquals("あい", result.text)
+        assertTrue(result.tokens.isEmpty())
     }
 
     @Test
