@@ -1,0 +1,20 @@
+-- 記録できなかった時間。reason は SqliteCaptureGapRepository の対応表で読み書きする
+CREATE TABLE capture_gap (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  started_at_ms INTEGER NOT NULL,
+  ended_at_ms INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  CHECK (ended_at_ms >= started_at_ms)
+);
+
+CREATE INDEX capture_gap_started_at ON capture_gap (started_at_ms);
+
+insert:
+INSERT INTO capture_gap (started_at_ms, ended_at_ms, reason)
+VALUES (?, ?, ?);
+
+listOverlapping:
+SELECT *
+FROM capture_gap
+WHERE started_at_ms < :toMillis AND ended_at_ms > :fromMillis
+ORDER BY started_at_ms, id;
