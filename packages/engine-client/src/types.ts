@@ -127,7 +127,11 @@ export type EngineEvent =
   // 受け取ったら getPermissions で取り直す
   | { type: "permissions-changed" }
   // 進み具合もこれで届く
-  | { type: "model-download-changed"; status: ModelDownloadStatus };
+  | { type: "model-download-changed"; status: ModelDownloadStatus }
+  // メモの追加のほか、根拠の発話の更新でも届く。受け取ったら listMemos と getMemo で取り直す
+  | { type: "memos-changed" }
+  // ToDo の追加や完了で届く。受け取ったら listTodos と getMemo で取り直す
+  | { type: "todos-changed" };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -156,6 +160,67 @@ export interface TranscriptEngineClient extends EngineClient {
   startModelDownload(): Promise<void>;
   // 途中までのファイルは残るので、次は続きから取得する
   cancelModelDownload(): Promise<void>;
+  // 戻り値を呼ぶと購読をやめる
+  subscribe(listener: EngineListener): () => void;
+}
+
+// メモと ToDo の実装の状態。意味は TranscriptionMode と同じ
+export type MemoMode = "ready" | "development" | "unavailable";
+
+// ToDo を最後まで読み取れたか。incomplete のメモは ToDo が欠けているかもしれない
+export type TodoExtraction = "complete" | "incomplete";
+
+export interface Memo {
+  id: string;
+  // 要約に失敗すると null。根拠の発話は残る
+  title: string | null;
+  summary: string | null;
+  todoExtraction: TodoExtraction;
+  // 最初の発話の開始時刻と、最後の発話の終了時刻(Unix 時間のミリ秒)
+  startedAt: number;
+  endedAt: number;
+}
+
+// - todo: 自分がこれからやること
+// - reminder: 自分が日時を覚えておくべき予定
+export type TodoKind = "todo" | "reminder";
+
+// - candidate: 期限の確度が低い。人が確かめるまでリマインドしない。日付を捨てた場合は dueDate が null
+// - open: 確定した ToDo。期限がないこともある
+// - done: 完了した
+export type TodoStatus = "candidate" | "open" | "done";
+
+export interface Todo {
+  id: string;
+  memoId: string;
+  task: string;
+  kind: TodoKind;
+  // 時差を持たない端末の日付(YYYY-MM-DD)
+  dueDate: string | null;
+  status: TodoStatus;
+  // 記録した時刻(Unix 時間のミリ秒)
+  createdAt: number;
+}
+
+export interface MemoDetail extends Memo {
+  // 根拠の発話。古い順
+  utterances: Utterance[];
+  // このメモから抽出した ToDo。記録した順
+  todos: Todo[];
+}
+
+// メモと ToDo を扱う実装。engine-bridge にはまだなく、今は Fake だけが提供する
+export interface MemoEngineClient {
+  getMemoMode(): Promise<MemoMode>;
+  // 開始時刻の新しい順に最大 limit 件を返す
+  listMemos(options: { limit: number }): Promise<Memo[]>;
+  // ないメモは null を返す
+  getMemo(id: string): Promise<MemoDetail | null>;
+  // 未完了、期限の早い順、新しい順に最大 limit 件を返す。期限のない ToDo は同じ状態の中で最後にする
+  listTodos(options: { limit: number }): Promise<Todo[]>;
+  // すでに完了していれば何もせず成功する。ない ToDo は reject する。
+  // 状態が変わるときは todos-changed を届けてから解決する
+  completeTodo(id: string): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

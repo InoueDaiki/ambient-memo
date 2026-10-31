@@ -1,5 +1,7 @@
 export { Button } from "./Button.tsx";
 export type { ButtonProps, ButtonVariant } from "./Button.tsx";
+export { CheckItem } from "./CheckItem.tsx";
+export type { CheckItemProps } from "./CheckItem.tsx";
 export { EmptyState } from "./EmptyState.tsx";
 export type { EmptyStateProps } from "./EmptyState.tsx";
 export { ListItem } from "./ListItem.tsx";
@@ -9,5 +11,10 @@ export type { ProgressBarProps } from "./ProgressBar.tsx";
 export { Screen } from "./Screen.tsx";
 export { StatusBanner } from "./StatusBanner.tsx";
 export type { StatusBannerProps, StatusBannerTone } from "./StatusBanner.tsx";
+export { TabBar } from "./TabBar.tsx";
+export type { TabBarItem, TabBarProps } from "./TabBar.tsx";
+export { Tag } from "./Tag.tsx";
+export type { TagProps } from "./Tag.tsx";
 export { Text } from "./Text.tsx";
 export type { TextProps } from "./Text.tsx";
+export { useColors } from "./theme.ts";

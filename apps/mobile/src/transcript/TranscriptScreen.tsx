@@ -101,7 +101,7 @@ export function TranscriptScreen() {
     listening.error.failure === "microphone-permission";
 
   return (
-    <Screen>
+    <Screen bottomInset={false}>
       <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm }}>
         <Text variant="title" accessibilityRole="header">
           文字起こし
