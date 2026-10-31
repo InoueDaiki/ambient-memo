@@ -1,0 +1,218 @@
+{
+ "thresholds": {
+  "0.5/0.45": {
+   "clean": {
+    "self_recall": 99.7,
+    "other_as_self": 11.7,
+    "self_as_other": 0.2,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 83.0
+   },
+   "snr15": {
+    "self_recall": 97.6,
+    "other_as_self": 5.4,
+    "self_as_other": 2.3,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 91.2
+   },
+   "tclean": {
+    "self_recall": 98.2,
+    "other_as_self": 16.9,
+    "self_as_other": 1.6,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 76.2
+   },
+   "tsnr15": {
+    "self_recall": 95.5,
+    "other_as_self": 7.9,
+    "self_as_other": 4.3,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 86.9
+   }
+  },
+  "0.55/0.5": {
+   "clean": {
+    "self_recall": 99.3,
+    "other_as_self": 3.9,
+    "self_as_other": 0.6,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 93.6
+   },
+   "snr15": {
+    "self_recall": 95.0,
+    "other_as_self": 1.0,
+    "self_as_other": 4.9,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 98.2
+   },
+   "tclean": {
+    "self_recall": 97.2,
+    "other_as_self": 8.2,
+    "self_as_other": 2.5,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 86.7
+   },
+   "tsnr15": {
+    "self_recall": 92.4,
+    "other_as_self": 2.5,
+    "self_as_other": 7.5,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 95.3
+   }
+  },
+  "0.65/0.6": {
+   "clean": {
+    "self_recall": 94.3,
+    "other_as_self": 0.1,
+    "self_as_other": 5.6,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 99.9
+   },
+   "snr15": {
+    "self_recall": 71.9,
+    "other_as_self": 0.0,
+    "self_as_other": 28.0,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 100.0
+   },
+   "tclean": {
+    "self_recall": 91.9,
+    "other_as_self": 1.0,
+    "self_as_other": 7.9,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 98.1
+   },
+   "tsnr15": {
+    "self_recall": 69.6,
+    "other_as_self": 0.2,
+    "self_as_other": 30.3,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 99.5
+   }
+  },
+  "0.7/0.65": {
+   "clean": {
+    "self_recall": 84.6,
+    "other_as_self": 0.0,
+    "self_as_other": 15.3,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 100.0
+   },
+   "snr15": {
+    "self_recall": 47.3,
+    "other_as_self": 0.0,
+    "self_as_other": 52.7,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 100.0
+   },
+   "tclean": {
+    "self_recall": 80.4,
+    "other_as_self": 0.4,
+    "self_as_other": 19.4,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 99.1
+   },
+   "tsnr15": {
+    "self_recall": 42.7,
+    "other_as_self": 0.1,
+    "self_as_other": 57.1,
+    "unknown": 0.0,
+    "self_unknown": 0.0,
+    "other_unknown": 0.0,
+    "self_precision": 99.7
+   }
+  }
+ },
+ "envs": {
+  "DKITCHEN": {
+   "self_recall": 77.2,
+   "other_as_self": 0.0,
+   "n_frames": 59027
+  },
+  "DLIVING": {
+   "self_recall": 91.4,
+   "other_as_self": 0.2,
+   "n_frames": 58930
+  },
+  "DWASHING": {
+   "self_recall": 98.6,
+   "other_as_self": 1.2,
+   "n_frames": 61392
+  },
+  "OMEETING": {
+   "self_recall": 86.3,
+   "other_as_self": 0.0,
+   "n_frames": 61767
+  },
+  "OOFFICE": {
+   "self_recall": 98.4,
+   "other_as_self": 0.3,
+   "n_frames": 46900
+  },
+  "PCAFETER": {
+   "self_recall": 77.7,
+   "other_as_self": 0.0,
+   "n_frames": 35398
+  },
+  "PRESTO": {
+   "self_recall": 70.1,
+   "other_as_self": 0.0,
+   "n_frames": 61802
+  },
+  "PSTATION": {
+   "self_recall": 89.0,
+   "other_as_self": 0.0,
+   "n_frames": 35198
+  },
+  "SPSQUARE": {
+   "self_recall": 97.2,
+   "other_as_self": 0.1,
+   "n_frames": 48476
+  },
+  "STRAFFIC": {
+   "self_recall": 90.6,
+   "other_as_self": 0.0,
+   "n_frames": 21789
+  },
+  "TBUS": {
+   "self_recall": 95.7,
+   "other_as_self": 0.0,
+   "n_frames": 62915
+  },
+  "TCAR": {
+   "self_recall": 97.8,
+   "other_as_self": 0.1,
+   "n_frames": 48539
+  }
+ }
+}
