@@ -37,7 +37,7 @@ MODELS = {
     "gemma-e4b": {"runtime": "litert", "file": "gemma-4-E4B-it.litertlm"},
     "lfm-jp": {"runtime": "llama", "file": "LFM2.5-1.2B-JP-202606-Q8_0.gguf"},
     "qwen3-4b": {"runtime": "llama", "file": "Qwen3-4B-Q4_K_M.gguf", "no_think": True},
-    "gemma-e2b-gguf": {"runtime": "llama", "file": "gemma-4-E2B_q4_0-it.gguf"},
+    "gemma-e2b-gguf": {"runtime": "llama", "file": "gemma-4-E2B_q4_0-it.gguf", "template_no_think": True},
     # 思考モードあり。充電中のバッチなら遅くてもよいので比べる
     "gemma-e2b-think": {"runtime": "litert", "file": "gemma-4-E2B-it.litertlm", "think": True},
     "gemma-e4b-think": {"runtime": "litert", "file": "gemma-4-E4B-it.litertlm", "think": True},
@@ -140,7 +140,7 @@ class Llama:
             "temperature": 0.0, "top_k": 1, "top_p": 1.0, "seed": 1,
             "max_tokens": max_tokens, "cache_prompt": False,
         }
-        if self.cfg.get("no_think"):
+        if self.cfg.get("no_think") or self.cfg.get("template_no_think"):
             body["chat_template_kwargs"] = {"enable_thinking": False}
         if schema is not None:
             body["response_format"] = {"type": "json_schema", "json_schema": {"name": "out", "schema": schema}}

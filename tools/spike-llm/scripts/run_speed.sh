@@ -6,7 +6,7 @@ set -u
 py=.venv/bin/python
 for b in cpu gpu; do
   for m in gemma-e2b gemma-e4b lfm-jp qwen3-4b gemma-e2b-gguf; do
-    "$py" scripts/run_eval.py --model "$m" --split test --backend "$b" --tasks summary,todo_schema --limit 16 --tag speed 2>&1 | tail -1
+    "$py" scripts/run_eval.py --model "$m" --split test --backend "$b" --tasks summary,todo_free --limit 8 --tag speed 2>&1 | tail -1
     echo "done $m $b"
   done
 done

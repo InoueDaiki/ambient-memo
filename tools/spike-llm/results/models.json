@@ -1,0 +1,44 @@
+[
+  {
+    "repo": "litert-community/gemma-4-E2B-it-litert-lm",
+    "revision": "1caa527c1e88b55f046fcd8d2b4265606680663d",
+    "file": "gemma-4-E2B-it.litertlm",
+    "bytes": 2588147712,
+    "sha256": "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c"
+  },
+  {
+    "repo": "litert-community/gemma-4-E4B-it-litert-lm",
+    "revision": "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+    "file": "gemma-4-E4B-it.litertlm",
+    "bytes": 3659530240,
+    "sha256": "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0"
+  },
+  {
+    "repo": "LiquidAI/LFM2.5-1.2B-JP-202606-GGUF",
+    "revision": "448ba3f7d408c2f5c32cec8038612f7c1ed9f054",
+    "file": "LFM2.5-1.2B-JP-202606-Q8_0.gguf",
+    "bytes": 1246253344,
+    "sha256": "d61784727aeac0da2f413dbb481273f465c7adf01b0bd72c8fd2ca1040c62c5e"
+  },
+  {
+    "repo": "Qwen/Qwen3-4B-GGUF",
+    "revision": "bc640142c66e1fdd12af0bd68f40445458f3869b",
+    "file": "Qwen3-4B-Q4_K_M.gguf",
+    "bytes": 2497280256,
+    "sha256": "7485fe6f11af29433bc51cab58009521f205840f5b4ae3a32fa7f92e8534fdf5"
+  },
+  {
+    "repo": "google/gemma-4-E2B-it-qat-q4_0-gguf",
+    "revision": "675cff42a74c774d6cb76f76d8eacb49b48c9b93",
+    "file": "gemma-4-E2B_q4_0-it.gguf",
+    "bytes": 3349516256,
+    "sha256": "fa401b55b07ee70a54c6dae3903c783a6e65064312529ea57175cb5f8dec6634"
+  },
+  {
+    "repo": "litert-community/embeddinggemma-2-text-270m-litert-lm",
+    "revision": "9be6e8b90982095dc05c2bd162e4b954ee4dbac7",
+    "file": "embeddinggemma-2-text-270m.litertlm",
+    "bytes": 164626432,
+    "sha256": "2d079ee2f6f066b1f368e8d7c819f55214eaef1d0513b312321901f30ab286fb"
+  }
+]

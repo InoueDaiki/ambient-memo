@@ -18,11 +18,11 @@ import yaml
 
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 BLIND = ROOT / "results" / "blind"
-SYSTEMS = ["gemma-e2b", "gemma-e4b", "lfm-jp", "qwen3-4b", "gemma-e2b-gguf", "gemma-e2b-think", "gemma-e4b-think", "qwen3-4b-think"]
+SYSTEMS = ["gemma-e2b", "gemma-e4b", "lfm-jp", "qwen3-4b", "gemma-e2b-gguf", "gemma-e2b-think", "gemma-e4b-think"]
 
 
 def load(sys_name):
-    p = ROOT / "results" / "raw" / f"{sys_name}.cpu.test.jsonl"
+    p = ROOT / "results" / "raw" / f"{sys_name}.gpu.test.jsonl"
     out = {}
     if p.exists():
         for l in p.open(encoding="utf-8"):

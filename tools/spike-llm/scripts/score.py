@@ -95,7 +95,7 @@ def score_todos(item, obj):
         due_hit += due_ok(p.get("due"), g["due"])
         kind_hit += p["kind"] == g["kind"]
     req = sum(not g.get("optional") for g in gold)
-    miss = [" / ".join(g["match"][0]) for i, g in enumerate(gold) if i not in used and not g.get("optional")]
+    miss = [" / ".join(map(str, g["match"][0])) for i, g in enumerate(gold) if i not in used and not g.get("optional")]
     return dict(tp=tp, fp=fp, gold=req, due=due_hit, kind=kind_hit, opt=opt), fps, miss
 
 
@@ -155,8 +155,8 @@ def main():
                 tot.update(m)
                 if not item["todos"]:
                     trap_fp += len(obj["items"])
-                if mode == "todo_schema" and (fps or miss):
-                    errors.append(f"- {x['id']} 誤検出 {fps} / 見逃し {miss}")
+                if fps or miss:
+                    errors.append(f"- {mode} {x['id']} 誤検出 {fps} / 見逃し {miss}")
             n = len(by[mode])
             p = tot["tp"] / (tot["tp"] + tot["fp"]) if tot["tp"] + tot["fp"] else 0
             rc = tot["tp"] / tot["gold"] if tot["gold"] else 0
