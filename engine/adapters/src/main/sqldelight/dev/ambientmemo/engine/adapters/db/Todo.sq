@@ -1,0 +1,23 @@
+-- メモから抽出した ToDo。due_date は端末の日付で YYYY-MM-DD。時刻までは抽出しない
+-- kind と status は SqliteMemoRepository の対応表で読み書きする
+CREATE TABLE todo (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  memo_id INTEGER NOT NULL REFERENCES memo (id),
+  task TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  due_date TEXT,
+  status TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL
+);
+
+CREATE INDEX todo_memo ON todo (memo_id);
+
+insert:
+INSERT INTO todo (memo_id, task, kind, due_date, status, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?);
+
+listByMemo:
+SELECT *
+FROM todo
+WHERE memo_id = :memoId
+ORDER BY id;

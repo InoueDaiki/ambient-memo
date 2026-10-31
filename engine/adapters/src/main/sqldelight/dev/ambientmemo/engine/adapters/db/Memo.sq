@@ -1,0 +1,47 @@
+-- 発話のまとまり。title と summary は要約に失敗すると NULL になる
+-- todo_extraction は SqliteMemoRepository の対応表で読み書きする
+CREATE TABLE memo (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  started_at_ms INTEGER NOT NULL,
+  ended_at_ms INTEGER NOT NULL,
+  title TEXT,
+  summary TEXT,
+  todo_extraction TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (ended_at_ms >= started_at_ms)
+);
+
+CREATE INDEX memo_started_at ON memo (started_at_ms);
+
+-- メモの根拠の発話。1つの発話は1つのメモにだけ入る
+CREATE TABLE memo_utterance (
+  memo_id INTEGER NOT NULL REFERENCES memo (id),
+  utterance_id INTEGER NOT NULL REFERENCES utterance (id),
+  PRIMARY KEY (memo_id, utterance_id)
+);
+
+CREATE UNIQUE INDEX memo_utterance_utterance ON memo_utterance (utterance_id);
+
+insert:
+INSERT INTO memo (started_at_ms, ended_at_ms, title, summary, todo_extraction, model_version, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+insertUtterance:
+INSERT INTO memo_utterance (memo_id, utterance_id)
+VALUES (?, ?);
+
+listAll:
+SELECT *
+FROM memo
+ORDER BY started_at_ms, id;
+
+listUtteranceIds:
+SELECT memo_utterance.utterance_id
+FROM memo_utterance
+JOIN utterance ON utterance.id = memo_utterance.utterance_id
+WHERE memo_utterance.memo_id = :memoId
+ORDER BY utterance.started_at_ms, utterance.id;
