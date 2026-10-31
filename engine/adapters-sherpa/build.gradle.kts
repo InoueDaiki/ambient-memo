@@ -12,6 +12,8 @@ kotlin {
 
 dependencies {
     api(project(":domain"))
+    // モデルの配布物(tar.bz2)の展開。Android にも JDK にも bzip2 の実装がない
+    implementation(libs.commons.compress)
 
     testFixturesApi(testFixtures(project(":domain")))
 

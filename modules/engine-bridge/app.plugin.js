@@ -1,14 +1,10 @@
 // android/ は prebuild の生成物なので、エンジンに要る設定をここで足す
 // - settings.gradle: engine/ の読み込み
 // - build.gradle: sherpa-onnx の AAR の取得元。engine/settings.gradle.kts と同じ指定
-// - Release のマニフェスト: INTERNET を外す。Debug は Metro のために残す
-const fs = require("node:fs");
+// INTERNET はモデルの取得に使うので、Release にも残す。モデルが確定したら、ここで Release の
+// マニフェストから外し、scripts/check-release-manifest.sh も戻す
 const path = require("node:path");
-const {
-  withDangerousMod,
-  withProjectBuildGradle,
-  withSettingsGradle,
-} = require("expo/config-plugins");
+const { withProjectBuildGradle, withSettingsGradle } = require("expo/config-plugins");
 
 const sherpaRepository = `
 // engine-bridge の app.plugin.js が足す
@@ -22,13 +18,6 @@ allprojects {
     }
   }
 }
-`;
-
-const releaseManifest = `<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:tools="http://schemas.android.com/tools">
-    <uses-permission android:name="android.permission.INTERNET" tools:node="remove" />
-</manifest>
 `;
 
 function withEngineBuild(config) {
@@ -52,18 +41,6 @@ function withSherpaRepository(config) {
   });
 }
 
-function withoutReleaseInternet(config) {
-  return withDangerousMod(config, [
-    "android",
-    (mod) => {
-      const directory = path.join(mod.modRequest.platformProjectRoot, "app/src/release");
-      fs.mkdirSync(directory, { recursive: true });
-      fs.writeFileSync(path.join(directory, "AndroidManifest.xml"), releaseManifest);
-      return mod;
-    },
-  ]);
-}
-
 module.exports = function withEngineBridge(config) {
-  return withoutReleaseInternet(withSherpaRepository(withEngineBuild(config)));
+  return withSherpaRepository(withEngineBuild(config));
 };

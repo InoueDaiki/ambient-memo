@@ -7,6 +7,7 @@ import type {
   ListeningStatus,
   SelfEnrollmentFailure,
   SelfEnrollmentStatus,
+  ModelDownloadStatus,
   TranscriptEngineClient,
   Utterance,
 } from "./types.ts";
@@ -17,11 +18,12 @@ export interface FakeEngineClientOptions {
   utterances?: Utterance[];
   permissions?: EnginePermissions;
   selfEnrollment?: SelfEnrollmentStatus;
+  modelDownload?: ModelDownloadStatus;
 }
 
 // エンジンなしで画面を開発・テストするための実装
 export class FakeEngineClient implements TranscriptEngineClient {
-  readonly #status: EngineStatus;
+  #status: EngineStatus;
   readonly #listeners = new Set<EngineListener>();
   #listeningStatus: ListeningStatus;
   #utterances: Utterance[];
@@ -32,6 +34,8 @@ export class FakeEngineClient implements TranscriptEngineClient {
   #enrollmentFailure: SelfEnrollmentFailure | undefined;
   #finishEnrollment: (() => void) | undefined;
   #rejectEnrollment: ((error: Error) => void) | undefined;
+  #modelDownload: ModelDownloadStatus;
+  #modelDownloadStarts = 0;
 
   constructor({
     status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
@@ -39,12 +43,18 @@ export class FakeEngineClient implements TranscriptEngineClient {
     utterances = [],
     permissions = { microphone: true, notifications: true },
     selfEnrollment = "enrolled",
+    modelDownload,
   }: FakeEngineClientOptions = {}) {
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
     this.#permissions = permissions;
     this.#selfEnrollment = selfEnrollment;
+    this.#modelDownload =
+      modelDownload ??
+      (status.transcription === "ready"
+        ? { state: "installed", downloadedBytes: 0, totalBytes: 0 }
+        : { state: "idle", downloadedBytes: 0, totalBytes: 713_741_187 });
   }
 
   getStatus(): Promise<EngineStatus> {
@@ -114,6 +124,36 @@ export class FakeEngineClient implements TranscriptEngineClient {
     return Promise.resolve();
   }
 
+  getModelDownloadStatus(): Promise<ModelDownloadStatus> {
+    return Promise.resolve(this.#modelDownload);
+  }
+
+  startModelDownload(): Promise<void> {
+    const current = this.#modelDownload;
+    if (current.state === "running" || current.state === "installed") return Promise.resolve();
+    this.#modelDownloadStarts += 1;
+    this.setModelDownload({
+      state: "running",
+      phase: "downloading",
+      completedBytes: current.downloadedBytes,
+      totalBytes: current.totalBytes,
+    });
+    return Promise.resolve();
+  }
+
+  cancelModelDownload(): Promise<void> {
+    const current = this.#modelDownload;
+    if (current.state === "running") {
+      this.setModelDownload({
+        state: "idle",
+        downloadedBytes:
+          current.phase === "downloading" ? current.completedBytes : current.totalBytes,
+        totalBytes: current.totalBytes,
+      });
+    }
+    return Promise.resolve();
+  }
+
   subscribe(listener: EngineListener): () => void {
     this.#listeners.add(listener);
     return () => {
@@ -145,6 +185,18 @@ export class FakeEngineClient implements TranscriptEngineClient {
   setPermissions(permissions: EnginePermissions): void {
     this.#permissions = permissions;
     this.#emit({ type: "permissions-changed" });
+  }
+
+  // 取得の進み具合や失敗を再現する。揃ったら文字起こしも使えるようになる
+  setModelDownload(status: ModelDownloadStatus): void {
+    this.#modelDownload = status;
+    if (status.state === "installed") this.#status = { ...this.#status, transcription: "ready" };
+    if (status.state === "idle") this.#status = { ...this.#status, transcription: "unavailable" };
+    this.#emit({ type: "model-download-changed", status });
+  }
+
+  get modelDownloadStarts(): number {
+    return this.#modelDownloadStarts;
   }
 
   get settingsOpened(): number {

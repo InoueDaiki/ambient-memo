@@ -1,5 +1,6 @@
 import {
   useListening,
+  useModelDownload,
   usePermissions,
   useTranscriptionMode,
   useUtterances,
@@ -22,6 +23,7 @@ import {
 import { FlatList, View } from "react-native";
 
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
+import { ModelDownloadButton, ModelDownloadNotice } from "./ModelDownload.tsx";
 import { SelfEnrollmentCard } from "./SelfEnrollmentCard.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
@@ -88,6 +90,8 @@ export function TranscriptScreen() {
   const { utterances, error: loadError } = useUtterances({ limit: UTTERANCE_LIMIT });
   const { permissions, openSettings } = usePermissions();
   const transcriptionMode = useTranscriptionMode();
+  const modelDownload = useModelDownload();
+  const needsModels = transcriptionMode === "unavailable";
   const { status, isChanging, start, stop } = listening;
   const isListening = status === "listening";
   // 開始を試すと OS の確認が出るので、断られた後にだけ設定へ案内する
@@ -103,9 +107,7 @@ export function TranscriptScreen() {
           文字起こし
         </Text>
         <SelfEnrollmentCard isListening={isListening} />
-        {transcriptionMode === "unavailable" && (
-          <StatusBanner tone="neutral" message="文字起こしのモデルが端末にありません。" />
-        )}
+        {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (
           <StatusBanner
@@ -153,12 +155,16 @@ export function TranscriptScreen() {
       </View>
 
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
-        <Button
-          label={isListening ? "聞き取りを止める" : "聞き取りを始める"}
-          variant={isListening ? "secondary" : "primary"}
-          disabled={status === undefined || isChanging}
-          onPress={isListening ? stop : start}
-        />
+        {needsModels ? (
+          <ModelDownloadButton {...modelDownload} />
+        ) : (
+          <Button
+            label={isListening ? "聞き取りを止める" : "聞き取りを始める"}
+            variant={isListening ? "secondary" : "primary"}
+            disabled={status === undefined || isChanging}
+            onPress={isListening ? stop : start}
+          />
+        )}
       </View>
     </Screen>
   );

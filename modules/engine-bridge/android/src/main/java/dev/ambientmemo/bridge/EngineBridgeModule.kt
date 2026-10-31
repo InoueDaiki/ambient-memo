@@ -16,6 +16,9 @@ import dev.ambientmemo.engine.android.SelfEnrollmentException
 import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
 import dev.ambientmemo.engine.android.TranscriptionMode
+import dev.ambientmemo.engine.domain.ModelDownloadFailure
+import dev.ambientmemo.engine.domain.ModelDownloadPhase
+import dev.ambientmemo.engine.domain.ModelDownloadState
 import dev.ambientmemo.engine.domain.currentEngineStatus
 import expo.modules.interfaces.permissions.PermissionsResponseListener
 import expo.modules.kotlin.exception.CodedException
@@ -78,6 +81,7 @@ class EngineBridgeModule : Module() {
       val moduleScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       scope = moduleScope
       moduleScope.launch { engine.captureState.collect(::publish) }
+      moduleScope.launch { engine.modelDownloads.state.collect(::publishModelDownload) }
       moduleScope.launch {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
@@ -129,6 +133,10 @@ class EngineBridgeModule : Module() {
       try {
         engine.startCapture()
       } catch (e: EngineStartException) {
+        // 確認で壊れたモデルが消えたときに、取得の案内を出す
+        if (e.failure == StartFailure.TRANSCRIPTION_UNAVAILABLE) {
+          publishModelDownload(engine.modelDownloads.state.value)
+        }
         throw StartFailedException(e.failure)
       }
       publish(engine.captureState.value)
@@ -137,6 +145,19 @@ class EngineBridgeModule : Module() {
     AsyncFunction("stopListening") Coroutine { ->
       engine.stopCapture()
       publish(engine.captureState.value)
+    }
+
+    AsyncFunction("getModelDownloadStatus") {
+      modelDownloadStatus(engine.modelDownloads.state.value)
+    }
+
+    // 利用者の操作でだけ呼ぶ。通信はここからしか始まらない
+    AsyncFunction("startModelDownload") {
+      engine.modelDownloads.start()
+    }
+
+    AsyncFunction("cancelModelDownload") {
+      engine.modelDownloads.cancel()
     }
 
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
@@ -203,6 +224,42 @@ class EngineBridgeModule : Module() {
         mapOf("type" to "listening-changed", "status" to status, "interrupted" to interrupted),
       )
     }
+  }
+
+  private fun publishModelDownload(state: ModelDownloadState) {
+    sendEvent(EVENT_ENGINE, mapOf("type" to "model-download-changed", "status" to modelDownloadStatus(state)))
+  }
+
+  private fun modelDownloadStatus(state: ModelDownloadState): Map<String, Any> = when (state) {
+    is ModelDownloadState.Running -> mapOf(
+      "state" to "running",
+      "phase" to when (state.progress.phase) {
+        ModelDownloadPhase.DOWNLOADING -> "downloading"
+        ModelDownloadPhase.VERIFYING -> "verifying"
+        ModelDownloadPhase.EXTRACTING -> "extracting"
+      },
+      "completedBytes" to state.progress.completedBytes.toDouble(),
+      "totalBytes" to state.progress.totalBytes.toDouble(),
+    )
+    is ModelDownloadState.Failed -> plannedStatus("failed") + mapOf(
+      "failure" to when (state.failure) {
+        ModelDownloadFailure.NETWORK -> "network"
+        ModelDownloadFailure.CORRUPTED -> "corrupted"
+        ModelDownloadFailure.INSUFFICIENT_STORAGE -> "insufficient-storage"
+        ModelDownloadFailure.UNKNOWN -> "unknown"
+      },
+      "shortageBytes" to state.shortageBytes.toDouble(),
+    )
+    ModelDownloadState.Idle -> plannedStatus(if (engine.modelDownloads.plan().isComplete) "installed" else "idle")
+  }
+
+  private fun plannedStatus(name: String): Map<String, Any> {
+    val plan = engine.modelDownloads.plan()
+    return mapOf(
+      "state" to name,
+      "downloadedBytes" to plan.downloadedBytes.toDouble(),
+      "totalBytes" to plan.totalBytes.toDouble(),
+    )
   }
 
   private fun publishPermissions() {

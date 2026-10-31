@@ -1,17 +1,27 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- モデルの取得だけに使う。モデルが確定したら、取得のコードと一緒に外す -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- 画面を消しても、モデルの取得と展開を続ける -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
 
     <application>
         <service
             android:name=".CaptureService"
             android:exported="false"
             android:foregroundServiceType="microphone" />
+
+        <service
+            android:name=".ModelDownloadService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
 
         <!-- BOOT_COMPLETED はシステムが送るので、他のアプリに公開しなくても届く -->
         <receiver

@@ -5,6 +5,7 @@ import {
   SelfEnrollmentError,
   type EnginePermissions,
   type ListeningStatus,
+  type ModelDownloadStatus,
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
   type TranscriptEngineClient,
@@ -134,14 +135,22 @@ export function useTranscriptionMode(): TranscriptionMode | undefined {
 
   useEffect(() => {
     let active = true;
-    client
-      .getStatus()
-      .then((status) => {
-        if (active) setMode(status.transcription);
-      })
-      .catch(() => undefined);
+    const load = () => {
+      client
+        .getStatus()
+        .then((status) => {
+          if (active) setMode(status.transcription);
+        })
+        .catch(() => undefined);
+    };
+    // 取得が終わったときと、確認で壊れたモデルが消えたときに変わる
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "model-download-changed" && event.status.state !== "running") load();
+    });
+    load();
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [client]);
 
@@ -196,6 +205,60 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
   }, [client]);
 
   return { status, isEnrolling, failure, enroll, cancel };
+}
+
+export interface UseModelDownloadResult {
+  // 最初の取得が終わるまでは undefined
+  status: ModelDownloadStatus | undefined;
+  // 利用者の操作でだけ呼ぶ
+  start: () => void;
+  cancel: () => void;
+}
+
+// 開いただけでは取得を始めない
+export function useModelDownload(): UseModelDownloadResult {
+  const client = useEngineClient();
+  const [status, setStatus] = useState<ModelDownloadStatus>();
+
+  useEffect(() => {
+    let active = true;
+    // 取得の結果より新しいイベントを上書きしないよう、イベントが来たら取得の結果を捨てる
+    let hasEvent = false;
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type !== "model-download-changed") return;
+      hasEvent = true;
+      setStatus(event.status);
+    });
+    client
+      .getModelDownloadStatus()
+      .then((current) => {
+        if (active && !hasEvent) setStatus(current);
+      })
+      // 案内が出ないだけで、聞き取りの開始のときに改めて確かめる
+      .catch(() => undefined);
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [client]);
+
+  const start = useCallback(() => {
+    client.startModelDownload().catch(() => {
+      setStatus({
+        state: "failed",
+        failure: "unknown",
+        shortageBytes: 0,
+        downloadedBytes: 0,
+        totalBytes: 0,
+      });
+    });
+  }, [client]);
+
+  const cancel = useCallback(() => {
+    client.cancelModelDownload().catch(() => undefined);
+  }, [client]);
+
+  return { status, start, cancel };
 }
 
 export interface UseUtterancesResult {

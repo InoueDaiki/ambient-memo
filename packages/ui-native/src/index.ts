@@ -4,6 +4,8 @@ export { EmptyState } from "./EmptyState.tsx";
 export type { EmptyStateProps } from "./EmptyState.tsx";
 export { ListItem } from "./ListItem.tsx";
 export type { ListItemProps } from "./ListItem.tsx";
+export { ProgressBar } from "./ProgressBar.tsx";
+export type { ProgressBarProps } from "./ProgressBar.tsx";
 export { Screen } from "./Screen.tsx";
 export { StatusBanner } from "./StatusBanner.tsx";
 export type { StatusBannerProps, StatusBannerTone } from "./StatusBanner.tsx";

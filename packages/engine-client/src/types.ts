@@ -84,6 +84,40 @@ export class SelfEnrollmentError extends Error {
   }
 }
 
+export type ModelDownloadPhase =
+  // 配布物を取得している
+  | "downloading"
+  // 取得した配布物が正しいことを確かめている
+  | "verifying"
+  // 使うファイルを取り出している
+  | "extracting";
+
+export type ModelDownloadFailure =
+  // 通信が切れたか、取得先が応じなかった。続きから取得できる
+  | "network"
+  // 配布物が期待と違った。途中までのファイルは消えたので、最初から取得する
+  | "corrupted"
+  // 端末の空き容量が足りない
+  | "insufficient-storage"
+  | "unknown";
+
+// バイト数は Number の整数で足りる範囲に収まる
+export type ModelDownloadStatus =
+  // モデルが揃っている
+  | { state: "installed"; downloadedBytes: number; totalBytes: number }
+  // 取得していない。downloadedBytes が 0 より大きければ、続きから取得できる
+  | { state: "idle"; downloadedBytes: number; totalBytes: number }
+  // completedBytes と totalBytes は phase の進み具合。totalBytes が 0 の間は準備中
+  | { state: "running"; phase: ModelDownloadPhase; completedBytes: number; totalBytes: number }
+  // shortageBytes は空き容量の不足分。分からないときは 0
+  | {
+      state: "failed";
+      failure: ModelDownloadFailure;
+      shortageBytes: number;
+      downloadedBytes: number;
+      totalBytes: number;
+    };
+
 export type EngineEvent =
   // 画面の操作だけでなく、エンジンの都合(マイクの占有など)でも変わる。
   // interrupted は、操作ではなくエンジンの都合で止まったときに true
@@ -91,7 +125,9 @@ export type EngineEvent =
   // 発話の追加のほか、話者の更新でも届く。受け取ったら listUtterances で取り直す
   | { type: "utterances-changed" }
   // 受け取ったら getPermissions で取り直す
-  | { type: "permissions-changed" };
+  | { type: "permissions-changed" }
+  // 進み具合もこれで届く
+  | { type: "model-download-changed"; status: ModelDownloadStatus };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -114,6 +150,12 @@ export interface TranscriptEngineClient extends EngineClient {
   enrollSelf(): Promise<void>;
   // 登録の途中なら止める。enrollSelf は cancelled で reject する
   cancelSelfEnrollment(): Promise<void>;
+  getModelDownloadStatus(): Promise<ModelDownloadStatus>;
+  // 取得を始めて、終わるのを待たずに解決する。結果は model-download-changed で届く。
+  // 通信はここからしか始まらないので、利用者の操作でだけ呼ぶ。取得中とモデルが揃っているときは何もしない
+  startModelDownload(): Promise<void>;
+  // 途中までのファイルは残るので、次は続きから取得する
+  cancelModelDownload(): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }
