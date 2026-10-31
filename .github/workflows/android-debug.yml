@@ -1,0 +1,46 @@
+# Android の Debug ビルド。ネイティブ周りを変えた PR と、main への push で動かす
+name: Android Debug
+
+on:
+  pull_request:
+    paths:
+      - apps/mobile/**
+      - engine/**
+      - modules/**
+      - packages/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - mise.toml
+      - .github/actions/**
+      - .github/workflows/android-debug.yml
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  build:
+    name: Debug ビルド
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          android-packages: platforms;android-37.0 build-tools;37.0.0 ndk;27.1.12297006 cmake;3.22.1
+      - run: mise run build:android:debug
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-debug-arm64
+          path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 7

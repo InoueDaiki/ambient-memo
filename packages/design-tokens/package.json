@@ -1,0 +1,14 @@
+{
+  "name": "@ambient-memo/design-tokens",
+  "version": "0.1.0",
+  "private": true,
+  "description": "デザイントークン(雛形。本体は後で作る)",
+  "type": "module",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "7.0.2"
+  }
+}

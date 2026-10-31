@@ -1,0 +1,39 @@
+name: セットアップ
+description: mise.toml の版でツールを入れ、JS の依存関係、Gradle のキャッシュ、Android SDK を用意する
+
+inputs:
+  android-packages:
+    description: sdkmanager で入れるもの(空白区切り)
+    default: platforms;android-37.0 build-tools;37.0.0
+
+runs:
+  using: composite
+  steps:
+    - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+      with:
+        # mise 自体の版も固定する
+        version: 2026.10.4
+
+    - name: pnpm のストアの場所
+      id: pnpm
+      shell: bash
+      run: echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+
+    - name: pnpm のキャッシュ
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ steps.pnpm.outputs.store }}
+        key: pnpm-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-${{ runner.os }}-${{ runner.arch }}-
+
+    - name: JS の依存関係
+      shell: bash
+      run: pnpm install --frozen-lockfile
+
+    # Java は mise が入れたものを使う
+    - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+      with:
+        packages: ${{ inputs.android-packages }}
+
+    # キャッシュの保存は既定のブランチだけで行われる
+    - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1

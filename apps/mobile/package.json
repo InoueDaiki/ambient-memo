@@ -1,0 +1,24 @@
+{
+  "name": "@ambient-memo/mobile",
+  "version": "0.1.0",
+  "private": true,
+  "description": "画面(React Native。Expo の開発ビルド)",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ambient-memo/engine-bridge": "workspace:*",
+    "@ambient-memo/engine-client": "workspace:*",
+    "@ambient-memo/ui-native": "workspace:*",
+    "expo": "58.0.22",
+    "react": "19.3.0",
+    "react-native": "0.88.1"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "typescript": "7.0.2"
+  }
+}

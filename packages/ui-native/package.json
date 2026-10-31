@@ -1,0 +1,24 @@
+{
+  "name": "@ambient-memo/ui-native",
+  "version": "0.1.0",
+  "private": true,
+  "description": "React Native の UI 部品(雛形。本体は後で作る)",
+  "exports": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@ambient-memo/design-tokens": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "expo": "58.0.22",
+    "react": "19.3.0",
+    "react-native": "0.88.1",
+    "typescript": "7.0.2"
+  },
+  "peerDependencies": {
+    "react": "*",
+    "react-native": "*"
+  }
+}
