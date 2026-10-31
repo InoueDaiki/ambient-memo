@@ -1,0 +1,31 @@
+{
+ "model": "parakeet-ja",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 7.01,
+  "ci95": [
+   4.85,
+   9.15
+  ]
+ },
+ "cer_kana": {
+  "cer": 2.55,
+  "ci95": [
+   1.42,
+   3.82
+  ]
+ },
+ "rtf": 0.0523,
+ "latency_p50_s": 0.279,
+ "latency_p95_s": 0.52,
+ "load_s": 0.65,
+ "disk_mb": 655.6,
+ "rss_base_mb": 78.0,
+ "rss_after_load_mb": 1929.2,
+ "rss_peak_mb": 2068.0,
+ "first_partial_s_mean": null
+}

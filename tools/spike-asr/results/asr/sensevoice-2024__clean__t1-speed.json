@@ -1,0 +1,31 @@
+{
+ "model": "sensevoice-2024",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 7.82,
+  "ci95": [
+   5.19,
+   10.57
+  ]
+ },
+ "cer_kana": {
+  "cer": 3.15,
+  "ci95": [
+   1.81,
+   4.64
+  ]
+ },
+ "rtf": 0.0273,
+ "latency_p50_s": 0.146,
+ "latency_p95_s": 0.269,
+ "load_s": 0.34,
+ "disk_mb": 239.6,
+ "rss_base_mb": 78.1,
+ "rss_after_load_mb": 952.3,
+ "rss_peak_mb": 1047.8,
+ "first_partial_s_mean": null
+}

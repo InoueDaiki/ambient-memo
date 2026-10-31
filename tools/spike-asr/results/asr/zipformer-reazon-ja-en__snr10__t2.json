@@ -1,0 +1,31 @@
+{
+ "model": "zipformer-reazon-ja-en",
+ "kind": "offline",
+ "cond": "snr10",
+ "threads": 2,
+ "n": 300,
+ "audio_s": 1769.5,
+ "cer_surface": {
+  "cer": 7.16,
+  "ci95": [
+   6.12,
+   8.19
+  ]
+ },
+ "cer_kana": {
+  "cer": 3.16,
+  "ci95": [
+   2.43,
+   4.01
+  ]
+ },
+ "rtf": 0.3114,
+ "latency_p50_s": 1.675,
+ "latency_p95_s": 3.401,
+ "load_s": 12.55,
+ "disk_mb": 209.9,
+ "rss_base_mb": 1877.8,
+ "rss_after_load_mb": 1877.8,
+ "rss_peak_mb": 1877.8,
+ "first_partial_s_mean": null
+}

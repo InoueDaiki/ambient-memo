@@ -1,0 +1,60 @@
+{
+ "embed": "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+ "cond": "clean",
+ "n_conv": 30,
+ "n_dev": 10,
+ "offline": {
+  "cluster_th": 0.7,
+  "nocollar": {
+   "der_pct": 27.32,
+   "miss_pct": 1.49,
+   "fa_pct": 11.46,
+   "conf_pct": 14.38
+  },
+  "collar025": {
+   "der_pct": 14.73,
+   "miss_pct": 0.07,
+   "fa_pct": 0.28,
+   "conf_pct": 14.38
+  },
+  "rtf": 0.0861
+ },
+ "app": {
+  "cluster_th": 0.5,
+  "th_self": 0.6,
+  "min_silence": 0.5,
+  "nocollar": {
+   "der_pct": 29.59,
+   "miss_pct": 2.24,
+   "fa_pct": 16.76,
+   "conf_pct": 10.59
+  },
+  "collar025": {
+   "der_pct": 16.13,
+   "miss_pct": 0.22,
+   "fa_pct": 5.16,
+   "conf_pct": 10.75
+  },
+  "self_recall_pct": 94.9,
+  "other_as_self_pct": 7.88
+ },
+ "app_sil02": {
+  "cluster_th": 0.5,
+  "th_self": 0.6,
+  "min_silence": 0.2,
+  "nocollar": {
+   "der_pct": 12.44,
+   "miss_pct": 3.58,
+   "fa_pct": 5.05,
+   "conf_pct": 3.81
+  },
+  "collar025": {
+   "der_pct": 3.84,
+   "miss_pct": 0.48,
+   "fa_pct": 0.0,
+   "conf_pct": 3.36
+  },
+  "self_recall_pct": 93.42,
+  "other_as_self_pct": 0.69
+ }
+}

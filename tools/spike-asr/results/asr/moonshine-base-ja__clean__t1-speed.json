@@ -1,0 +1,31 @@
+{
+ "model": "moonshine-base-ja",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 8.37,
+  "ci95": [
+   6.28,
+   10.58
+  ]
+ },
+ "cer_kana": {
+  "cer": 2.4,
+  "ci95": [
+   1.47,
+   3.43
+  ]
+ },
+ "rtf": 0.0179,
+ "latency_p50_s": 0.087,
+ "latency_p95_s": 0.214,
+ "load_s": 0.21,
+ "disk_mb": 141.3,
+ "rss_base_mb": 78.0,
+ "rss_after_load_mb": 532.0,
+ "rss_peak_mb": 627.4,
+ "first_partial_s_mean": null
+}

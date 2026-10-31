@@ -1,0 +1,31 @@
+{
+ "model": "cohere-transcribe",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 7.01,
+  "ci95": [
+   4.64,
+   9.76
+  ]
+ },
+ "cer_kana": {
+  "cer": 1.6,
+  "ci95": [
+   0.71,
+   2.61
+  ]
+ },
+ "rtf": 0.1141,
+ "latency_p50_s": 0.591,
+ "latency_p95_s": 1.173,
+ "load_s": 3.54,
+ "disk_mb": 2888.1,
+ "rss_base_mb": 78.1,
+ "rss_after_load_mb": 3699.7,
+ "rss_peak_mb": 5034.3,
+ "first_partial_s_mean": null
+}

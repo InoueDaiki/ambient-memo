@@ -1,0 +1,9 @@
+{
+ "kind": "vad",
+ "model": "silero_vad_v4.onnx",
+ "audio_s": 313.4,
+ "rtf_1thread": 0.00259,
+ "rss_base_mb": 74.4,
+ "rss_peak_mb": 126.7,
+ "rss_added_mb": 52.3
+}

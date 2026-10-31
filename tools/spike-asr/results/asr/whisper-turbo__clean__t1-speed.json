@@ -1,0 +1,31 @@
+{
+ "model": "whisper-turbo",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 6.95,
+  "ci95": [
+   4.68,
+   9.8
+  ]
+ },
+ "cer_kana": {
+  "cer": 2.55,
+  "ci95": [
+   1.55,
+   3.6
+  ]
+ },
+ "rtf": 0.4043,
+ "latency_p50_s": 2.182,
+ "latency_p95_s": 3.646,
+ "load_s": 0.85,
+ "disk_mb": 1036.6,
+ "rss_base_mb": 78.1,
+ "rss_after_load_mb": 2521.9,
+ "rss_peak_mb": 3092.0,
+ "first_partial_s_mean": null
+}

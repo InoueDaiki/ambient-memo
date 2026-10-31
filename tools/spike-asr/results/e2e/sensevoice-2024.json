@@ -1,0 +1,23 @@
+{
+ "model": "sensevoice-2024",
+ "vad": "silero_vad.onnx",
+ "e2e": {
+  "clean": {
+   "segments": 134,
+   "utts": 80,
+   "cer_surface": 9.58,
+   "cer_kana": 5.73
+  },
+  "snr10": {
+   "segments": 88,
+   "utts": 80,
+   "cer_surface": 8.61,
+   "cer_kana": 4.48
+  }
+ },
+ "noise_only": {
+  "segments": 225,
+  "with_text_pct": 80.4,
+  "mean_chars": 1.5
+ }
+}

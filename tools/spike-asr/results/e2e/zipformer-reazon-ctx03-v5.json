@@ -1,0 +1,26 @@
+{
+ "model": "zipformer-reazon",
+ "vad": "silero_vad_v5.onnx",
+ "ctx": 0.3,
+ "zero": 0.3,
+ "min_silence": 0.5,
+ "e2e": {
+  "clean": {
+   "segments": 126,
+   "utts": 80,
+   "cer_surface": 8.95,
+   "cer_kana": 3.9
+  },
+  "snr10": {
+   "segments": 124,
+   "utts": 80,
+   "cer_surface": 9.07,
+   "cer_kana": 3.94
+  }
+ },
+ "noise_only": {
+  "segments": 64,
+  "with_text_pct": 100.0,
+  "mean_chars": 1.9
+ }
+}
