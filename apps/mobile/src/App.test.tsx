@@ -12,7 +12,7 @@ const utterance = (overrides: Partial<Utterance> & { id: string }): Utterance =>
 });
 
 async function renderApp(client: FakeEngineClient) {
-  await render(<App client={client} />);
+  await render(<App client={client} memoClient={client} />);
   await screen.findByText(/^(止まっています|聞き取り中)$/);
 }
 
