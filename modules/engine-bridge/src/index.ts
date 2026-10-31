@@ -10,15 +10,19 @@ import {
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
   type ModelDownloadStatus,
+  type MemoEngineClient,
   type TranscriptEngineClient,
-  type Utterance,
 } from "@ambient-memo/engine-client";
 import { requireNativeModule, type EventSubscription } from "expo";
 
-// ネイティブの null は、名前がないことを表す
-type NativeUtterance = Omit<Utterance, "speakerName"> & { speakerName: string | null };
+import {
+  createMemoClient,
+  toUtterance,
+  type MemoNativeModule,
+  type NativeUtterance,
+} from "./memo-client.ts";
 
-interface EngineBridgeNativeModule {
+interface EngineBridgeNativeModule extends MemoNativeModule {
   getStatus(): Promise<EngineStatus>;
   getListeningStatus(): Promise<ListeningStatus>;
   getPermissions(): Promise<EnginePermissions>;
@@ -63,10 +67,6 @@ function toEnrollmentError(error: unknown): unknown {
   return failure === undefined ? error : new SelfEnrollmentError(failure);
 }
 
-function toUtterance({ speakerName, ...rest }: NativeUtterance): Utterance {
-  return speakerName === null ? rest : { ...rest, speakerName };
-}
-
 export function createEngineClient(): TranscriptEngineClient {
   const native = requireNativeModule<EngineBridgeNativeModule>("EngineBridge");
   return {
@@ -95,4 +95,8 @@ export function createEngineClient(): TranscriptEngineClient {
       return () => subscription.remove();
     },
   };
+}
+
+export function createMemoEngineClient(): MemoEngineClient {
+  return createMemoClient(requireNativeModule<EngineBridgeNativeModule>("EngineBridge"));
 }

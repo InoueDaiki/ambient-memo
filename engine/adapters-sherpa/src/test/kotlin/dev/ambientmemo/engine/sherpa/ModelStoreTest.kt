@@ -62,12 +62,29 @@ class ModelStoreTest {
 
     @Test
     fun `アプリが使うモデルは、すべて固定の https の URL から取得できる`() {
-        ModelCatalog.ACTIVE.packages.forEach { modelPackage ->
+        ModelCatalog.DOWNLOADS.forEach { modelPackage ->
             val source = checkNotNull(modelPackage.source) { modelPackage.id }
             assertTrue(isModelHost(URL(source.url)), source.url)
             assertTrue(source.sizeBytes > 0, source.url)
             assertTrue(source.sha256.matches(Regex("[0-9a-f]{64}")), source.url)
         }
+    }
+
+    @Test
+    fun `文字起こしと話者のモデルを取得の対象にする`() {
+        val expected = ModelCatalog.ACTIVE.packages + ModelCatalog.ACTIVE_SPEAKER.modelPackage
+
+        assertTrue(ModelCatalog.DOWNLOADS.containsAll(expected))
+    }
+
+    @Test
+    fun `話者のモデルは配布元の綴りのタグから、単体のファイルで取得する`() {
+        val modelPackage = ModelCatalog.ACTIVE_SPEAKER.modelPackage
+        val source = modelPackage.source as ModelSource.SingleFile
+
+        assertEquals(ModelCatalog.ACTIVE_SPEAKER.model, source.file)
+        assertTrue(source.url.contains("/speaker-recongition-models/"), source.url)
+        assertTrue(source.url.endsWith("/${source.file.name}"), source.url)
     }
 
     @Test

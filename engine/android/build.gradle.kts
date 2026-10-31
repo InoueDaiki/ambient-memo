@@ -27,5 +27,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(testFixtures(project(":domain")))
+    // JS の境界の契約テストを、本物の SQLite で流す
+    testImplementation(libs.sqldelight.sqlite.driver)
     testRuntimeOnly(libs.junit.platform.launcher)
 }

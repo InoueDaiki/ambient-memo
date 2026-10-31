@@ -182,14 +182,22 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
 
   useEffect(() => {
     let active = true;
-    client
-      .getSelfEnrollmentStatus()
-      .then((current) => {
-        if (active) setStatus(current);
-      })
-      .catch(() => undefined);
+    const load = () => {
+      client
+        .getSelfEnrollmentStatus()
+        .then((current) => {
+          if (active) setStatus(current);
+        })
+        .catch(() => undefined);
+    };
+    // 話者のモデルは取得で揃うので、そのときに unavailable から変わる
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "model-download-changed" && event.status.state !== "running") load();
+    });
+    load();
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [client]);
 

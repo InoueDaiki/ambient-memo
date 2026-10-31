@@ -76,7 +76,7 @@ function MemoBody({ memo }: { memo: MemoDetail }) {
         <ListItem
           key={utterance.id}
           text={utterance.text}
-          label={speakerLabels[utterance.speaker]}
+          label={utterance.speakerName ?? speakerLabels[utterance.speaker]}
           meta={formatTime(utterance.startedAt)}
         />
       ))}

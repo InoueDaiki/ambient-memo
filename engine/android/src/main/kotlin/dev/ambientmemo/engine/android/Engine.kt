@@ -6,12 +6,14 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import dev.ambientmemo.engine.adapters.SqliteCaptureGapRepository
+import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.CapturePipeline
 import dev.ambientmemo.engine.domain.EnrollmentOutcome
+import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
 import dev.ambientmemo.engine.domain.SelfEnrollment
 import dev.ambientmemo.engine.domain.Speaker
@@ -37,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.CopyOnWriteArraySet
 
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
@@ -66,10 +69,22 @@ class Engine private constructor(context: Context) {
     private val speakerModel = ModelCatalog.ACTIVE_SPEAKER
     private val modelStore = ModelStore(File(this.context.filesDir, MODELS_DIRECTORY))
     private val database by lazy { openAndroidDatabase(this.context) }
-    private val utteranceRepository by lazy {
+    internal val utteranceRepository by lazy {
         ObservableUtteranceRepository(SqliteUtteranceRepository(database)) { changes.tryEmit(Unit) }
     }
     private val speakerRepository by lazy { SqliteSpeakerRepository(database) }
+    private val memoListeners = CopyOnWriteArraySet<(MemoChange) -> Unit>()
+
+    /** メモと ToDo の読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
+    internal val memoRepository: MemoRepository by lazy {
+        ObservableMemoRepository(SqliteMemoRepository(database)) { change ->
+            memoListeners.forEach { it(change) }
+        }
+    }
+
+    /** JS が見るメモと ToDo。 */
+    val memoBridge by lazy { MemoBridge(memoRepository, ::speakers, SystemClock) }
+
     private val enrollmentRunner = EnrollmentRunner(scope, ::enrollmentPrecondition, ::runEnrollment)
     private val changes = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
@@ -83,7 +98,19 @@ class Engine private constructor(context: Context) {
     )
 
     /** モデルの取得。聞き取りとは別に動く。 */
-    val modelDownloads = ModelDownloads(this.context, modelStore, models.packages)
+    val modelDownloads = ModelDownloads(this.context, modelStore, ModelCatalog.DOWNLOADS)
+
+    /**
+     * メモか ToDo が変わると、書いたスレッドで呼ぶ。書き込みが戻る前に届くので、
+     * 完了の Promise を解決するより先に、画面へ知らせられる。
+     */
+    fun addMemoListener(listener: (MemoChange) -> Unit) {
+        memoListeners += listener
+    }
+
+    fun removeMemoListener(listener: (MemoChange) -> Unit) {
+        memoListeners -= listener
+    }
 
     val captureState: StateFlow<CaptureState> = runner.state
 

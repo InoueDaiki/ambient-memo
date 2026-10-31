@@ -13,6 +13,7 @@ import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerRepository
+import dev.ambientmemo.engine.domain.TodoCompletion
 import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.TodoKind
 import dev.ambientmemo.engine.domain.TodoStatus
@@ -485,5 +486,106 @@ abstract class MemoRepositoryContract {
         assertTrue(stores.memos.listTodos(other.id).isEmpty())
         assertEquals(listOf(second), stores.memos.listUtteranceIds(other.id))
         assertEquals(1, stores.memos.listTodos(memoWithTodo.id).size)
+    }
+
+    private fun startingAt(memo: NewMemo, startedAtMillis: Long) =
+        memo.copy(startedAtMillis = startedAtMillis, endedAtMillis = startedAtMillis + 10)
+
+    @Test
+    fun `最近のメモは新しい順に limit 件まで返し、同時刻は後から記録したものを先にする`() = runTest {
+        val stores = stores()
+        val oldest = stores.memos.recordMemo(startingAt(memo(stores.utterance(1)), 100))!!
+        val first = stores.memos.recordMemo(startingAt(memo(stores.utterance(2)), 200))!!
+        val second = stores.memos.recordMemo(startingAt(memo(stores.utterance(3)), 200))!!
+
+        assertEquals(listOf(second, first), stores.memos.listRecentMemos(2))
+        assertEquals(listOf(second, first, oldest), stores.memos.listRecentMemos(10))
+    }
+
+    @Test
+    fun `メモを id で引ける`() = runTest {
+        val stores = stores()
+        val saved = stores.memos.recordMemo(memo(stores.utterance(100)))!!
+
+        assertEquals(saved, stores.memos.findMemo(saved.id))
+        assertNull(stores.memos.findMemo(saved.id + 1))
+    }
+
+    @Test
+    fun `メモの根拠の発話を開始時刻の順に返す`() = runTest {
+        val stores = stores()
+        val later = stores.utterance(200)
+        val earlier = stores.utterance(100)
+        val other = stores.utterance(300)
+        val saved = stores.memos.recordMemo(memo(later, earlier))!!
+        stores.memos.recordMemo(memo(other))
+
+        assertEquals(listOf(earlier, later), stores.memos.listMemoUtterances(saved.id).map { it.id })
+    }
+
+    @Test
+    fun `ToDo は未完了、期限の早い順、新しい順、記録した順に並べ、期限のないものは後ろにする`() = runTest {
+        val stores = stores()
+        fun todo(task: String, due: CalendarDate?, status: TodoStatus = TodoStatus.OPEN) =
+            NewTodo(task, TodoKind.TODO, due, status)
+        val soon = CalendarDate(2026, 11, 1)
+        val older = memo(
+            stores.utterance(1),
+            todos = listOf(todo("完了", CalendarDate(2026, 1, 1)), todo("期限なし", null), todo("古い", soon)),
+        ).copy(createdAtMillis = 1_000)
+        val newer = memo(
+            stores.utterance(2),
+            todos = listOf(
+                todo("新しい1", soon, TodoStatus.CANDIDATE),
+                todo("新しい2", soon),
+                todo("遅い", CalendarDate(2026, 12, 1)),
+            ),
+        ).copy(createdAtMillis = 2_000)
+        val saved = stores.memos.recordMemo(older)!!
+        stores.memos.recordMemo(newer)
+        val done = stores.memos.listTodos(saved.id).first { it.task == "完了" }
+        stores.memos.completeTodo(done.id, 3_000)
+
+        assertEquals(
+            listOf("新しい1", "新しい2", "古い", "遅い", "期限なし", "完了"),
+            stores.memos.listTodosByPriority(10).map { it.task },
+        )
+        assertEquals(2, stores.memos.listTodosByPriority(2).size)
+    }
+
+    @Test
+    fun `完了すると状態と時刻が残り、他の ToDo は変わらない`() = runTest {
+        val stores = stores()
+        val todos = listOf(
+            NewTodo("完了する", TodoKind.TODO, null, TodoStatus.CANDIDATE),
+            NewTodo("そのまま", TodoKind.TODO, null, TodoStatus.OPEN),
+        )
+        val saved = stores.memos.recordMemo(memo(stores.utterance(100), todos = todos))!!
+        val (target, other) = stores.memos.listTodos(saved.id)
+
+        assertEquals(TodoCompletion.COMPLETED, stores.memos.completeTodo(target.id, 5_000))
+
+        val (completed, untouched) = stores.memos.listTodos(saved.id)
+        assertEquals(TodoStatus.DONE, completed.status)
+        assertEquals(5_000L, completed.completedAtMillis)
+        assertEquals(other, untouched)
+        assertNull(target.completedAtMillis)
+    }
+
+    @Test
+    fun `完了済みの ToDo の完了は最初の時刻を変えない`() = runTest {
+        val stores = stores()
+        val todos = listOf(NewTodo("作業", TodoKind.TODO, null, TodoStatus.OPEN))
+        val saved = stores.memos.recordMemo(memo(stores.utterance(100), todos = todos))!!
+        val id = stores.memos.listTodos(saved.id).single().id
+        stores.memos.completeTodo(id, 5_000)
+
+        assertEquals(TodoCompletion.ALREADY_DONE, stores.memos.completeTodo(id, 6_000))
+        assertEquals(5_000L, stores.memos.listTodos(saved.id).single().completedAtMillis)
+    }
+
+    @Test
+    fun `ない ToDo の完了は NOT_FOUND を返す`() = runTest {
+        assertEquals(TodoCompletion.NOT_FOUND, stores().memos.completeTodo(1, 5_000))
     }
 }

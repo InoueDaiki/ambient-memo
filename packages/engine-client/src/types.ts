@@ -155,7 +155,7 @@ export interface TranscriptEngineClient extends EngineClient {
   // 登録の途中なら止める。enrollSelf は cancelled で reject する
   cancelSelfEnrollment(): Promise<void>;
   getModelDownloadStatus(): Promise<ModelDownloadStatus>;
-  // 取得を始めて、終わるのを待たずに解決する。結果は model-download-changed で届く。
+  // 文字起こしと話者のモデルが対象。取得を始めて、終わるのを待たずに解決する。結果は model-download-changed で届く。
   // 通信はここからしか始まらないので、利用者の操作でだけ呼ぶ。取得中とモデルが揃っているときは何もしない
   startModelDownload(): Promise<void>;
   // 途中までのファイルは残るので、次は続きから取得する

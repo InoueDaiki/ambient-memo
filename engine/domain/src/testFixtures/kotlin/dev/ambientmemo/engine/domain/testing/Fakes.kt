@@ -20,6 +20,8 @@ import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.StoredSpeakerEmbedding
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.Todo
+import dev.ambientmemo.engine.domain.TodoCompletion
+import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.Transcription
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.domain.UtteranceRepository
@@ -271,10 +273,11 @@ val LlmRequest.isTodoRequest: Boolean
     get() = "JSON だけを出力" in user
 
 /** [utterances] の発話を整理の対象として読む。本物と同じ 1 件ずつの記録だけを行う。 */
+@Suppress("TooManyFunctions") // MemoRepository の項目を実装している
 class InMemoryMemoRepository(
     private val utterances: UtteranceRepository,
 ) : MemoRepository {
-    private class Record(val memo: Memo, val utteranceIds: List<Long>, val todos: List<Todo>)
+    private class Record(val memo: Memo, val utteranceIds: List<Long>, var todos: List<Todo>)
 
     private val lock = Mutex()
     private val records = mutableListOf<Record>()
@@ -324,5 +327,44 @@ class InMemoryMemoRepository(
 
     override suspend fun listTodos(memoId: Long): List<Todo> = lock.withLock {
         records.firstOrNull { it.memo.id == memoId }?.todos.orEmpty()
+    }
+
+    override suspend fun listRecentMemos(limit: Int): List<Memo> = lock.withLock {
+        records.map { it.memo }
+            .sortedWith(compareByDescending(Memo::startedAtMillis).thenByDescending(Memo::id))
+            .take(limit)
+    }
+
+    override suspend fun findMemo(memoId: Long): Memo? = lock.withLock {
+        records.firstOrNull { it.memo.id == memoId }?.memo
+    }
+
+    override suspend fun listMemoUtterances(memoId: Long): List<Utterance> = lock.withLock {
+        val ids = records.firstOrNull { it.memo.id == memoId }?.utteranceIds.orEmpty().toSet()
+        all().filter { it.id in ids }
+    }
+
+    override suspend fun listTodosByPriority(limit: Int): List<Todo> = lock.withLock {
+        records.flatMap { it.todos }
+            .sortedWith(
+                compareBy<Todo> { it.status == TodoStatus.DONE }
+                    .thenBy { it.dueDate == null }
+                    .thenBy { it.dueDate?.toString() }
+                    .thenByDescending { it.createdAtMillis }
+                    .thenBy { it.id },
+            )
+            .take(limit)
+    }
+
+    override suspend fun completeTodo(todoId: Long, completedAtMillis: Long): TodoCompletion = lock.withLock {
+        val record = records.firstOrNull { record -> record.todos.any { it.id == todoId } }
+            ?: return@withLock TodoCompletion.NOT_FOUND
+        if (record.todos.first { it.id == todoId }.status == TodoStatus.DONE) {
+            return@withLock TodoCompletion.ALREADY_DONE
+        }
+        record.todos = record.todos.map {
+            if (it.id == todoId) it.copy(status = TodoStatus.DONE, completedAtMillis = completedAtMillis) else it
+        }
+        TodoCompletion.COMPLETED
     }
 }

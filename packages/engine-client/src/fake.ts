@@ -84,7 +84,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
       modelDownload ??
       (status.transcription === "ready"
         ? { state: "installed", downloadedBytes: 0, totalBytes: 0 }
-        : { state: "idle", downloadedBytes: 0, totalBytes: 713_741_187 });
+        : { state: "idle", downloadedBytes: 0, totalBytes: 742_022_351 });
     this.#memoMode = memoMode;
     this.#memos = [...memos];
   }
@@ -271,7 +271,10 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   // 取得の進み具合や失敗を再現する。揃ったら文字起こしも使えるようになる
   setModelDownload(status: ModelDownloadStatus): void {
     this.#modelDownload = status;
-    if (status.state === "installed") this.#status = { ...this.#status, transcription: "ready" };
+    if (status.state === "installed") {
+      this.#status = { ...this.#status, transcription: "ready" };
+      if (this.#selfEnrollment === "unavailable") this.#selfEnrollment = "not-enrolled";
+    }
     if (status.state === "idle") this.#status = { ...this.#status, transcription: "unavailable" };
     this.#emit({ type: "model-download-changed", status });
   }

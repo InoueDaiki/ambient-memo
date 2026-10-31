@@ -174,13 +174,36 @@ describe("文字起こしの画面", () => {
   });
 
   describe("モデルの取得", () => {
+    it("話者のモデルだけがなければ、聞き取りを妨げずに取得へ案内し、揃うと登録できる", async () => {
+      const client = new FakeEngineClient({
+        selfEnrollment: "unavailable",
+        modelDownload: { state: "idle", downloadedBytes: 0, totalBytes: 28_281_164 },
+      });
+      await renderApp(client);
+
+      await screen.findByText(/話者のモデルが端末にありません/);
+      await screen.findByText(/声の登録にはモデルの取得が必要です。約 29 MB を通信します/);
+      expect(screen.getByRole("button", { name: "聞き取りを始める" })).toBeOnTheScreen();
+      expect(screen.queryByRole("button", { name: "声を登録する" })).toBeNull();
+
+      await userEvent.press(screen.getByRole("button", { name: "モデルを取得する" }));
+      expect(client.modelDownloadStarts).toBe(1);
+
+      await act(async () => {
+        client.setModelDownload({ state: "installed", downloadedBytes: 0, totalBytes: 0 });
+      });
+
+      await screen.findByRole("button", { name: "声を登録する" });
+      expect(screen.queryByText(/話者のモデルが端末にありません/)).toBeNull();
+    });
+
     const status = { engineName: "fake", apiVersion: 1, transcription: "unavailable" } as const;
 
     it("開いただけでは取得を始めず、通信量を伝える", async () => {
       const client = new FakeEngineClient({ status });
       await renderApp(client);
 
-      await screen.findByText(/約 714 MB を通信します/);
+      await screen.findByText(/約 743 MB を通信します/);
       screen.getByRole("button", { name: "モデルを取得する" });
       expect(screen.queryByRole("button", { name: "聞き取りを始める" })).toBeNull();
       expect(client.modelDownloadStarts).toBe(0);

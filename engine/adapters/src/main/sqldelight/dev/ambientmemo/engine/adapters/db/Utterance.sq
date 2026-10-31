@@ -40,6 +40,13 @@ FROM utterance
 ORDER BY started_at_ms DESC, id DESC
 LIMIT :limit;
 
+listByMemo:
+SELECT utterance.*
+FROM utterance
+JOIN memo_utterance ON memo_utterance.utterance_id = utterance.id
+WHERE memo_utterance.memo_id = :memoId
+ORDER BY utterance.started_at_ms, utterance.id;
+
 listUnorganized:
 SELECT *
 FROM utterance

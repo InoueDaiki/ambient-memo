@@ -4,11 +4,10 @@ import {
   type MemoDetail,
   type Todo,
 } from "@ambient-memo/engine-client";
-import { afterEach, describe, expect, it } from "@jest/globals";
+import { describe, expect, it } from "@jest/globals";
 import { act, render, screen, userEvent, waitFor } from "@testing-library/react-native";
 
 import { App } from "../App.tsx";
-import { createAppMemoClient } from "../engine.ts";
 import { formatDueDate, formatMemoPeriod } from "./format.ts";
 
 const at = (day: number, hour: number, minute = 0) =>
@@ -115,6 +114,25 @@ describe("メモの詳細", () => {
     await openTab(client, "メモ");
     await userEvent.press(await screen.findByText(title));
   }
+
+  it("根拠の発話には、話者の名前があれば名前を出す", async () => {
+    const utterances = [
+      {
+        id: "u1",
+        text: "週末に行こう",
+        speaker: "other" as const,
+        speakerName: "話者1",
+        startedAt: 1,
+      },
+    ];
+    await openMemo(
+      new FakeEngineClient({ memos: [memo({ id: "m1", utterances })] }),
+      "買い物の相談",
+    );
+
+    await screen.findByText("話者1");
+    expect(screen.queryByText("それ以外")).toBeNull();
+  });
 
   it("要約と根拠の発話を古い順に、話者と時刻を添えて出す", async () => {
     const client = new FakeEngineClient({
@@ -386,30 +404,11 @@ describe("ナビゲーション", () => {
 });
 
 describe("アプリの Fake", () => {
-  const original = __DEV__;
-
-  afterEach(() => {
-    Object.assign(globalThis, { __DEV__: original });
-  });
-
-  it("開発中は架空の見本を出し、開発用だと知らせる", async () => {
-    const client = new FakeEngineClient();
-    await render(<App client={client} />);
-    await screen.findByText("止まっています");
-
-    await userEvent.press(screen.getByRole("tab", { name: "メモ" }));
+  it("見本を使う Fake では、開発用だと知らせる", async () => {
+    await openTab(new FakeEngineClient({ memoMode: "development", memos: sampleMemos }), "メモ");
 
     await screen.findByText("開発用: メモと ToDo は本物ではありません");
     await screen.findByText(sampleMemos[0]?.title ?? "");
-  });
-
-  it("Release では見本を出さない", async () => {
-    Object.assign(globalThis, { __DEV__: false });
-    const client = createAppMemoClient();
-
-    expect(await client.listMemos({ limit: 10 })).toEqual([]);
-    expect(await client.listTodos({ limit: 10 })).toEqual([]);
-    expect(await client.getMemoMode()).toBe("unavailable");
   });
 
   it("使えないときは、そのことを知らせる", async () => {

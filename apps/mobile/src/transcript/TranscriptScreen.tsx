@@ -92,6 +92,11 @@ export function TranscriptScreen() {
   const transcriptionMode = useTranscriptionMode();
   const modelDownload = useModelDownload();
   const needsModels = transcriptionMode === "unavailable";
+  // 文字起こしのモデルだけを入れた端末では、話者のモデルが残っている
+  const needsSpeakerModel =
+    transcriptionMode === "ready" &&
+    modelDownload.status !== undefined &&
+    modelDownload.status.state !== "installed";
   const { status, isChanging, start, stop } = listening;
   const isListening = status === "listening";
   // 開始を試すと OS の確認が出るので、断られた後にだけ設定へ案内する
@@ -108,6 +113,12 @@ export function TranscriptScreen() {
         </Text>
         <SelfEnrollmentCard isListening={isListening} />
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
+        {needsSpeakerModel && (
+          <>
+            <ModelDownloadNotice status={modelDownload.status} missing="speaker" />
+            <ModelDownloadButton {...modelDownload} variant="secondary" />
+          </>
+        )}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (
           <StatusBanner

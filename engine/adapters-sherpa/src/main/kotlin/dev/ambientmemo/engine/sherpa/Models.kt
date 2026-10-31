@@ -12,6 +12,10 @@ private const val VERIFIED_STAMP = ".verified"
 /** sherpa-onnx の配布物の置き場所。 */
 private const val SHERPA_RELEASES = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
 
+/** 話者のモデルの置き場所。配布元のタグの綴りは recongition のまま。 */
+private const val SPEAKER_RELEASES =
+    "https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models"
+
 class ModelFile(
     val name: String,
     val sizeBytes: Long,
@@ -21,7 +25,7 @@ class ModelFile(
 /**
  * 1つのディレクトリに置くモデルのファイルの組。ディレクトリの名前は [id]。
  *
- * [source] がないパッケージはアプリから取得できない。[ModelCatalog.ACTIVE] には必ず持たせる。
+ * [source] がないパッケージはアプリから取得できない。[ModelCatalog.DOWNLOADS] のパッケージには必ず持たせる。
  */
 class ModelPackage(
     val id: String,
@@ -177,7 +181,9 @@ object ModelCatalog {
             28_281_164,
             "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
         )
-        SpeakerModel(ModelPackage("3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced", listOf(model)), model)
+        val source = ModelSource.SingleFile("$SPEAKER_RELEASES/${model.name}", model)
+        val id = "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced"
+        SpeakerModel(ModelPackage(id, listOf(model), source), model)
     }
 
     /** アプリが使うモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
@@ -185,6 +191,9 @@ object ModelCatalog {
 
     /** アプリが使う話者のモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
     val ACTIVE_SPEAKER: SpeakerModel = CAMPPLUS_ADVANCED
+
+    /** アプリが取得するパッケージ。すべてに [ModelPackage.source] が要る。 */
+    val DOWNLOADS: List<ModelPackage> = ACTIVE.packages + ACTIVE_SPEAKER.modelPackage
 }
 
 /** [root] の下にモデルを置く。端末では内部ストレージ、JVM ではテスト用のディレクトリ。 */

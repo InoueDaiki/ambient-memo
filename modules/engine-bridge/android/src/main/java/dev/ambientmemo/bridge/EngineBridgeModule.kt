@@ -12,10 +12,13 @@ import dev.ambientmemo.engine.android.CaptureState
 import dev.ambientmemo.engine.android.Engine
 import dev.ambientmemo.engine.android.EngineStartException
 import dev.ambientmemo.engine.android.EnrollmentFailure
+import dev.ambientmemo.engine.android.MemoChange
 import dev.ambientmemo.engine.android.SelfEnrollmentException
 import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
+import dev.ambientmemo.engine.android.TodoNotFoundException
 import dev.ambientmemo.engine.android.TranscriptionMode
+import dev.ambientmemo.engine.android.toWire
 import dev.ambientmemo.engine.domain.ModelDownloadFailure
 import dev.ambientmemo.engine.domain.ModelDownloadPhase
 import dev.ambientmemo.engine.domain.ModelDownloadState
@@ -61,6 +64,12 @@ private class EnrollmentFailedException(failure: EnrollmentFailure) : CodedExcep
   cause = null,
 )
 
+private class TodoNotFoundCodedException : CodedException(
+  code = "todo-not-found",
+  message = "ToDo がありません",
+  cause = null,
+)
+
 class EngineBridgeModule : Module() {
   private val context: Context
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
@@ -70,6 +79,15 @@ class EngineBridgeModule : Module() {
 
   private var scope: CoroutineScope? = null
   private val publishLock = Any()
+
+  // 書き込みが戻る前に呼ばれるので、完了の Promise より先にイベントが届く
+  private val memoListener: (MemoChange) -> Unit = { change ->
+    val type = when (change) {
+      MemoChange.MEMOS -> "memos-changed"
+      MemoChange.TODOS -> "todos-changed"
+    }
+    sendEvent(EVENT_ENGINE, mapOf("type" to type))
+  }
   private var publishedStatus: String? = null
 
   override fun definition() = ModuleDefinition {
@@ -85,10 +103,12 @@ class EngineBridgeModule : Module() {
       moduleScope.launch {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
+      engine.addMemoListener(memoListener)
     }
 
     OnDestroy {
       scope?.cancel()
+      engine.removeMemoListener(memoListener)
     }
 
     // 設定の画面で権限を変えて戻ってきたときに、案内を更新する
@@ -162,20 +182,26 @@ class EngineBridgeModule : Module() {
 
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
       val speakers = engine.speakers()
-      engine.recentUtterances(limit).map {
-        // 特徴量は JS へ渡さない。JS が知るのは表示に使う名前だけ
-        val speaker = it.speakerId?.let(speakers::get)
-        mapOf(
-          "id" to it.id.toString(),
-          "text" to it.text,
-          "speaker" to when {
-            speaker == null -> "unknown"
-            speaker.isSelf -> "self"
-            else -> "other"
-          },
-          "speakerName" to speaker?.displayName,
-          "startedAt" to it.startedAtMillis.toDouble(),
-        )
+      engine.recentUtterances(limit).map { it.toWire(speakers) }
+    }
+
+    AsyncFunction("listMemos") Coroutine { limit: Int ->
+      engine.memoBridge.listMemos(limit)
+    }
+
+    AsyncFunction("getMemo") Coroutine { id: String ->
+      engine.memoBridge.getMemo(id)
+    }
+
+    AsyncFunction("listTodos") Coroutine { limit: Int ->
+      engine.memoBridge.listTodos(limit)
+    }
+
+    AsyncFunction("completeTodo") Coroutine { id: String ->
+      try {
+        engine.memoBridge.completeTodo(id)
+      } catch (_: TodoNotFoundException) {
+        throw TodoNotFoundCodedException()
       }
     }
 
