@@ -1,0 +1,6 @@
+# LLM 検証の専用ツール。ルートの mise.toml には足さない
+[tools]
+python = "3.12.13"
+uv = "0.13.6"
+# LFM と Qwen の公式 GGUF を動かす。公式のビルド済みバイナリ(ggml-org のリリース)
+"github:ggml-org/llama.cpp" = { version = "b12020", asset_pattern = "llama-b12020-bin-macos-arm64.tar.gz", bin_path = "llama-b12020" }
