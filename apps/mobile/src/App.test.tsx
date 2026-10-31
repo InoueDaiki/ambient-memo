@@ -160,6 +160,119 @@ describe("文字起こしの画面", () => {
     await screen.findByText("文字起こしのモデルが端末にありません。");
   });
 
+  describe("モデルの取得", () => {
+    const status = { engineName: "fake", apiVersion: 1, transcription: "unavailable" } as const;
+
+    it("開いただけでは取得を始めず、通信量を伝える", async () => {
+      const client = new FakeEngineClient({ status });
+      await renderApp(client);
+
+      await screen.findByText(/約 714 MB を通信します/);
+      screen.getByRole("button", { name: "モデルを取得する" });
+      expect(screen.queryByRole("button", { name: "聞き取りを始める" })).toBeNull();
+      expect(client.modelDownloadStarts).toBe(0);
+    });
+
+    it("操作で取得を始めて、進み具合を出す", async () => {
+      const client = new FakeEngineClient({ status });
+      await renderApp(client);
+
+      await press("モデルを取得する");
+
+      expect(client.modelDownloadStarts).toBe(1);
+      await act(async () => {
+        client.setModelDownload({
+          state: "running",
+          phase: "downloading",
+          completedBytes: 300_000_000,
+          totalBytes: 600_000_000,
+        });
+      });
+      await screen.findByText("取得中 300 MB / 600 MB");
+      expect(screen.getByRole("progressbar").props.accessibilityValue.now).toBe(50);
+
+      await act(async () => {
+        client.setModelDownload({
+          state: "running",
+          phase: "extracting",
+          completedBytes: 1,
+          totalBytes: 2,
+        });
+      });
+      await screen.findByText("モデルを取り出しています");
+    });
+
+    it("取得が終わると聞き取りを始められる", async () => {
+      const client = new FakeEngineClient({ status });
+      await renderApp(client);
+      await press("モデルを取得する");
+
+      await act(async () => {
+        client.setModelDownload({ state: "installed", downloadedBytes: 0, totalBytes: 0 });
+      });
+
+      await screen.findByRole("button", { name: "聞き取りを始める" });
+      expect(screen.queryByText(/モデルが端末にありません/)).toBeNull();
+    });
+
+    it("途中で止めたら、続きから取得できる", async () => {
+      const client = new FakeEngineClient({ status });
+      await renderApp(client);
+      await press("モデルを取得する");
+      await act(async () => {
+        client.setModelDownload({
+          state: "running",
+          phase: "downloading",
+          completedBytes: 300_000_000,
+          totalBytes: 600_000_000,
+        });
+      });
+
+      await press("取得を止める");
+
+      await screen.findByText("300 MB / 600 MB まで取得済みです。続きから取得できます。");
+      await press("続きから取得する");
+      expect(client.modelDownloadStarts).toBe(2);
+    });
+
+    it.each([
+      ["network", 0, "通信が切れたため、取得が止まりました。"],
+      ["corrupted", 0, "取得したファイルが正しくなかったため、消しました。"],
+      ["insufficient-storage", 1_500_000_000, "空き容量が足りません。あと 1.5 GB 空けてください。"],
+      ["unknown", 0, "モデルを取得できませんでした。"],
+    ] as const)("失敗(%s)を知らせて、やり直せる", async (failure, shortageBytes, message) => {
+      const client = new FakeEngineClient({
+        status,
+        modelDownload: {
+          state: "failed",
+          failure,
+          shortageBytes,
+          downloadedBytes: 0,
+          totalBytes: 600_000_000,
+        },
+      });
+      await renderApp(client);
+
+      await screen.findByText(message);
+      await press("モデルを取得する");
+
+      expect(client.modelDownloadStarts).toBe(1);
+    });
+
+    it("聞き取りを始めるときにモデルが壊れていたら、取得へ案内する", async () => {
+      const client = new FakeEngineClient();
+      client.failNextStart(new EngineStartError("transcription-unavailable"));
+      await renderApp(client);
+      await press("聞き取りを始める");
+
+      await act(async () => {
+        client.setModelDownload({ state: "idle", downloadedBytes: 0, totalBytes: 600_000_000 });
+      });
+
+      await screen.findByRole("button", { name: "モデルを取得する" });
+    });
+  });
+
   it("モデルがあるときは案内を出さない", async () => {
     await renderApp(new FakeEngineClient());
 

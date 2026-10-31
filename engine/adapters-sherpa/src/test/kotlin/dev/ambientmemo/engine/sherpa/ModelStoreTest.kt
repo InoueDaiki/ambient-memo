@@ -7,6 +7,7 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
 import java.io.File
+import java.net.URL
 import java.security.MessageDigest
 
 class ModelStoreTest {
@@ -56,6 +57,16 @@ class ModelStoreTest {
         install(content.copyOf(content.size - 1))
 
         assertFalse(store.isInstalled(models))
+    }
+
+    @Test
+    fun `アプリが使うモデルは、すべて固定の https の URL から取得できる`() {
+        ModelCatalog.ACTIVE.packages.forEach { modelPackage ->
+            val source = checkNotNull(modelPackage.source) { modelPackage.id }
+            assertTrue(isModelHost(URL(source.url)), source.url)
+            assertTrue(source.sizeBytes > 0, source.url)
+            assertTrue(source.sha256.matches(Regex("[0-9a-f]{64}")), source.url)
+        }
     }
 
     @Test

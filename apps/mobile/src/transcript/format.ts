@@ -18,3 +18,12 @@ export function formatDay(timestamp: number): string {
   const date = new Date(timestamp);
   return `${date.getMonth() + 1}月${date.getDate()}日(${weekdays[date.getDay()]})`;
 }
+
+const MEGABYTE = 1_000_000;
+const GIGABYTE = 1_000_000_000;
+
+// 通信量と空き容量の目安を出す。端末の設定の画面に合わせて 1000 で割る
+export function formatBytes(bytes: number): string {
+  if (bytes >= GIGABYTE) return `${(bytes / GIGABYTE).toFixed(1)} GB`;
+  return `${Math.ceil(bytes / MEGABYTE)} MB`;
+}

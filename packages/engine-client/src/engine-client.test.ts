@@ -58,6 +58,72 @@ describe.each<[string, () => TranscriptEngineClient]>([
   });
 });
 
+describe("FakeEngineClient のモデルの取得", () => {
+  const missing = () =>
+    new FakeEngineClient({
+      status: { engineName: "fake", apiVersion: 1, transcription: "unavailable" },
+    });
+
+  it("開始するまで取得しない", async () => {
+    const client = missing();
+
+    expect((await client.getModelDownloadStatus()).state).toBe("idle");
+    expect(client.modelDownloadStarts).toBe(0);
+  });
+
+  it("開始すると取得中になり、イベントで届く", async () => {
+    const client = missing();
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    await client.startModelDownload();
+    await client.startModelDownload();
+
+    expect(client.modelDownloadStarts).toBe(1);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({
+      type: "model-download-changed",
+      status: { state: "running", phase: "downloading" },
+    });
+  });
+
+  it("止めると途中までの量が残る", async () => {
+    const client = missing();
+    await client.startModelDownload();
+    client.setModelDownload({
+      state: "running",
+      phase: "downloading",
+      completedBytes: 100,
+      totalBytes: 200,
+    });
+
+    await client.cancelModelDownload();
+
+    expect(await client.getModelDownloadStatus()).toEqual({
+      state: "idle",
+      downloadedBytes: 100,
+      totalBytes: 200,
+    });
+  });
+
+  it("揃うと文字起こしが使える", async () => {
+    const client = missing();
+
+    client.setModelDownload({ state: "installed", downloadedBytes: 0, totalBytes: 0 });
+
+    expect((await client.getStatus()).transcription).toBe("ready");
+  });
+
+  it("モデルが揃っていれば開始しても何もしない", async () => {
+    const client = new FakeEngineClient();
+
+    await client.startModelDownload();
+
+    expect(client.modelDownloadStarts).toBe(0);
+    expect((await client.getModelDownloadStatus()).state).toBe("installed");
+  });
+});
+
 describe("FakeEngineClient の発話", () => {
   const utterance = (id: string, startedAt: number): Utterance => ({
     id,
