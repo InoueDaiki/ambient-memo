@@ -2,15 +2,28 @@
   "name": "@ambient-memo/engine-client",
   "version": "0.1.0",
   "private": true,
-  "description": "エンジンの TS 型と Fake 実装",
+  "description": "エンジンの TS 型、Fake 実装、React の hooks",
   "type": "module",
-  "exports": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./react": "./src/react.tsx"
+  },
   "scripts": {
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },
   "devDependencies": {
+    "@types/react": "19.3.0",
+    "react": "19.3.0",
     "typescript": "7.0.2",
     "vitest": "5.0.5"
+  },
+  "peerDependencies": {
+    "react": "*"
+  },
+  "peerDependenciesMeta": {
+    "react": {
+      "optional": true
+    }
   }
 }

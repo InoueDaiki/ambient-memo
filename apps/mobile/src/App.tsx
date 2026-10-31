@@ -1,25 +1,19 @@
-import { createEngineClient } from "@ambient-memo/engine-bridge";
-import type { EngineStatus } from "@ambient-memo/engine-client";
-import { Screen } from "@ambient-memo/ui-native";
-import { useEffect, useState } from "react";
-import { Text } from "react-native";
+import type { TranscriptEngineClient } from "@ambient-memo/engine-client";
+import { EngineClientProvider } from "@ambient-memo/engine-client/react";
+import { useState } from "react";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
-export function App() {
-  const [status, setStatus] = useState<EngineStatus>();
-  const [error, setError] = useState<string>();
+import { createAppEngineClient } from "./engine.ts";
+import { TranscriptScreen } from "./transcript/TranscriptScreen.tsx";
 
-  useEffect(() => {
-    createEngineClient()
-      .getStatus()
-      .then(setStatus)
-      .catch((e: unknown) => setError(String(e)));
-  }, []);
-
+// テストは client に Fake を渡す
+export function App({ client }: { client?: TranscriptEngineClient }) {
+  const [engineClient] = useState(() => client ?? createAppEngineClient());
   return (
-    <Screen>
-      <Text>
-        {error ?? (status ? `${status.engineName} (API ${status.apiVersion})` : "読み込み中")}
-      </Text>
-    </Screen>
+    <SafeAreaProvider>
+      <EngineClientProvider client={engineClient}>
+        <TranscriptScreen />
+      </EngineClientProvider>
+    </SafeAreaProvider>
   );
 }

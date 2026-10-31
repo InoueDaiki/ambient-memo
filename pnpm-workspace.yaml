@@ -2,6 +2,10 @@ packages:
   - apps/*
   - packages/*
   - modules/*
+# jest が連れてくるネイティブの依存。配布済みのバイナリを使うので、install 時のスクリプトは動かさない
+allowBuilds:
+  '@parcel/watcher': false
+  unrs-resolver: false
 minimumReleaseAgeExclude:
   - '@expo/cli@58.1.18'
   - '@expo/config@58.0.10'
