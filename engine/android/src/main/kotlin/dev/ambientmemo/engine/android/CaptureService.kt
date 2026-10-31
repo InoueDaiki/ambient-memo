@@ -43,8 +43,7 @@ class CaptureService : Service() {
 
     private fun start(startId: Int) {
         val notifications = EngineNotifications(this)
-        val isDevelopment = engine.transcriptionMode == TranscriptionMode.DEVELOPMENT
-        val notification = notifications.capture(stopIntent(this), isDevelopment)
+        val notification = notifications.capture(stopIntent(this))
         try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                 startForeground(

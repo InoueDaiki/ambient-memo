@@ -82,7 +82,6 @@ class EngineBridgeModule : Module() {
         "engineName" to status.engineName,
         "apiVersion" to status.apiVersion,
         "transcription" to when (engine.transcriptionMode) {
-          TranscriptionMode.DEVELOPMENT -> "development"
           TranscriptionMode.READY -> "ready"
           TranscriptionMode.UNAVAILABLE -> "unavailable"
         },
@@ -105,7 +104,7 @@ class EngineBridgeModule : Module() {
     }
 
     AsyncFunction("startListening") Coroutine { ->
-      // 使えないのにマイクの許可を求めない
+      // モデルがないのにマイクの許可を求めない
       if (engine.transcriptionMode == TranscriptionMode.UNAVAILABLE) {
         throw StartFailedException(StartFailure.TRANSCRIPTION_UNAVAILABLE)
       }

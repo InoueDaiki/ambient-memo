@@ -148,23 +148,23 @@ describe("文字起こしの画面", () => {
 
     await press("聞き取りを始める");
 
-    await screen.findByText("文字起こしの機能がまだ入っていないため、聞き取りを始められません。");
+    await screen.findByText("文字起こしのモデルが端末にないため、聞き取りを始められません。");
   });
 
-  it("開発用の実装で動いているときは、そのことを出す", async () => {
+  it("モデルが端末にないときは、そのことを出す", async () => {
     const client = new FakeEngineClient({
-      status: { engineName: "fake", apiVersion: 1, transcription: "development" },
+      status: { engineName: "fake", apiVersion: 1, transcription: "unavailable" },
     });
     await renderApp(client);
 
-    await screen.findByText("開発用: 文字起こしは本物ではありません");
+    await screen.findByText("文字起こしのモデルが端末にありません。");
   });
 
-  it("本物の実装では開発用の表示を出さない", async () => {
+  it("モデルがあるときは案内を出さない", async () => {
     await renderApp(new FakeEngineClient());
 
     await screen.findByText("まだ発話はありません");
-    expect(screen.queryByText(/開発用/)).toBeNull();
+    expect(screen.queryByText(/モデルが端末に/)).toBeNull();
   });
 
   it("マイクの都合で止まったら理由を知らせて、次の開始で消す", async () => {

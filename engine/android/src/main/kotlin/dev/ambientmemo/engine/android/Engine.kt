@@ -10,8 +10,14 @@ import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.CapturePipeline
+import dev.ambientmemo.engine.domain.NoiseTextFilter
 import dev.ambientmemo.engine.domain.SystemClock
 import dev.ambientmemo.engine.domain.Utterance
+import dev.ambientmemo.engine.sherpa.ModelCatalog
+import dev.ambientmemo.engine.sherpa.ModelStore
+import dev.ambientmemo.engine.sherpa.SherpaSettings
+import dev.ambientmemo.engine.sherpa.android.androidTranscriber
+import dev.ambientmemo.engine.sherpa.android.androidVoiceActivityDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -22,13 +28,16 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import java.io.File
 
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
+private const val MODELS_DIRECTORY = "models"
 
-/** 文字起こしの実装の状態。 */
-enum class TranscriptionMode { DEVELOPMENT, READY, UNAVAILABLE }
+/** 文字起こしの状態。モデルが内部ストレージになければ [UNAVAILABLE]。 */
+enum class TranscriptionMode { READY, UNAVAILABLE }
 
 /** 聞き取りを始められなかった理由。 */
 enum class StartFailure { MICROPHONE_PERMISSION, TRANSCRIPTION_UNAVAILABLE, MICROPHONE_UNAVAILABLE }
@@ -38,12 +47,13 @@ class EngineStartException(val failure: StartFailure) : Exception(failure.name)
 /**
  * プロセスに1つのエンジン。Service と engine-bridge はここを通して同じ状態を見る。
  *
- * 依存の組み立てもここで行う。発話の検知と文字起こしの差し替えは [speechComponents] の1か所で行う。
+ * 依存の組み立てもここで行う。モデルは [ModelCatalog.ACTIVE] で差し替える。
  */
 class Engine private constructor(context: Context) {
     private val context = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    private val speech: SpeechComponents? = speechComponents()
+    private val models = ModelCatalog.ACTIVE
+    private val modelStore = ModelStore(File(this.context.filesDir, MODELS_DIRECTORY))
     private val database by lazy { openAndroidDatabase(this.context) }
     private val utteranceRepository by lazy {
         ObservableUtteranceRepository(SqliteUtteranceRepository(database)) { changes.tryEmit(Unit) }
@@ -55,8 +65,8 @@ class Engine private constructor(context: Context) {
     private val runner = CaptureRunner(
         scope = scope,
         onFailure = { Log.e(TAG, "聞き取りが止まりました: ${it.javaClass.simpleName}") },
-        createPipeline = ::createPipeline,
-        audioSource = ::microphoneAudioSource,
+        capture = ::capture,
+        audioSource = { developmentAudioSource(this.context) ?: microphoneAudioSource() },
     )
 
     val captureState: StateFlow<CaptureState> = runner.state
@@ -65,23 +75,25 @@ class Engine private constructor(context: Context) {
     val utterancesChanged: SharedFlow<Unit> = changes.asSharedFlow()
 
     val transcriptionMode: TranscriptionMode
-        get() = when {
-            speech == null -> TranscriptionMode.UNAVAILABLE
-            speech.isDevelopment -> TranscriptionMode.DEVELOPMENT
-            else -> TranscriptionMode.READY
-        }
+        get() = if (modelStore.isInstalled(models)) TranscriptionMode.READY else TranscriptionMode.UNAVAILABLE
 
-    private fun createPipeline(audioSource: AudioSource): CapturePipeline {
-        val components = checkNotNull(speech) { "文字起こしの実装がありません" }
-        return CapturePipeline(
-            audioSource = audioSource,
-            voiceActivityDetector = components.voiceActivityDetector,
-            transcriber = components.transcriber,
-            utterances = utteranceRepository,
-            captureGaps = SqliteCaptureGapRepository(database),
-            clock = SystemClock,
-            processingContext = Dispatchers.Default,
-        )
+    /** ネイティブのメモリは聞き取りの間だけ持つ。パイプラインは文字起こしが終わってから戻るので、ここで解放できる。 */
+    private suspend fun capture(audioSource: AudioSource) {
+        androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
+            androidTranscriber(modelStore, models).use { transcriber ->
+                CapturePipeline(
+                    audioSource = audioSource,
+                    voiceActivityDetector = voiceActivityDetector,
+                    transcriber = transcriber,
+                    utterances = utteranceRepository,
+                    captureGaps = SqliteCaptureGapRepository(database),
+                    clock = SystemClock,
+                    config = SherpaSettings.captureConfig(),
+                    processingContext = Dispatchers.Default,
+                    transcriptionFilter = NoiseTextFilter(),
+                ).run()
+            }
+        }
     }
 
     /**
@@ -104,8 +116,8 @@ class Engine private constructor(context: Context) {
         }
     }
 
-    private fun precondition(): StartFailure? = when {
-        speech == null -> StartFailure.TRANSCRIPTION_UNAVAILABLE
+    private suspend fun precondition(): StartFailure? = when {
+        !withContext(Dispatchers.IO) { modelStore.verify(models) } -> StartFailure.TRANSCRIPTION_UNAVAILABLE
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
             StartFailure.MICROPHONE_PERMISSION
         else -> null

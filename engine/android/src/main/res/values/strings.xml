@@ -4,7 +4,6 @@
     <string name="channel_reminder">聞き取りのお知らせ</string>
     <string name="capture_title">聞き取り中</string>
     <string name="capture_text">音声は保存しません</string>
-    <string name="capture_text_development">開発用: 文字起こしは本物ではありません</string>
     <string name="capture_stop">停止</string>
     <string name="reboot_title">聞き取りは止まっています</string>
     <string name="reboot_text">記録するには起動してください</string>

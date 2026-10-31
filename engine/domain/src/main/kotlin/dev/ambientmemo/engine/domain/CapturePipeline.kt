@@ -33,6 +33,7 @@ class CapturePipeline(
     private val clock: Clock,
     private val config: CaptureConfig = CaptureConfig(),
     private val processingContext: CoroutineContext = EmptyCoroutineContext,
+    private val transcriptionFilter: TranscriptionFilter = TranscriptionFilter { _, _ -> true },
 ) {
     /**
      * 音声の終わりまで処理する。
@@ -116,7 +117,8 @@ class CapturePipeline(
     private suspend fun process(segment: SpeechSegment, backlog: SegmentBacklog) = segment.use {
         try {
             val transcription = transcriber.transcribe(segment)
-            if (transcription.text.isNotBlank()) {
+            val durationMillis = segment.endedAtMillis - segment.startedAtMillis
+            if (transcription.text.isNotBlank() && transcriptionFilter.shouldSave(transcription.text, durationMillis)) {
                 utterances.insert(segment.toUtterance(transcription))
             }
         } catch (e: Exception) {

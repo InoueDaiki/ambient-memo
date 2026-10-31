@@ -53,7 +53,7 @@ class CaptureRunnerTest {
     private fun runner(source: () -> AudioSource) = CaptureRunner(
         scope = CoroutineScope(SupervisorJob() + Dispatchers.Default),
         onFailure = { synchronized(failures) { failures += it } },
-        createPipeline = { audio ->
+        capture = { audio ->
             CapturePipeline(
                 audioSource = audio,
                 voiceActivityDetector = ScriptedVoiceActivityDetector(listOf(0L..<10_000L)),
@@ -61,7 +61,7 @@ class CaptureRunnerTest {
                 utterances = utterances,
                 captureGaps = gaps,
                 clock = FakeClock(),
-            )
+            ).run()
         },
         audioSource = source,
     )
@@ -127,7 +127,7 @@ class CaptureRunnerTest {
         val runner = CaptureRunner(
             scope = CoroutineScope(SupervisorJob() + Dispatchers.Unconfined),
             onFailure = { failures += it },
-            createPipeline = { error("呼ばれない") },
+            capture = { error("呼ばれない") },
             audioSource = { throw AudioCaptureException("開けない") },
         )
 

@@ -30,11 +30,11 @@ private suspend fun Flow<AudioFrame>.copyAll(): List<CopiedFrame> {
     return frames
 }
 
-private fun segment(millis: Int = 500) = SpeechSegment(
+private fun segment(samples: ShortArray = SyntheticAudio.tone(500)) = SpeechSegment(
     startedAtMillis = 0,
-    endedAtMillis = millis.toLong(),
+    endedAtMillis = samples.size * 1_000L / TEST_SAMPLE_RATE_HZ,
     sampleRateHz = TEST_SAMPLE_RATE_HZ,
-    samples = SyntheticAudio.tone(millis),
+    samples = samples,
 )
 
 /** 有限の音声を流せる [AudioSource] の契約テスト。 */
@@ -98,20 +98,31 @@ abstract class ClockContract {
 abstract class VoiceActivityDetectorContract {
     protected abstract fun detector(speechMillis: LongRange): VoiceActivityDetector
 
-    /** 発話の時間帯には [SyntheticAudio.tone]、それ以外には無音を置いた音声。 */
-    private val audio = SyntheticAudio.silence(200) + SyntheticAudio.tone(600) + SyntheticAudio.silence(200)
+    /** 発話の音声。音声の中身を見る本物の実装は、本物の発話に差し替える。 */
+    protected open fun speech(): ShortArray = SyntheticAudio.tone(600)
 
     private fun AudioFrame.copy() = AudioFrame(startedAtMillis, samples.copyOf())
 
-    private suspend fun results(detector: VoiceActivityDetector): List<Boolean> {
+    private suspend fun results(detector: VoiceActivityDetector, audio: ShortArray): List<Boolean> {
         val results = mutableListOf<Boolean>()
         FakeAudioSource(audio).frames().onEach { results += detector.isSpeech(it.copy()) }.collect()
         return results
     }
 
+    private fun speechRange(speech: ShortArray): LongRange {
+        val endMillis = LEADING_SILENCE_MILLIS + speech.size * 1_000L / TEST_SAMPLE_RATE_HZ
+        return LEADING_SILENCE_MILLIS.toLong()..<endMillis
+    }
+
+    /** 発話の前後に無音を置いた音声。 */
+    private fun audio(speech: ShortArray) =
+        SyntheticAudio.silence(LEADING_SILENCE_MILLIS) + speech + SyntheticAudio.silence(TRAILING_SILENCE_MILLIS)
+
     @Test
     fun `発話の時間帯を発話と判定する`() = runTest {
-        val results = results(detector(200L..<800L))
+        val speech = speech()
+
+        val results = results(detector(speechRange(speech)), audio(speech))
 
         assertTrue(results.any { it })
         assertFalse(results.first())
@@ -119,34 +130,60 @@ abstract class VoiceActivityDetectorContract {
     }
 
     @Test
-    fun `reset すると同じ音声で同じ結果になる`() = runTest {
-        val detector = detector(200L..<800L)
+    fun `無音を発話と判定しない`() = runTest {
+        val results = results(detector(LongRange.EMPTY), SyntheticAudio.silence(1_000))
 
-        val first = results(detector)
+        assertFalse(results.any { it })
+    }
+
+    @Test
+    fun `reset すると同じ音声で同じ結果になる`() = runTest {
+        val speech = speech()
+        val detector = detector(speechRange(speech))
+
+        val first = results(detector, audio(speech))
         detector.reset()
-        val second = results(detector)
+        val second = results(detector, audio(speech))
 
         assertEquals(first, second)
+    }
+
+    private companion object {
+        const val LEADING_SILENCE_MILLIS = 200
+        const val TRAILING_SILENCE_MILLIS = 1_000
     }
 }
 
 abstract class TranscriberContract {
     protected abstract fun transcriber(): Transcriber
 
+    /** 発話の音声。音声の中身を見る本物の実装は、本物の発話に差し替える。 */
+    protected open fun speech(): ShortArray = SyntheticAudio.tone(500)
+
     @Test
     fun `発話の音声を文字にする`() = runTest {
-        val transcription = transcriber().transcribe(segment())
+        val transcription = transcriber().transcribe(segment(speech()))
 
         assertTrue(transcription.text.isNotBlank())
     }
 
     @Test
     fun `バッファの解放は呼び出し側に任せる`() = runTest {
-        val segment = segment()
+        val segment = segment(speech())
 
         transcriber().transcribe(segment)
 
         assertFalse(segment.isReleased)
+    }
+
+    @Test
+    fun `渡された音声を書き換えない`() = runTest {
+        val samples = speech()
+        val segment = segment(samples.copyOf())
+
+        transcriber().transcribe(segment)
+
+        assertArrayEquals(samples, segment.samples)
     }
 }
 

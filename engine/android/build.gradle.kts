@@ -22,6 +22,8 @@ android {
 dependencies {
     api(project(":domain"))
     implementation(project(":adapters"))
+    implementation(project(":adapters-sherpa"))
+    implementation(project(":adapters-sherpa-android"))
     implementation(libs.kotlinx.coroutines.android)
 
     testImplementation(testFixtures(project(":domain")))

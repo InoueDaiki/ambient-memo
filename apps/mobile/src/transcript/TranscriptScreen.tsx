@@ -55,7 +55,7 @@ function listeningErrorMessage(status: ListeningStatus | undefined, error: unkno
       case "microphone-unavailable":
         return "マイクを開けませんでした。ほかのアプリが使っていないか確かめてください。";
       case "transcription-unavailable":
-        return "文字起こしの機能がまだ入っていないため、聞き取りを始められません。";
+        return "文字起こしのモデルが端末にないため、聞き取りを始められません。";
     }
   }
   return "聞き取りを始められませんでした。もう一度試してください。";
@@ -101,8 +101,8 @@ export function TranscriptScreen() {
         <Text variant="title" accessibilityRole="header">
           文字起こし
         </Text>
-        {transcriptionMode === "development" && (
-          <StatusBanner tone="neutral" message="開発用: 文字起こしは本物ではありません" />
+        {transcriptionMode === "unavailable" && (
+          <StatusBanner tone="neutral" message="文字起こしのモデルが端末にありません。" />
         )}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (

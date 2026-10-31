@@ -42,6 +42,14 @@ description = "Kotlin のテスト(engine/ の JUnit)"
 dir = "engine"
 run = "./gradlew test"
 
+[tasks."models:fetch"]
+description = "本物のモデルを engine/.cache/models に取得する(開発用)。SHA-256 を確かめる"
+run = "scripts/fetch-models.sh"
+
+[tasks."models:push"]
+description = "取得したモデルを、接続した端末の Debug ビルドの内部ストレージへ入れる"
+run = "scripts/push-models.sh"
+
 [tasks.mobile]
 description = "Metro を起動する。ビルドは mobile:android"
 run = "pnpm --dir apps/mobile start"

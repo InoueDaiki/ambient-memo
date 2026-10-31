@@ -22,8 +22,7 @@ internal class EngineNotifications(private val context: Context) {
     private val manager = context.getSystemService(NotificationManager::class.java)
 
     /** 聞き取り中ずっと出す通知。 */
-    fun capture(stopIntent: Intent, isDevelopment: Boolean): Notification {
-        val text = if (isDevelopment) R.string.capture_text_development else R.string.capture_text
+    fun capture(stopIntent: Intent): Notification {
         val stop = PendingIntent.getService(
             context,
             REQUEST_STOP,
@@ -33,7 +32,7 @@ internal class EngineNotifications(private val context: Context) {
         val stopAction = Notification.Action.Builder(null, context.getString(R.string.capture_stop), stop).build()
         return builder(CHANNEL_CAPTURE)
             .setContentTitle(context.getString(R.string.capture_title))
-            .setContentText(context.getString(text))
+            .setContentText(context.getString(R.string.capture_text))
             .setContentIntent(openApp())
             .setOngoing(true)
             .addAction(stopAction)

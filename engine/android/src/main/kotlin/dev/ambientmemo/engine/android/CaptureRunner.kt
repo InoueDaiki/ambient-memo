@@ -2,7 +2,6 @@ package dev.ambientmemo.engine.android
 
 import dev.ambientmemo.engine.domain.AudioFrame
 import dev.ambientmemo.engine.domain.AudioSource
-import dev.ambientmemo.engine.domain.CapturePipeline
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -27,7 +26,7 @@ sealed interface CaptureState {
 }
 
 /**
- * [CapturePipeline] を1本だけ動かし、状態を公開する。
+ * 聞き取りを1本だけ動かし、状態を公開する。
  *
  * 最初のフレームが届いて初めて [CaptureState.Listening] にする。マイクを開けなかったときに、
  * 聞き取り中と見せないため。
@@ -35,7 +34,7 @@ sealed interface CaptureState {
 internal class CaptureRunner(
     private val scope: CoroutineScope,
     private val onFailure: (Exception) -> Unit = {},
-    private val createPipeline: (AudioSource) -> CapturePipeline,
+    private val capture: suspend (AudioSource) -> Unit,
     private val audioSource: () -> AudioSource,
 ) {
     private val mutableState = MutableStateFlow<CaptureState>(CaptureState.Stopped())
@@ -82,7 +81,7 @@ internal class CaptureRunner(
         // マイクの音声に終わりはないので、頼まれずに戻ったときも中断として扱う
         var interrupted = true
         try {
-            createPipeline(ObservedAudioSource(audioSource(), ::markListening)).run()
+            capture(ObservedAudioSource(audioSource(), ::markListening))
         } catch (e: CancellationException) {
             interrupted = false
             throw e

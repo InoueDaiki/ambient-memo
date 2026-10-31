@@ -1,10 +1,9 @@
 // 画面から見たエンジンの境界。Android 固有の型や概念を持ち込まない
 
-// 文字起こしの実装の状態
-// - ready: 本物の認識で動く
-// - development: 開発用の Fake で動く。画面でそのことを知らせる
-// - unavailable: 実装がなく、聞き取りを始められない
-export type TranscriptionMode = "ready" | "development" | "unavailable";
+// 文字起こしの状態
+// - ready: モデルが端末にあり、聞き取りを始められる
+// - unavailable: モデルが端末になく、聞き取りを始められない
+export type TranscriptionMode = "ready" | "unavailable";
 
 export interface EngineStatus {
   engineName: string;
