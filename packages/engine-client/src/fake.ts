@@ -1,6 +1,7 @@
 import type {
   EngineEvent,
   EngineListener,
+  EnginePermissions,
   EngineStatus,
   ListeningStatus,
   TranscriptEngineClient,
@@ -11,6 +12,7 @@ export interface FakeEngineClientOptions {
   status?: EngineStatus;
   listeningStatus?: ListeningStatus;
   utterances?: Utterance[];
+  permissions?: EnginePermissions;
 }
 
 // エンジンなしで画面を開発・テストするための実装
@@ -20,15 +22,19 @@ export class FakeEngineClient implements TranscriptEngineClient {
   #listeningStatus: ListeningStatus;
   #utterances: Utterance[];
   #startError: Error | undefined;
+  #permissions: EnginePermissions;
+  #settingsOpened = 0;
 
   constructor({
-    status = { engineName: "fake-engine", apiVersion: 1 },
+    status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
     listeningStatus = "stopped",
     utterances = [],
+    permissions = { microphone: true, notifications: true },
   }: FakeEngineClientOptions = {}) {
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
+    this.#permissions = permissions;
   }
 
   getStatus(): Promise<EngineStatus> {
@@ -37,6 +43,15 @@ export class FakeEngineClient implements TranscriptEngineClient {
 
   getListeningStatus(): Promise<ListeningStatus> {
     return Promise.resolve(this.#listeningStatus);
+  }
+
+  getPermissions(): Promise<EnginePermissions> {
+    return Promise.resolve(this.#permissions);
+  }
+
+  openPermissionSettings(): Promise<void> {
+    this.#settingsOpened += 1;
+    return Promise.resolve();
   }
 
   startListening(): Promise<void> {
@@ -78,6 +93,22 @@ export class FakeEngineClient implements TranscriptEngineClient {
     if (status === this.#listeningStatus) return;
     this.#listeningStatus = status;
     this.#emit({ type: "listening-changed", status });
+  }
+
+  // エンジンの都合で止まったことを再現する(マイクの占有など)
+  interrupt(): void {
+    if (this.#listeningStatus === "stopped") return;
+    this.#listeningStatus = "stopped";
+    this.#emit({ type: "listening-changed", status: "stopped", interrupted: true });
+  }
+
+  setPermissions(permissions: EnginePermissions): void {
+    this.#permissions = permissions;
+    this.#emit({ type: "permissions-changed" });
+  }
+
+  get settingsOpened(): number {
+    return this.#settingsOpened;
   }
 
   // 次の startListening を失敗させる

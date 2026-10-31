@@ -1,0 +1,38 @@
+-- 版 1 から 2: 整理ジョブの memo、memo_utterance、todo と、発話の処理済みの印を足す。既存の発話は未処理のまま
+ALTER TABLE utterance ADD COLUMN organized_at_ms INTEGER;
+
+CREATE INDEX utterance_unorganized ON utterance (started_at_ms, id) WHERE organized_at_ms IS NULL;
+
+CREATE TABLE memo (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  started_at_ms INTEGER NOT NULL,
+  ended_at_ms INTEGER NOT NULL,
+  title TEXT,
+  summary TEXT,
+  todo_extraction TEXT NOT NULL,
+  model_version TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (ended_at_ms >= started_at_ms)
+);
+
+CREATE INDEX memo_started_at ON memo (started_at_ms);
+
+CREATE TABLE memo_utterance (
+  memo_id INTEGER NOT NULL REFERENCES memo (id),
+  utterance_id INTEGER NOT NULL REFERENCES utterance (id),
+  PRIMARY KEY (memo_id, utterance_id)
+);
+
+CREATE UNIQUE INDEX memo_utterance_utterance ON memo_utterance (utterance_id);
+
+CREATE TABLE todo (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  memo_id INTEGER NOT NULL REFERENCES memo (id),
+  task TEXT NOT NULL,
+  kind TEXT NOT NULL,
+  due_date TEXT,
+  status TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL
+);
+
+CREATE INDEX todo_memo ON todo (memo_id);

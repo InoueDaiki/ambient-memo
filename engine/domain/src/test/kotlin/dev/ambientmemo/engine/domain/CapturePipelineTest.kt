@@ -70,6 +70,27 @@ class CapturePipelineTest {
         config = config,
     )
 
+    @Test
+    fun `保存しないと判定した発話は欠落にせず、バッファを解放する`() = runTest {
+        val (audio, speech) = bursts(2)
+        val transcriber = FakeTranscriber()
+
+        CapturePipeline(
+            audioSource = FakeAudioSource(audio),
+            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
+            transcriber = transcriber,
+            utterances = utterances,
+            captureGaps = gaps,
+            clock = clock,
+            config = config,
+            transcriptionFilter = { text, _ -> text == "発話2" },
+        ).run()
+
+        assertEquals(listOf("発話2"), savedUtterances().map { it.text })
+        assertTrue(savedGaps().isEmpty())
+        assertTrue(transcriber.received.all { it.isReleased })
+    }
+
     private suspend fun savedUtterances() = utterances.listOverlapping(0, Long.MAX_VALUE)
 
     private suspend fun savedGaps() = gaps.listOverlapping(0, Long.MAX_VALUE)

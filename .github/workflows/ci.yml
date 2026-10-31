@@ -37,4 +37,12 @@ jobs:
         with:
           persist-credentials: false
       - uses: ./.github/actions/setup
+      # 本物のモデルで契約テストと結合テストを流す。キーは取得するモデルを決めるスクリプトで変わる
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: engine/.cache/models
+          key: models-${{ hashFiles('scripts/fetch-models.sh') }}
+      - run: mise run models:fetch
       - run: mise run test
+        env:
+          AMBIENT_MEMO_REQUIRE_MODELS: "true"

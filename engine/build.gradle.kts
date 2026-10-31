@@ -16,4 +16,12 @@ subprojects {
     tasks.withType<Detekt>().configureEach {
         source("src/testFixtures/kotlin")
     }
+
+    // 本物のモデルを使うテストの置き場所。モデルの有無でテストの結果が変わるので、入力にも入れる
+    tasks.withType<Test>().configureEach {
+        val modelsDir = System.getenv("AMBIENT_MEMO_MODELS_DIR") ?: "$rootDir/.cache/models"
+        systemProperty("ambientmemo.modelsDir", modelsDir)
+        systemProperty("ambientmemo.requireModels", System.getenv("AMBIENT_MEMO_REQUIRE_MODELS") ?: "false")
+        inputs.property("modelsInstalled", file(modelsDir).list()?.sorted().orEmpty())
+    }
 }

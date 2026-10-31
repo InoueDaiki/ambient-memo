@@ -10,6 +10,8 @@ kotlin {
 
 dependencies {
     api(libs.kotlinx.coroutines.core)
+    // LLM の自由形式の JSON を JsonElement として読むだけなので、コンパイラプラグインは入れない
+    implementation(libs.kotlinx.serialization.json)
 
     // Fake と契約テストは adapters のテストからも使う
     testFixturesApi(libs.junit.jupiter)

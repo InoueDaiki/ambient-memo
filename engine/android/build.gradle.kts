@@ -12,8 +12,20 @@ android {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+    testOptions {
+        unitTests.all {
+            it.useJUnitPlatform()
+        }
+    }
 }
 
 dependencies {
     api(project(":domain"))
+    implementation(project(":adapters"))
+    implementation(project(":adapters-sherpa"))
+    implementation(project(":adapters-sherpa-android"))
+    implementation(libs.kotlinx.coroutines.android)
+
+    testImplementation(testFixtures(project(":domain")))
+    testRuntimeOnly(libs.junit.platform.launcher)
 }

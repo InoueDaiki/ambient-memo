@@ -46,5 +46,8 @@ dependencies {
 
     testImplementation(testFixtures(project(":domain")))
     testImplementation(libs.sqldelight.sqlite.driver)
+    // 本物のモデルで WAV から SQLite まで通すテスト用。アプリには JVM の jar を入れない
+    testImplementation(testFixtures(project(":adapters-sherpa")))
+    testImplementation(project(":adapters-sherpa-jvm"))
     testRuntimeOnly(libs.junit.platform.launcher)
 }
