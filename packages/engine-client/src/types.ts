@@ -86,6 +86,10 @@ export type ModelDownloadStatus =
       totalBytes: number;
     };
 
+// 整理のモデルは数 GB あるので、文字起こしのモデルとは別に取得する
+// - unavailable: アプリからは取得できない
+export type OrganizerModelStatus = ModelDownloadStatus | { state: "unavailable" };
+
 export type EngineEvent =
   // 画面の操作だけでなく、エンジンの都合(マイクの占有など)でも変わる。
   // interrupted は、操作ではなくエンジンの都合で止まったときに true
@@ -95,7 +99,8 @@ export type EngineEvent =
   // 受け取ったら getPermissions で取り直す
   | { type: "permissions-changed" }
   // 進み具合もこれで届く
-  | { type: "model-download-changed"; status: ModelDownloadStatus };
+  | { type: "model-download-changed"; status: ModelDownloadStatus }
+  | { type: "organizer-model-changed"; status: OrganizerModelStatus };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -117,7 +122,11 @@ export interface TranscriptEngineClient extends EngineClient {
   // 通信はここからしか始まらないので、利用者の操作でだけ呼ぶ。取得中とモデルが揃っているときは何もしない
   startModelDownload(): Promise<void>;
   // 途中までのファイルは残るので、次は続きから取得する
+  // 動いている取得を止める。文字起こしのモデルにも整理のモデルにも使う
   cancelModelDownload(): Promise<void>;
+  getOrganizerModelStatus(): Promise<OrganizerModelStatus>;
+  // startModelDownload と同じ約束で、結果は organizer-model-changed で届く。取得は同時に 1 本だけ
+  startOrganizerModelDownload(): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

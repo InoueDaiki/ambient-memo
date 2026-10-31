@@ -11,6 +11,7 @@ import android.provider.Settings
 import dev.ambientmemo.engine.android.CaptureState
 import dev.ambientmemo.engine.android.Engine
 import dev.ambientmemo.engine.android.EngineStartException
+import dev.ambientmemo.engine.android.ModelGroup
 import dev.ambientmemo.engine.android.StartFailure
 import dev.ambientmemo.engine.android.TranscriptionMode
 import dev.ambientmemo.engine.domain.ModelDownloadFailure
@@ -65,7 +66,12 @@ class EngineBridgeModule : Module() {
       val moduleScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
       scope = moduleScope
       moduleScope.launch { engine.captureState.collect(::publish) }
-      moduleScope.launch { engine.modelDownloads.state.collect(::publishModelDownload) }
+      moduleScope.launch {
+        engine.modelDownloads.state.collect {
+          publishModelDownload(it)
+          publishOrganizerModel(it)
+        }
+      }
       moduleScope.launch {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
@@ -144,6 +150,15 @@ class EngineBridgeModule : Module() {
       engine.modelDownloads.cancel()
     }
 
+    AsyncFunction("getOrganizerModelStatus") {
+      organizerModelStatus(engine.modelDownloads.state.value)
+    }
+
+    // 利用者の操作でだけ呼ぶ。数 GB あるので、聞き取りのモデルとは別に選んでもらう
+    AsyncFunction("startOrganizerModelDownload") {
+      engine.modelDownloads.start(ModelGroup.ORGANIZER)
+    }
+
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
       engine.recentUtterances(limit).map {
         mapOf(
@@ -185,31 +200,52 @@ class EngineBridgeModule : Module() {
     sendEvent(EVENT_ENGINE, mapOf("type" to "model-download-changed", "status" to modelDownloadStatus(state)))
   }
 
-  private fun modelDownloadStatus(state: ModelDownloadState): Map<String, Any> = when (state) {
+  private fun publishOrganizerModel(state: ModelDownloadState) {
+    sendEvent(EVENT_ENGINE, mapOf("type" to "organizer-model-changed", "status" to organizerModelStatus(state)))
+  }
+
+  private fun organizerModelStatus(state: ModelDownloadState): Map<String, Any> {
+    val downloads = engine.modelDownloads
+    return when {
+      downloads.plan(ModelGroup.ORGANIZER).isComplete -> plannedStatus("installed", ModelGroup.ORGANIZER)
+      !downloads.isAvailable(ModelGroup.ORGANIZER) -> mapOf("state" to "unavailable")
+      else -> modelDownloadStatus(state, ModelGroup.ORGANIZER)
+    }
+  }
+
+  /** 取得は組をまたいで1本なので、別の組の取得の状態は [group] の状態として見せない。 */
+  private fun modelDownloadStatus(
+    state: ModelDownloadState,
+    group: ModelGroup = ModelGroup.SPEECH,
+  ): Map<String, Any> {
+    val visible = if (engine.modelDownloads.activeGroup == group) state else ModelDownloadState.Idle
+    return when (visible) {
     is ModelDownloadState.Running -> mapOf(
       "state" to "running",
-      "phase" to when (state.progress.phase) {
+      "phase" to when (visible.progress.phase) {
         ModelDownloadPhase.DOWNLOADING -> "downloading"
         ModelDownloadPhase.VERIFYING -> "verifying"
         ModelDownloadPhase.EXTRACTING -> "extracting"
       },
-      "completedBytes" to state.progress.completedBytes.toDouble(),
-      "totalBytes" to state.progress.totalBytes.toDouble(),
+      "completedBytes" to visible.progress.completedBytes.toDouble(),
+      "totalBytes" to visible.progress.totalBytes.toDouble(),
     )
-    is ModelDownloadState.Failed -> plannedStatus("failed") + mapOf(
-      "failure" to when (state.failure) {
+    is ModelDownloadState.Failed -> plannedStatus("failed", group) + mapOf(
+      "failure" to when (visible.failure) {
         ModelDownloadFailure.NETWORK -> "network"
         ModelDownloadFailure.CORRUPTED -> "corrupted"
         ModelDownloadFailure.INSUFFICIENT_STORAGE -> "insufficient-storage"
         ModelDownloadFailure.UNKNOWN -> "unknown"
       },
-      "shortageBytes" to state.shortageBytes.toDouble(),
+      "shortageBytes" to visible.shortageBytes.toDouble(),
     )
-    ModelDownloadState.Idle -> plannedStatus(if (engine.modelDownloads.plan().isComplete) "installed" else "idle")
+    ModelDownloadState.Idle ->
+      plannedStatus(if (engine.modelDownloads.plan(group).isComplete) "installed" else "idle", group)
+    }
   }
 
-  private fun plannedStatus(name: String): Map<String, Any> {
-    val plan = engine.modelDownloads.plan()
+  private fun plannedStatus(name: String, group: ModelGroup): Map<String, Any> {
+    val plan = engine.modelDownloads.plan(group)
     return mapOf(
       "state" to name,
       "downloadedBytes" to plan.downloadedBytes.toDouble(),

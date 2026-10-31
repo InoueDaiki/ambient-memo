@@ -273,6 +273,62 @@ describe("文字起こしの画面", () => {
     });
   });
 
+  describe("整理のモデルの取得", () => {
+    const idle = { state: "idle", downloadedBytes: 0, totalBytes: 3_659_530_240 } as const;
+
+    it("開いただけでは取得を始めず、文字起こしのモデルとは別に選べる", async () => {
+      const client = new FakeEngineClient({ organizerModel: idle });
+      await renderApp(client);
+
+      await screen.findByText(/発話をメモと ToDo に整理するには/);
+      screen.getByRole("button", { name: "聞き取りを始める" });
+      expect(client.organizerModelStarts).toBe(0);
+
+      await press("整理のモデルを取得する");
+
+      expect(client.organizerModelStarts).toBe(1);
+      expect(client.modelDownloadStarts).toBe(0);
+      await screen.findByRole("button", { name: "取得を止める" });
+      screen.getByRole("button", { name: "聞き取りを始める" });
+    });
+
+    it("文字起こしのモデルがない間は案内しない", async () => {
+      const client = new FakeEngineClient({
+        status: { engineName: "fake", apiVersion: 1, transcription: "unavailable" },
+        organizerModel: idle,
+      });
+      await renderApp(client);
+
+      await screen.findByRole("button", { name: "モデルを取得する" });
+      expect(screen.queryByRole("button", { name: "整理のモデルを取得する" })).toBeNull();
+    });
+
+    it("取得済みや、アプリから取得できないときは何も出さない", async () => {
+      await renderApp(new FakeEngineClient({ organizerModel: { state: "unavailable" } }));
+
+      await screen.findByText("まだ発話はありません");
+      expect(screen.queryByText(/整理/)).toBeNull();
+    });
+
+    it("途中で止まったら続きから取得できる", async () => {
+      const client = new FakeEngineClient({
+        organizerModel: {
+          state: "failed",
+          failure: "network",
+          shortageBytes: 0,
+          downloadedBytes: 1_000_000_000,
+          totalBytes: idle.totalBytes,
+        },
+      });
+      await renderApp(client);
+
+      await screen.findByText("通信が切れたため、取得が止まりました。");
+      await press("整理のモデルを続きから取得する");
+
+      expect(client.organizerModelStarts).toBe(1);
+    });
+  });
+
   it("モデルがあるときは案内を出さない", async () => {
     await renderApp(new FakeEngineClient());
 

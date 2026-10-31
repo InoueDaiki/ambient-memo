@@ -31,6 +31,10 @@ private val MODEL_HOSTS = setOf(
 /** カタログの URL と、その転送先として認める場所。 */
 fun isModelHost(url: URL): Boolean = url.protocol == "https" && url.host in MODEL_HOSTS
 
+/** [isModelHost] が認めない取得先の配布物は、画面に出さない。押しても必ず失敗するため。 */
+val ModelPackage.isDownloadAllowed: Boolean
+    get() = source?.let { isModelHost(URL(it.url)) } == true
+
 /** [offsetBytes] は [body] の先頭の位置。続きを頼んでも、取得先が先頭から返すことがある。 */
 class ModelResponse(
     val offsetBytes: Long,

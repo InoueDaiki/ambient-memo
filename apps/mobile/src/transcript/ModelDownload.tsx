@@ -1,5 +1,8 @@
 import type { ModelDownloadStatus } from "@ambient-memo/engine-client";
-import type { UseModelDownloadResult } from "@ambient-memo/engine-client/react";
+import type {
+  UseModelDownloadResult,
+  UseOrganizerModelResult,
+} from "@ambient-memo/engine-client/react";
 import { spacing } from "@ambient-memo/design-tokens";
 import { Button, ProgressBar, StatusBanner, Text } from "@ambient-memo/ui-native";
 import { View } from "react-native";
@@ -67,6 +70,52 @@ export function ModelDownloadNotice({ status }: { status: ModelDownloadStatus | 
         <Text variant="caption" color="fgMuted">
           {guide(status)}
         </Text>
+      )}
+    </View>
+  );
+}
+
+function organizerGuide(status: ModelDownloadStatus): string {
+  if (status.state === "running" || status.state === "installed") return "";
+  if (status.downloadedBytes > 0) {
+    return `${formatBytes(status.downloadedBytes)} / ${formatBytes(status.totalBytes)} まで取得済みです。続きから取得できます。`;
+  }
+  return `発話をメモと ToDo に整理するには、別のモデルが必要です。約 ${formatBytes(status.totalBytes)} を通信するので、Wi-Fi をおすすめします。なくても聞き取りはできます。`;
+}
+
+// 整理のモデルの案内。聞き取りとは別に、利用者が取得するかを選ぶ。取得済みや取得できないときは何も出さない
+export function OrganizerModelSection({ status, start, cancel }: UseOrganizerModelResult) {
+  if (status === undefined || status.state === "installed" || status.state === "unavailable") {
+    return null;
+  }
+  const canResume = status.state !== "running" && status.downloadedBytes > 0;
+  return (
+    <View style={{ gap: spacing.sm }}>
+      {status.state === "failed" && <StatusBanner tone="danger" message={failureMessage(status)} />}
+      {status.state === "running" && (
+        <>
+          <ProgressBar
+            label="整理のモデルの取得"
+            value={status.totalBytes > 0 ? status.completedBytes / status.totalBytes : 0}
+          />
+          <Text variant="caption" color="fgMuted">
+            {runningMessage(status)}
+          </Text>
+        </>
+      )}
+      {organizerGuide(status) !== "" && (
+        <Text variant="caption" color="fgMuted">
+          {organizerGuide(status)}
+        </Text>
+      )}
+      {status.state === "running" ? (
+        <Button label="取得を止める" variant="secondary" onPress={cancel} />
+      ) : (
+        <Button
+          label={canResume ? "整理のモデルを続きから取得する" : "整理のモデルを取得する"}
+          variant="secondary"
+          onPress={start}
+        />
       )}
     </View>
   );

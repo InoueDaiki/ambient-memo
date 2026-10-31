@@ -5,6 +5,7 @@ import type {
   EngineStatus,
   ListeningStatus,
   ModelDownloadStatus,
+  OrganizerModelStatus,
   TranscriptEngineClient,
   Utterance,
 } from "./types.ts";
@@ -15,6 +16,7 @@ export interface FakeEngineClientOptions {
   utterances?: Utterance[];
   permissions?: EnginePermissions;
   modelDownload?: ModelDownloadStatus;
+  organizerModel?: OrganizerModelStatus;
 }
 
 // エンジンなしで画面を開発・テストするための実装
@@ -28,6 +30,8 @@ export class FakeEngineClient implements TranscriptEngineClient {
   #settingsOpened = 0;
   #modelDownload: ModelDownloadStatus;
   #modelDownloadStarts = 0;
+  #organizerModel: OrganizerModelStatus;
+  #organizerModelStarts = 0;
 
   constructor({
     status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
@@ -35,7 +39,9 @@ export class FakeEngineClient implements TranscriptEngineClient {
     utterances = [],
     permissions = { microphone: true, notifications: true },
     modelDownload,
+    organizerModel = { state: "installed", downloadedBytes: 0, totalBytes: 0 },
   }: FakeEngineClientOptions = {}) {
+    this.#organizerModel = organizerModel;
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
@@ -102,6 +108,14 @@ export class FakeEngineClient implements TranscriptEngineClient {
   }
 
   cancelModelDownload(): Promise<void> {
+    const organizer = this.#organizerModel;
+    if (organizer.state === "running") {
+      this.setOrganizerModel({
+        state: "idle",
+        downloadedBytes: organizer.completedBytes,
+        totalBytes: organizer.totalBytes,
+      });
+    }
     const current = this.#modelDownload;
     if (current.state === "running") {
       this.setModelDownload({
@@ -111,6 +125,23 @@ export class FakeEngineClient implements TranscriptEngineClient {
         totalBytes: current.totalBytes,
       });
     }
+    return Promise.resolve();
+  }
+
+  getOrganizerModelStatus(): Promise<OrganizerModelStatus> {
+    return Promise.resolve(this.#organizerModel);
+  }
+
+  startOrganizerModelDownload(): Promise<void> {
+    const current = this.#organizerModel;
+    if (current.state !== "idle" && current.state !== "failed") return Promise.resolve();
+    this.#organizerModelStarts += 1;
+    this.setOrganizerModel({
+      state: "running",
+      phase: "downloading",
+      completedBytes: current.downloadedBytes,
+      totalBytes: current.totalBytes,
+    });
     return Promise.resolve();
   }
 
@@ -153,6 +184,15 @@ export class FakeEngineClient implements TranscriptEngineClient {
     if (status.state === "installed") this.#status = { ...this.#status, transcription: "ready" };
     if (status.state === "idle") this.#status = { ...this.#status, transcription: "unavailable" };
     this.#emit({ type: "model-download-changed", status });
+  }
+
+  setOrganizerModel(status: OrganizerModelStatus): void {
+    this.#organizerModel = status;
+    this.#emit({ type: "organizer-model-changed", status });
+  }
+
+  get organizerModelStarts(): number {
+    return this.#organizerModelStarts;
   }
 
   get modelDownloadStarts(): number {

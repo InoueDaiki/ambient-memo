@@ -8,11 +8,14 @@ data class OrganizeConfig(
     val maxChunkChars: Int = DEFAULT_MAX_CHUNK_CHARS,
     /** LLM の出力が読めなかったときの再試行の回数。 */
     val maxRetries: Int = DEFAULT_MAX_RETRIES,
+    /** 同じまとまりの処理がこの回数失敗したら、そのまとまりを飛ばして先を試す。 */
+    val maxChunkAttempts: Int = DEFAULT_MAX_CHUNK_ATTEMPTS,
 ) {
     init {
         require(minSilenceGapMillis > 0) { "minSilenceGapMillis は正の値です" }
         require(maxChunkChars > 0) { "maxChunkChars は正の値です" }
         require(maxRetries >= 0) { "maxRetries は 0 以上です" }
+        require(maxChunkAttempts > 0) { "maxChunkAttempts は正の値です" }
     }
 
     private companion object {
@@ -21,6 +24,7 @@ data class OrganizeConfig(
         // 検証の文脈長 4096 トークンから、指示、日付の表、出力の分を除いた余裕を見た値
         const val DEFAULT_MAX_CHUNK_CHARS = 1_800
         const val DEFAULT_MAX_RETRIES = 1
+        const val DEFAULT_MAX_CHUNK_ATTEMPTS = 3
     }
 }
 
@@ -116,8 +120,11 @@ enum class OrganizeOutcome {
     LLM_FAILED,
 }
 
+/** [unreadableCount] は、LLM で読めずに要約のないメモとして記録したまとまりの数。[memoCount] に含む。 */
+
 data class OrganizeResult(
     val outcome: OrganizeOutcome,
     val memoCount: Int,
     val todoCount: Int,
+    val unreadableCount: Int = 0,
 )

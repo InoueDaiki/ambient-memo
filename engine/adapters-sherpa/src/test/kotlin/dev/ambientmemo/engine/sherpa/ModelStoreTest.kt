@@ -2,6 +2,7 @@
 
 package dev.ambientmemo.engine.sherpa
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -67,6 +68,24 @@ class ModelStoreTest {
             assertTrue(source.sizeBytes > 0, source.url)
             assertTrue(source.sha256.matches(Regex("[0-9a-f]{64}")), source.url)
         }
+    }
+
+    @Test
+    fun `Gemma は固定のリビジョンの単一ファイルで、聞き取りのモデルと別に持つ`() {
+        val model = ModelCatalog.ACTIVE_LLM.modelPackage
+        val source = model.source as ModelSource.SingleFile
+
+        assertTrue(source.url.startsWith("https://huggingface.co/litert-community/"))
+        assertTrue("/resolve/e6a3892a8c22cf87ff99583996149cf3cb32452b/" in source.url)
+        assertEquals(listOf(source.file), model.files)
+        assertTrue(ModelCatalog.ACTIVE.packages.none { it.id == model.id })
+    }
+
+    @Test
+    fun `許可していない取得先のパッケージは取得できない扱いにする`() {
+        assertTrue(ModelCatalog.ACTIVE.packages.all { it.isDownloadAllowed })
+        assertFalse(ModelCatalog.ACTIVE_LLM.modelPackage.isDownloadAllowed)
+        assertFalse(ModelPackage("source-none", emptyList()).isDownloadAllowed)
     }
 
     @Test

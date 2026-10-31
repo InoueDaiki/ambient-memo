@@ -10,6 +10,9 @@ commons-compress = "1.28.0"
 coroutines = "1.10.2"
 sqldelight = "2.4.1"
 sherpa-onnx = "2.0.1"
+# 0.17 以降は Kotlin 2.4 を要求する。React Native の Kotlin に揃えられる最後の版
+litertlm = "0.16.1"
+work = "2.11.2"
 
 androidx-test-runner = "1.7.0"
 androidx-test-junit = "1.3.0"
@@ -21,10 +24,12 @@ androidx-test-runner = { module = "androidx.test:runner", version.ref = "android
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter", version.ref = "junit" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+litertlm-android = { module = "com.google.ai.edge.litertlm:litertlm-android", version.ref = "litertlm" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "serialization" }
+work-runtime = { module = "androidx.work:work-runtime", version.ref = "work" }
 sqldelight-android-driver = { module = "app.cash.sqldelight:android-driver", version.ref = "sqldelight" }
 sqldelight-sqlite-driver = { module = "app.cash.sqldelight:sqlite-driver", version.ref = "sqldelight" }
 

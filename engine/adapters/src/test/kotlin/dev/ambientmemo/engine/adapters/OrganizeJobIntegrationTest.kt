@@ -3,8 +3,12 @@ package dev.ambientmemo.engine.adapters
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.ambientmemo.engine.adapters.db.AmbientMemoDatabase
 import dev.ambientmemo.engine.domain.CalendarDate
+import dev.ambientmemo.engine.domain.InMemoryOrganizeAttempts
 import dev.ambientmemo.engine.domain.Llm
+import dev.ambientmemo.engine.domain.LlmInputTooLongException
+import dev.ambientmemo.engine.domain.LlmRequest
 import dev.ambientmemo.engine.domain.NewUtterance
+import dev.ambientmemo.engine.domain.OrganizeAttempts
 import dev.ambientmemo.engine.domain.OrganizeConfig
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
@@ -56,7 +60,8 @@ class OrganizeJobIntegrationTest {
         val memos = SqliteMemoRepository(database)
         val clock = FakeClock(afterLastTalk)
 
-        fun job(llm: Llm) = OrganizeJob(memos, llm, clock, tokyo, config)
+        fun job(llm: Llm, attempts: OrganizeAttempts = InMemoryOrganizeAttempts()) =
+            OrganizeJob(memos, llm, clock, tokyo, config, attempts)
 
         suspend fun say(startedAtMillis: Long, text: String) = utterances
             .insert(NewUtterance(startedAtMillis, startedAtMillis + 2_000, text, 0.9, startedAtMillis + 2_000))
@@ -456,6 +461,143 @@ class OrganizeJobIntegrationTest {
 
         assertEquals(2, result.memoCount)
         assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
+    }
+
+    private fun FakeLlm.Companion.failingOn(word: String, failure: () -> Exception) = FakeLlm { _, request ->
+        if (word in request.user) throw failure()
+        if (request.isTodoRequest) """{"items": []}""" else "- 要約"
+    }
+
+    private fun Harness.unreadableMemos() = column("SELECT id FROM memo WHERE summary IS NULL")
+
+    @Test
+    fun `文脈長を超えたまとまりは半分に分けて処理する`() = withDatabase { db ->
+        db.say(evening, "前半")
+        db.say(evening + minute, "長すぎる後半")
+        db.say(evening + 2 * minute, "続き")
+        // 3 発話がそろっているときだけ長すぎる
+        val llm = FakeLlm { _, request ->
+            if ("前半" in request.user && "続き" in request.user) throw LlmInputTooLongException()
+            if (request.isTodoRequest) """{"items": []}""" else "- 要約"
+        }
+
+        val result = db.job(llm).run()
+
+        assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
+        assertEquals(2, result.memoCount)
+        assertEquals(0, result.unreadableCount)
+        assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
+    }
+
+    @Test
+    fun `1 発話でも文脈長を超えるなら、要約のないメモにして先へ進む`() = withDatabase { db ->
+        val tooLong = db.say(evening, "とても長い発話")
+        db.say(evening + hour, "次の話題")
+        val llm = FakeLlm.failingOn("とても長い") { LlmInputTooLongException() }
+
+        val result = db.job(llm).run()
+
+        assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
+        assertEquals(2, result.memoCount)
+        assertEquals(1, result.unreadableCount)
+        val memo = db.memos.listMemos().first()
+        assertNull(memo.summary)
+        assertEquals(TodoExtraction.INCOMPLETE, memo.todoExtraction)
+        assertEquals(listOf(tooLong), db.memos.listUtteranceIds(memo.id))
+        assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
+    }
+
+    @Test
+    fun `同じまとまりで失敗が続いても、後のまとまりが動けばそのまとまりを記録して進む`() = withDatabase { db ->
+        db.say(evening, "壊れた話題")
+        db.say(evening + hour, "次の話題")
+        val llm = FakeLlm.failingOn("壊れた") { IOException("実行基盤の失敗") }
+        val attempts = InMemoryOrganizeAttempts()
+
+        val first = db.job(llm, attempts).run()
+        val second = db.job(llm, attempts).run()
+        val third = db.job(llm, attempts).run()
+
+        assertEquals(OrganizeOutcome.LLM_FAILED, first.outcome)
+        assertEquals(OrganizeOutcome.LLM_FAILED, second.outcome)
+        assertEquals(OrganizeOutcome.COMPLETED, third.outcome)
+        assertEquals(2, third.memoCount)
+        assertEquals(1, third.unreadableCount)
+        assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
+    }
+
+    @Test
+    fun `どのまとまりでも失敗するなら実行基盤の問題なので、発話を未処理のまま残す`() = withDatabase { db ->
+        db.sayConversations(3)
+        val llm = FakeLlm { _, _ -> throw IOException("GPU が使えない") }
+        val attempts = InMemoryOrganizeAttempts()
+
+        val results = List(6) { db.job(llm, attempts).run() }
+
+        assertTrue(results.all { it.outcome == OrganizeOutcome.LLM_FAILED })
+        assertEquals(0, db.count("memo"))
+        assertEquals(6, db.memos.listUnorganizedUtterances().size)
+    }
+
+    @Test
+    fun `クラッシュで処理が返らなくても回数が残り、そのまとまりを飛ばす`() = withDatabase { db ->
+        val first = db.say(evening, "クラッシュする話題")
+        db.say(evening + hour, "次の話題")
+        val attempts = InMemoryOrganizeAttempts()
+        // 始める前の記録だけが残る状態。ネイティブのクラッシュでは例外も後始末も動かない
+        attempts.set(first, config.maxChunkAttempts)
+        val llm = FakeLlm.failingOn("クラッシュ") { AssertionError("呼ばれないはず") as Exception }
+
+        val result = db.job(llm, attempts).run()
+
+        assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
+        assertEquals(1, result.unreadableCount)
+        assertTrue(llm.received.none { "クラッシュ" in it.user })
+        assertEquals(1, db.unreadableMemos().size)
+    }
+
+    @Test
+    fun `飛ばしたまとまりしか残っていなければ、記録せず次回に回す`() = withDatabase { db ->
+        val only = db.say(evening, "最後の話題")
+        val attempts = InMemoryOrganizeAttempts()
+        attempts.set(only, config.maxChunkAttempts)
+
+        val result = db.job(FakeLlm.organizing(), attempts).run()
+
+        assertEquals(OrganizeOutcome.LLM_FAILED, result.outcome)
+        assertEquals(0, db.count("memo"))
+    }
+
+    @Test
+    fun `成功したら回数を消す`() = withDatabase { db ->
+        val id = db.say(evening, "話題")
+        val attempts = InMemoryOrganizeAttempts()
+        attempts.set(id, 1)
+
+        db.job(FakeLlm.organizing(), attempts).run()
+
+        assertEquals(0, attempts.count(id))
+    }
+
+    @Test
+    fun `キャンセルはまとまりのせいではないので、回数を増やさない`() = withDatabase { db ->
+        val id = db.say(evening, "話題")
+        val started = CompletableDeferred<Unit>()
+        val llm = FakeLlm { _, _: LlmRequest ->
+            started.complete(Unit)
+            delay(Long.MAX_VALUE)
+            ""
+        }
+        val attempts = InMemoryOrganizeAttempts()
+
+        coroutineScope {
+            val job = launch { db.job(llm, attempts).run() }
+            started.await()
+            job.cancelAndJoin()
+        }
+
+        assertEquals(0, attempts.count(id))
+        assertEquals(1, db.memos.listUnorganizedUtterances().size)
     }
 
     @Test

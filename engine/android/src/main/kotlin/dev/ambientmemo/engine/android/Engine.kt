@@ -70,7 +70,8 @@ class Engine private constructor(context: Context) {
     )
 
     /** モデルの取得。聞き取りとは別に動く。 */
-    val modelDownloads = ModelDownloads(this.context, modelStore, models.packages)
+    val modelDownloads =
+        ModelDownloads(this.context, modelStore, models.packages, listOf(ModelCatalog.ACTIVE_LLM.modelPackage))
 
     val captureState: StateFlow<CaptureState> = runner.state
 
@@ -79,6 +80,10 @@ class Engine private constructor(context: Context) {
 
     val transcriptionMode: TranscriptionMode
         get() = if (modelStore.isInstalled(models)) TranscriptionMode.READY else TranscriptionMode.UNAVAILABLE
+
+    init {
+        OrganizeSchedule.ensureScheduled(this.context)
+    }
 
     /** ネイティブのメモリは聞き取りの間だけ持つ。パイプラインは文字起こしが終わってから戻るので、ここで解放できる。 */
     private suspend fun capture(audioSource: AudioSource) {

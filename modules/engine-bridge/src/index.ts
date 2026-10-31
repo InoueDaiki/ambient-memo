@@ -7,6 +7,7 @@ import {
   type EngineStatus,
   type ListeningStatus,
   type ModelDownloadStatus,
+  type OrganizerModelStatus,
   type TranscriptEngineClient,
   type Utterance,
 } from "@ambient-memo/engine-client";
@@ -23,6 +24,8 @@ interface EngineBridgeNativeModule {
   getModelDownloadStatus(): Promise<ModelDownloadStatus>;
   startModelDownload(): Promise<void>;
   cancelModelDownload(): Promise<void>;
+  getOrganizerModelStatus(): Promise<OrganizerModelStatus>;
+  startOrganizerModelDownload(): Promise<void>;
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): EventSubscription;
 }
 
@@ -55,6 +58,8 @@ export function createEngineClient(): TranscriptEngineClient {
     getModelDownloadStatus: () => native.getModelDownloadStatus(),
     startModelDownload: () => native.startModelDownload(),
     cancelModelDownload: () => native.cancelModelDownload(),
+    getOrganizerModelStatus: () => native.getOrganizerModelStatus(),
+    startOrganizerModelDownload: () => native.startOrganizerModelDownload(),
     subscribe: (listener: EngineListener) => {
       const subscription = native.addListener("engine", listener);
       return () => subscription.remove();

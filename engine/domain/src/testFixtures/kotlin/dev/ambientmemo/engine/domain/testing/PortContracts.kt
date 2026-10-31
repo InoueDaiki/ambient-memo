@@ -7,6 +7,7 @@ import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.Clock
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.LlmRequest
+import dev.ambientmemo.engine.domain.OrganizeAttempts
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.Transcriber
@@ -212,6 +213,30 @@ abstract class SpeakerEmbedderContract {
         embedder().embed(segment)
 
         assertFalse(segment.isReleased)
+    }
+}
+
+/** [OrganizeAttempts] の契約テスト。 */
+abstract class OrganizeAttemptsContract {
+    protected abstract fun attempts(): OrganizeAttempts
+
+    @Test
+    fun `記録がなければ 0 回`() {
+        assertEquals(0, attempts().count(1))
+    }
+
+    @Test
+    fun `まとまりごとに回数を残し、消したまとまりだけ 0 回に戻る`() {
+        val attempts = attempts()
+
+        attempts.set(1, 2)
+        attempts.set(2, 1)
+        attempts.set(1, 3)
+        attempts.clear(2)
+        attempts.clear(99)
+
+        assertEquals(3, attempts.count(1))
+        assertEquals(0, attempts.count(2))
     }
 }
 

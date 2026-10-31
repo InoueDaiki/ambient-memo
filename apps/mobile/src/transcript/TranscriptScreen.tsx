@@ -1,6 +1,7 @@
 import {
   useListening,
   useModelDownload,
+  useOrganizerModel,
   usePermissions,
   useTranscriptionMode,
   useUtterances,
@@ -23,7 +24,11 @@ import {
 import { FlatList, View } from "react-native";
 
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
-import { ModelDownloadButton, ModelDownloadNotice } from "./ModelDownload.tsx";
+import {
+  ModelDownloadButton,
+  ModelDownloadNotice,
+  OrganizerModelSection,
+} from "./ModelDownload.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
 const UTTERANCE_LIMIT = 200;
@@ -90,6 +95,7 @@ export function TranscriptScreen() {
   const { permissions, openSettings } = usePermissions();
   const transcriptionMode = useTranscriptionMode();
   const modelDownload = useModelDownload();
+  const organizerModel = useOrganizerModel();
   const needsModels = transcriptionMode === "unavailable";
   const { status, isChanging, start, stop } = listening;
   const isListening = status === "listening";
@@ -106,6 +112,7 @@ export function TranscriptScreen() {
           文字起こし
         </Text>
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
+        {transcriptionMode === "ready" && <OrganizerModelSection {...organizerModel} />}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (
           <StatusBanner

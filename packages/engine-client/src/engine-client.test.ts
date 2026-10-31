@@ -122,6 +122,46 @@ describe("FakeEngineClient のモデルの取得", () => {
     expect(client.modelDownloadStarts).toBe(0);
     expect((await client.getModelDownloadStatus()).state).toBe("installed");
   });
+
+  it("整理のモデルは文字起こしのモデルと別に取得する", async () => {
+    const client = new FakeEngineClient({
+      organizerModel: { state: "idle", downloadedBytes: 0, totalBytes: 3_659_530_240 },
+    });
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    await client.startOrganizerModelDownload();
+    await client.startOrganizerModelDownload();
+
+    expect(client.organizerModelStarts).toBe(1);
+    expect(client.modelDownloadStarts).toBe(0);
+    expect(events[0]).toMatchObject({
+      type: "organizer-model-changed",
+      status: { state: "running", phase: "downloading" },
+    });
+
+    client.setOrganizerModel({
+      state: "running",
+      phase: "downloading",
+      completedBytes: 100,
+      totalBytes: 3_659_530_240,
+    });
+    await client.cancelModelDownload();
+
+    expect(await client.getOrganizerModelStatus()).toEqual({
+      state: "idle",
+      downloadedBytes: 100,
+      totalBytes: 3_659_530_240,
+    });
+  });
+
+  it("取得できない整理のモデルは始めない", async () => {
+    const client = new FakeEngineClient({ organizerModel: { state: "unavailable" } });
+
+    await client.startOrganizerModelDownload();
+
+    expect(client.organizerModelStarts).toBe(0);
+  });
 });
 
 describe("FakeEngineClient の発話", () => {

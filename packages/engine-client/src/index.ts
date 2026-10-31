@@ -12,6 +12,7 @@ export type {
   ModelDownloadFailure,
   ModelDownloadPhase,
   ModelDownloadStatus,
+  OrganizerModelStatus,
   Speaker,
   TranscriptEngineClient,
   TranscriptionMode,
