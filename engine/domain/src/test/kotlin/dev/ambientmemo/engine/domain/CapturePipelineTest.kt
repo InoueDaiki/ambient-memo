@@ -2,8 +2,10 @@ package dev.ambientmemo.engine.domain
 
 import dev.ambientmemo.engine.domain.testing.FakeAudioSource
 import dev.ambientmemo.engine.domain.testing.FakeClock
+import dev.ambientmemo.engine.domain.testing.FakeSpeakerEmbedder
 import dev.ambientmemo.engine.domain.testing.FakeTranscriber
 import dev.ambientmemo.engine.domain.testing.InMemoryCaptureGapRepository
+import dev.ambientmemo.engine.domain.testing.InMemorySpeakerRepository
 import dev.ambientmemo.engine.domain.testing.InMemoryUtteranceRepository
 import dev.ambientmemo.engine.domain.testing.ScriptedVoiceActivityDetector
 import dev.ambientmemo.engine.domain.testing.SyntheticAudio
@@ -94,6 +96,107 @@ class CapturePipelineTest {
     private suspend fun savedUtterances() = utterances.listOverlapping(0, Long.MAX_VALUE)
 
     private suspend fun savedGaps() = gaps.listOverlapping(0, Long.MAX_VALUE)
+
+    private suspend fun identifier(embedder: FakeSpeakerEmbedder): SpeakerIdentifier {
+        val speakers = InMemorySpeakerRepository()
+        speakers.saveSelfEmbedding(SpeakerEmbedding(floatArrayOf(1f, 0f, 0f), embedder.modelVersion), 3, 0)
+        return SpeakerIdentifier(embedder, speakers, clock)
+    }
+
+    private fun speakerPipeline(
+        audio: ShortArray,
+        speech: List<LongRange>,
+        identifier: SpeakerIdentifier,
+    ) = CapturePipeline(
+        audioSource = FakeAudioSource(audio),
+        voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
+        transcriber = FakeTranscriber(),
+        utterances = utterances,
+        captureGaps = gaps,
+        clock = clock,
+        config = config,
+        speakerIdentifier = identifier,
+    )
+
+    @Test
+    fun `話者を判定して発話と一緒に保存し、バッファを解放する`() = runTest {
+        val (audio, speech) = bursts(1)
+        val embedder = FakeSpeakerEmbedder()
+
+        speakerPipeline(audio, speech, identifier(embedder)).run()
+
+        val saved = savedUtterances().single()
+        assertEquals(1L, saved.speakerId)
+        assertEquals(1.0, saved.speakerConfidence)
+        assertTrue(embedder.received.single().isReleased)
+    }
+
+    @Test
+    fun `特徴量の失敗では文字起こしを失わず、話者を不明にして次へ進む`() = runTest {
+        val (audio, speech) = bursts(2)
+        val embedder = FakeSpeakerEmbedder { index, _ ->
+            if (index == 0) throw IOException("失敗")
+            floatArrayOf(1f, 0f, 0f)
+        }
+
+        speakerPipeline(audio, speech, identifier(embedder)).run()
+
+        assertEquals(listOf(null, 1L), savedUtterances().map { it.speakerId })
+        assertTrue(savedGaps().isEmpty())
+        assertTrue(embedder.received.all { it.isReleased })
+    }
+
+    @Test
+    fun `内側のタイムアウトで特徴量が止まっても、処理全体を止めない`() = runTest {
+        val (audio, speech) = bursts(2)
+        val embedder = FakeSpeakerEmbedder { index, _ ->
+            if (index == 0) withTimeout(1) { awaitCancellation() }
+            floatArrayOf(1f, 0f, 0f)
+        }
+
+        speakerPipeline(audio, speech, identifier(embedder)).run()
+
+        assertEquals(2, savedUtterances().size)
+    }
+
+    @Test
+    fun `特徴量の途中でキャンセルすると欠落を記録し、バッファを解放する`() = runTest {
+        val (audio, speech) = bursts(1)
+        val started = CompletableDeferred<Unit>()
+        val embedder = FakeSpeakerEmbedder { _, _ ->
+            started.complete(Unit)
+            awaitCancellation()
+        }
+        val pipeline = speakerPipeline(audio + SyntheticAudio.silence(100), speech, identifier(embedder))
+
+        val job = launch { pipeline.run() }
+        started.await()
+        job.cancelAndJoin()
+
+        assertTrue(savedUtterances().isEmpty())
+        assertEquals(listOf(CaptureGapReason.PIPELINE_STOPPED), savedGaps().map { it.reason })
+        assertTrue(embedder.received.single().isReleased)
+    }
+
+    @Test
+    fun `保存しない発話の特徴量は作らない`() = runTest {
+        val (audio, speech) = bursts(1)
+        val embedder = FakeSpeakerEmbedder()
+
+        CapturePipeline(
+            audioSource = FakeAudioSource(audio),
+            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
+            transcriber = FakeTranscriber(),
+            utterances = utterances,
+            captureGaps = gaps,
+            clock = clock,
+            config = config,
+            transcriptionFilter = { _, _ -> false },
+            speakerIdentifier = identifier(embedder),
+        ).run()
+
+        assertTrue(embedder.received.isEmpty())
+    }
 
     @Test
     fun `WAV の発話を検知して文字起こしを保存し、バッファを解放する`(@TempDir dir: Path) = runTest {

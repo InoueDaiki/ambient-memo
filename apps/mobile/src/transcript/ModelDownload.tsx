@@ -39,19 +39,37 @@ function runningMessage(status: RunningStatus): string {
   }
 }
 
-function guide(status: ModelDownloadStatus): string {
+export type MissingModels = "transcription" | "speaker";
+
+const missingMessages: Record<MissingModels, string> = {
+  transcription: "文字起こしのモデルが端末にありません。",
+  speaker: "話者のモデルが端末にありません。聞き取りはできますが、自分の声の登録はできません。",
+};
+
+const neededFor: Record<MissingModels, string> = {
+  transcription: "聞き取り",
+  speaker: "声の登録",
+};
+
+function guide(status: ModelDownloadStatus, missing: MissingModels): string {
   if (status.state === "running" || status.state === "installed") return "";
   if (status.downloadedBytes > 0) {
     return `${formatBytes(status.downloadedBytes)} / ${formatBytes(status.totalBytes)} まで取得済みです。続きから取得できます。`;
   }
-  return `聞き取りにはモデルの取得が必要です。約 ${formatBytes(status.totalBytes)} を通信します。通信するのはモデルの取得だけで、音声や文字起こしは送りません。`;
+  return `${neededFor[missing]}にはモデルの取得が必要です。約 ${formatBytes(status.totalBytes)} を通信します。通信するのはモデルの取得だけで、音声や文字起こしは送りません。`;
 }
 
 // モデルがないときの案内と、取得の進み具合
-export function ModelDownloadNotice({ status }: { status: ModelDownloadStatus | undefined }) {
+export function ModelDownloadNotice({
+  status,
+  missing = "transcription",
+}: {
+  status: ModelDownloadStatus | undefined;
+  missing?: MissingModels;
+}) {
   return (
     <View style={{ gap: spacing.sm }}>
-      <StatusBanner tone="neutral" message="文字起こしのモデルが端末にありません。" />
+      <StatusBanner tone="neutral" message={missingMessages[missing]} />
       {status?.state === "failed" && (
         <StatusBanner tone="danger" message={failureMessage(status)} />
       )}
@@ -66,9 +84,9 @@ export function ModelDownloadNotice({ status }: { status: ModelDownloadStatus | 
           </Text>
         </>
       )}
-      {status !== undefined && guide(status) !== "" && (
+      {status !== undefined && guide(status, missing) !== "" && (
         <Text variant="caption" color="fgMuted">
-          {guide(status)}
+          {guide(status, missing)}
         </Text>
       )}
     </View>
@@ -83,11 +101,9 @@ function organizerGuide(status: ModelDownloadStatus): string {
   return `発話をメモと ToDo に整理するには、別のモデルが必要です。約 ${formatBytes(status.totalBytes)} を通信するので、Wi-Fi をおすすめします。なくても聞き取りはできます。`;
 }
 
-// 整理のモデルの案内。聞き取りとは別に、利用者が取得するかを選ぶ。取得済みや取得できないときは何も出さない
+// 整理のモデルの案内。聞き取りとは別に、利用者が取得するかを選ぶ。取得済みなら何も出さない
 export function OrganizerModelSection({ status, start, cancel }: UseOrganizerModelResult) {
-  if (status === undefined || status.state === "installed" || status.state === "unavailable") {
-    return null;
-  }
+  if (status === undefined || status.state === "installed") return null;
   const canResume = status.state !== "running" && status.downloadedBytes > 0;
   return (
     <View style={{ gap: spacing.sm }}>
@@ -121,8 +137,14 @@ export function OrganizerModelSection({ status, start, cancel }: UseOrganizerMod
   );
 }
 
-// 画面の下の操作。モデルがない間は、聞き取りの開始の代わりに出す
-export function ModelDownloadButton({ status, start, cancel }: UseModelDownloadResult) {
+// 文字起こしのモデルがない間は、画面の下に聞き取りの開始の代わりに出す。
+// 話者のモデルだけがないときは、聞き取りを妨げないように secondary で案内の下に出す
+export function ModelDownloadButton({
+  status,
+  start,
+  cancel,
+  variant = "primary",
+}: UseModelDownloadResult & { variant?: "primary" | "secondary" }) {
   if (status?.state === "running") {
     return <Button label="取得を止める" variant="secondary" onPress={cancel} />;
   }
@@ -131,6 +153,7 @@ export function ModelDownloadButton({ status, start, cancel }: UseModelDownloadR
   return (
     <Button
       label={canResume ? "続きから取得する" : "モデルを取得する"}
+      variant={variant}
       disabled={status === undefined}
       onPress={start}
     />

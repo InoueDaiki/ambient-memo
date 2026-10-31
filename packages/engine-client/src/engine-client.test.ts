@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { FakeEngineClient } from "./fake.ts";
-import type { EngineEvent, TranscriptEngineClient, Utterance } from "./types.ts";
+import { memo, runMemoClientContract, todo } from "./memo-contract.ts";
+import { sampleMemos } from "./sample-memos.ts";
+import {
+  SelfEnrollmentError,
+  type EngineEvent,
+  type TranscriptEngineClient,
+  type Utterance,
+} from "./types.ts";
 
 // 契約テスト。本物の実装を作ったら、同じテストをその実装にも流す
 describe.each<[string, () => TranscriptEngineClient]>([
@@ -55,6 +62,49 @@ describe.each<[string, () => TranscriptEngineClient]>([
 
     expect(events).toEqual([]);
     await client.stopListening();
+  });
+});
+
+describe("FakeEngineClient の声の登録", () => {
+  const notEnrolled = () => new FakeEngineClient({ selfEnrollment: "not-enrolled" });
+
+  it("聞き取りが終わると登録済みになる", async () => {
+    const client = notEnrolled();
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+
+    const done = client.enrollSelf();
+    client.finishEnrollment();
+    await done;
+
+    expect(await client.getSelfEnrollmentStatus()).toBe("enrolled");
+  });
+
+  it("止めると cancelled で reject し、登録しない", async () => {
+    const client = notEnrolled();
+
+    const done = client.enrollSelf();
+    await client.cancelSelfEnrollment();
+
+    await expect(done).rejects.toEqual(new SelfEnrollmentError("cancelled"));
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+  });
+
+  it("聞き取り中は登録できない", async () => {
+    const client = notEnrolled();
+    await client.startListening();
+
+    await expect(client.enrollSelf()).rejects.toEqual(new SelfEnrollmentError("listening"));
+  });
+
+  it("失敗は1回だけ起きる", async () => {
+    const client = notEnrolled();
+    client.failNextEnrollment("not-enough-speech");
+
+    await expect(client.enrollSelf()).rejects.toEqual(new SelfEnrollmentError("not-enough-speech"));
+
+    const done = client.enrollSelf();
+    client.finishEnrollment();
+    await done;
   });
 });
 
@@ -155,8 +205,8 @@ describe("FakeEngineClient のモデルの取得", () => {
     });
   });
 
-  it("取得できない整理のモデルは始めない", async () => {
-    const client = new FakeEngineClient({ organizerModel: { state: "unavailable" } });
+  it("取得済みの整理のモデルは始めない", async () => {
+    const client = new FakeEngineClient();
 
     await client.startOrganizerModelDownload();
 
@@ -201,5 +251,54 @@ describe("FakeEngineClient の発話", () => {
 
     await client.startListening();
     expect(await client.getListeningStatus()).toBe("listening");
+  });
+});
+
+runMemoClientContract("FakeEngineClient", (memos) => new FakeEngineClient({ memos }));
+
+describe("FakeEngineClient のメモと ToDo", () => {
+  it("メモが増えるとイベントが届く", () => {
+    const client = new FakeEngineClient();
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    client.addMemo(memo("a"));
+    client.addMemo(memo("b", { todos: [todo("t")] }));
+
+    expect(events).toEqual([
+      { type: "memos-changed" },
+      { type: "memos-changed" },
+      { type: "todos-changed" },
+    ]);
+  });
+
+  it("読み取りと完了の失敗は1回だけ起きる", async () => {
+    const client = new FakeEngineClient({ memos: [memo("a", { todos: [todo("t")] })] });
+
+    client.failNextMemoRead(new Error("読めない"));
+    await expect(client.listMemos({ limit: 1 })).rejects.toThrow("読めない");
+    expect(await client.listMemos({ limit: 1 })).toHaveLength(1);
+
+    client.failNextComplete(new Error("書けない"));
+    await expect(client.completeTodo("t")).rejects.toThrow("書けない");
+    await client.completeTodo("t");
+    expect((await client.listTodos({ limit: 1 }))[0]?.status).toBe("done");
+  });
+});
+
+describe("見本のメモ", () => {
+  it("画面が扱う状態をすべて含む", () => {
+    const todos = sampleMemos.flatMap((item) => item.todos);
+
+    expect(sampleMemos.some((item) => item.summary === null)).toBe(true);
+    expect(sampleMemos.some((item) => item.todoExtraction === "incomplete")).toBe(true);
+    expect(todos.some((item) => item.status === "candidate" && item.dueDate !== null)).toBe(true);
+    expect(todos.some((item) => item.status === "candidate" && item.dueDate === null)).toBe(true);
+  });
+
+  it("ToDo の memoId が親のメモを指す", () => {
+    for (const item of sampleMemos) {
+      expect(item.todos.every((entry) => entry.memoId === item.id)).toBe(true);
+    }
   });
 });

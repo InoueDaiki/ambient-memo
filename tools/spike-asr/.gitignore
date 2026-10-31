@@ -1,0 +1,6 @@
+# データとモデルの本体はコミットしない
+.cache/
+.venv/
+build/
+__pycache__/
+*.jar

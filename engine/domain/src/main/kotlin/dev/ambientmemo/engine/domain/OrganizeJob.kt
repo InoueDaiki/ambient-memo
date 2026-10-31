@@ -18,9 +18,10 @@ private const val MAX_TITLE_CHARS = 30
  *
  * 失敗の回数は [attempts] に残す。アプリでは実行をまたいで残る実装を渡す。
  */
-@Suppress("TooManyFunctions") // まとまりの処理の流れを1か所で読めるようにする
+@Suppress("TooManyFunctions", "LongParameterList") // まとまりの処理の流れを1か所で読めるようにする
 class OrganizeJob(
     private val memos: MemoRepository,
+    private val speakers: SpeakerRepository,
     private val llm: Llm,
     private val clock: Clock,
     private val timeZone: TimeZone,
@@ -35,9 +36,10 @@ class OrganizeJob(
      * 特定のまとまりで止まり続けないように、読めないまとまりは要約のないメモとして記録して先へ進む。
      */
     suspend fun run(shouldContinue: () -> Boolean = { true }): OrganizeResult {
-        val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone)
+        val labels = SpeakerLabels(speakers.listSpeakers())
+        val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, labels)
             .withoutOngoing(clock.nowMillis(), config)
-        val pass = Pass()
+        val pass = Pass(labels)
         val stoppedBy = chunks.firstNotNullOfOrNull { chunk ->
             if (shouldContinue()) process(chunk, pass) else OrganizeOutcome.STOPPED
         }
@@ -47,6 +49,7 @@ class OrganizeJob(
     }
 
     private class Pass(
+        val labels: SpeakerLabels,
         var memoCount: Int = 0,
         var todoCount: Int = 0,
         var unreadableCount: Int = 0,
@@ -79,7 +82,7 @@ class OrganizeJob(
         val attempted = attempts.count(key)
         // クラッシュでは後の処理が動かないので、始める前に数える
         attempts.set(key, attempted + 1)
-        return when (val draft = draftOf(chunk, key, attempted)) {
+        return when (val draft = draftOf(chunk, pass.labels, key, attempted)) {
             is Draft.Ready -> {
                 record(draft.memo, key, pass)
                 resolveSuspects(pass)
@@ -145,8 +148,8 @@ class OrganizeJob(
 
     // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private suspend fun draftOf(chunk: UtteranceChunk, key: Long, attempted: Int): Draft = try {
-        Draft.Ready(draft(chunk))
+    private suspend fun draftOf(chunk: UtteranceChunk, labels: SpeakerLabels, key: Long, attempted: Int): Draft = try {
+        Draft.Ready(draft(chunk, labels))
     } catch (e: LlmInputTooLongException) {
         ensureNotCancelled(key, attempted)
         Draft.TooLong
@@ -164,8 +167,10 @@ class OrganizeJob(
         currentCoroutineContext().ensureActive()
     }
 
-    private suspend fun draft(chunk: UtteranceChunk): NewMemo {
-        val transcript = chunk.toTranscript(timeZone)
+    private suspend fun draft(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo {
+        val transcript = chunk.toTranscript(timeZone, labels)
+        // 話者の名前は日付の手がかりにしない。「明日香」などを「明日」と読まないように、本文だけで確かめる
+        val spokenText = chunk.toTranscript(timeZone)
         val spokenOn = CalendarDate.of(chunk.startedAtMillis, timeZone)
         val endedOn = CalendarDate.of(chunk.endedAtMillis, timeZone)
         val summary = summarize(spokenOn, transcript)
@@ -181,7 +186,7 @@ class OrganizeJob(
             utteranceIds = chunk.utterances.map { it.id },
             todos = parsed.items
                 .distinctBy { item -> item.task.filterNot(Char::isWhitespace) }
-                .map { item -> item.toNewTodo(assessDue(item.due, spokenOn, endedOn, transcript)) },
+                .map { item -> item.toNewTodo(assessDue(item.due, spokenOn, endedOn, spokenText)) },
         )
     }
 

@@ -1,0 +1,50 @@
+{
+ "model": "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+ "dim": 192,
+ "load_s": 0.42,
+ "by": {
+  "clean/full": {
+   "eer_pct": 0.22,
+   "eer_samegender_eval_pct": 0.35,
+   "th_far1": 0.629,
+   "eval_far_pct": 4.42,
+   "eval_frr_pct": 0.0,
+   "trials": 21000
+  },
+  "clean/3s": {
+   "eer_pct": 0.4,
+   "eer_samegender_eval_pct": 0.97,
+   "th_far1": 0.605,
+   "eval_far_pct": 4.03,
+   "eval_frr_pct": 0.2,
+   "trials": 21000
+  },
+  "clean/1.5s": {
+   "eer_pct": 1.4,
+   "eer_samegender_eval_pct": 2.82,
+   "th_far1": 0.575,
+   "eval_far_pct": 3.34,
+   "eval_frr_pct": 0.8,
+   "trials": 21000
+  },
+  "snr10/3s": {
+   "eer_pct": 1.78,
+   "eer_samegender_eval_pct": 3.01,
+   "th_far1": 0.567,
+   "eval_far_pct": 3.22,
+   "eval_frr_pct": 1.0,
+   "trials": 21000
+  },
+  "far/3s": {
+   "eer_pct": 3.6,
+   "eer_samegender_eval_pct": 6.2,
+   "th_far1": 0.504,
+   "eval_far_pct": 2.89,
+   "eval_frr_pct": 6.4,
+   "trials": 21000
+  }
+ },
+ "rtf": 0.0261,
+ "size_mb": 28.3,
+ "rss_peak_mb": 4098.2
+}

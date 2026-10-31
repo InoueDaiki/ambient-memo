@@ -1,0 +1,31 @@
+{
+ "model": "whisper-small",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 2,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 14.21,
+  "ci95": [
+   9.9,
+   19.52
+  ]
+ },
+ "cer_kana": {
+  "cer": 7.04,
+  "ci95": [
+   3.72,
+   11.17
+  ]
+ },
+ "rtf": 0.226,
+ "latency_p50_s": 1.128,
+ "latency_p95_s": 2.486,
+ "load_s": 0.52,
+ "disk_mb": 375.5,
+ "rss_base_mb": 78.1,
+ "rss_after_load_mb": 973.0,
+ "rss_peak_mb": 1540.5,
+ "first_partial_s_mean": null
+}

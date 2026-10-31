@@ -7,6 +7,6 @@ module.exports = {
   roots: ["<rootDir>/src"],
   setupFiles: ["<rootDir>/jest.setup.js"],
   transformIgnorePatterns: [
-    "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(?:(?:jest-)?react-native|@react-native(?:-community)?|expo(?:nent)?(?:-[^/]+)?|@expo(?:nent)?|@testing-library/react-native|test-renderer|universal-test-renderer|react-native-safe-area-context)(?:/|$))",
+    "node_modules/(?!(?:\\.pnpm/[^/]+/node_modules/)?(?:(?:jest-)?react-native|@react-native(?:-community)?|expo(?:nent)?(?:-[^/]+)?|@expo(?:nent)?|@testing-library/react-native|test-renderer|universal-test-renderer|react-native-safe-area-context|react-native-screens|@react-navigation)(?:/|$))",
   ],
 };

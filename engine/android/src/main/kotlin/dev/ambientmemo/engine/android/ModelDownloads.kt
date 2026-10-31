@@ -10,7 +10,6 @@ import dev.ambientmemo.engine.sherpa.HttpModelTransport
 import dev.ambientmemo.engine.sherpa.ModelDownloader
 import dev.ambientmemo.engine.sherpa.ModelPackage
 import dev.ambientmemo.engine.sherpa.ModelStore
-import dev.ambientmemo.engine.sherpa.isDownloadAllowed
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -82,15 +81,13 @@ class ModelDownloads internal constructor(
         it.downloader.plan(it.packages)
     }
 
-    /** アプリから取得できる組か。取得先を許可していなければ false。 */
-    fun isAvailable(group: ModelGroup): Boolean = groupOf(group).packages.all { it.isDownloadAllowed }
 
     /**
      * Foreground Service を開始するので、アプリが前面にある間に呼ぶ。
      * 動いている間と、モデルが揃っているときは何もしない。
      */
     fun start(group: ModelGroup = ModelGroup.SPEECH) {
-        if (!isAvailable(group) || plan(group).isComplete || !runner.markStarting()) return
+        if (plan(group).isComplete || !runner.markStarting()) return
         activeGroup = group
         val intent = ModelDownloadService.startIntent(context)
         try {

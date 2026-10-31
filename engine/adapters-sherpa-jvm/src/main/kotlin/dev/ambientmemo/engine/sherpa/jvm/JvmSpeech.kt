@@ -8,16 +8,21 @@ import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
 import com.k2fsa.sherpa.onnx.OfflineSenseVoiceModelConfig
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
+import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor
+import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
 import dev.ambientmemo.engine.sherpa.AsrModel
 import dev.ambientmemo.engine.sherpa.ModelFile
 import dev.ambientmemo.engine.sherpa.ModelStore
 import dev.ambientmemo.engine.sherpa.NativeRecognizer
+import dev.ambientmemo.engine.sherpa.NativeSpeakerExtractor
 import dev.ambientmemo.engine.sherpa.NativeVad
 import dev.ambientmemo.engine.sherpa.SherpaSettings
+import dev.ambientmemo.engine.sherpa.SherpaSpeakerEmbedder
 import dev.ambientmemo.engine.sherpa.SherpaTranscriber
 import dev.ambientmemo.engine.sherpa.SherpaVoiceActivityDetector
+import dev.ambientmemo.engine.sherpa.SpeakerModel
 import dev.ambientmemo.engine.sherpa.SpeechModels
 
 private val nativeLibrary by lazy { LibraryUtils.load() }
@@ -27,6 +32,9 @@ fun jvmVoiceActivityDetector(store: ModelStore, models: SpeechModels): SherpaVoi
 
 fun jvmTranscriber(store: ModelStore, models: SpeechModels): SherpaTranscriber =
     SherpaTranscriber { JvmRecognizer(store, models.asr) }
+
+fun jvmSpeakerEmbedder(store: ModelStore, model: SpeakerModel): SherpaSpeakerEmbedder =
+    SherpaSpeakerEmbedder(model.version) { JvmSpeakerExtractor(store.pathOf(model.modelPackage, model.model)) }
 
 private class JvmVad(model: String) : NativeVad {
     private val vad: Vad
@@ -95,6 +103,33 @@ private class JvmRecognizer(store: ModelStore, model: AsrModel) : NativeRecogniz
     }
 
     override fun close() = recognizer.release()
+}
+
+private class JvmSpeakerExtractor(model: String) : NativeSpeakerExtractor {
+    private val extractor: SpeakerEmbeddingExtractor
+
+    init {
+        nativeLibrary
+        extractor = SpeakerEmbeddingExtractor(
+            SpeakerEmbeddingExtractorConfig.builder()
+                .setModel(model)
+                .setNumThreads(SherpaSettings.SPEAKER_THREADS)
+                .build(),
+        )
+    }
+
+    override fun compute(samples: FloatArray, sampleRateHz: Int): FloatArray? {
+        val stream = extractor.createStream()
+        try {
+            stream.acceptWaveform(samples, sampleRateHz)
+            stream.inputFinished()
+            return if (extractor.isReady(stream)) extractor.compute(stream) else null
+        } finally {
+            stream.release()
+        }
+    }
+
+    override fun close() = extractor.release()
 }
 
 private fun modelConfig(store: ModelStore, model: AsrModel): OfflineModelConfig {

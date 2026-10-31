@@ -12,6 +12,7 @@ import dev.ambientmemo.engine.domain.OrganizeAttempts
 import dev.ambientmemo.engine.domain.OrganizeConfig
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
+import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.TodoKind
 import dev.ambientmemo.engine.domain.TodoStatus
@@ -60,8 +61,10 @@ class OrganizeJobIntegrationTest {
         val memos = SqliteMemoRepository(database)
         val clock = FakeClock(afterLastTalk)
 
+        val speakers = SqliteSpeakerRepository(database)
+
         fun job(llm: Llm, attempts: OrganizeAttempts = InMemoryOrganizeAttempts()) =
-            OrganizeJob(memos, llm, clock, tokyo, config, attempts)
+            OrganizeJob(memos, speakers, llm, clock, tokyo, config, attempts)
 
         suspend fun say(startedAtMillis: Long, text: String) = utterances
             .insert(NewUtterance(startedAtMillis, startedAtMillis + 2_000, text, 0.9, startedAtMillis + 2_000))
@@ -619,6 +622,46 @@ class OrganizeJobIntegrationTest {
 
             assertEquals(1, db.memos.listUnorganizedUtterances().size)
             assertEquals(1, db.job(FakeLlm.organizing()).run().memoCount)
+        }
+    }
+
+    @Test
+    fun `文字起こしを話者のラベルつきで LLM に渡す`() = runTest {
+        openTestDriver(dir.resolve("labels.db")).use { driver ->
+            val harness = Harness(driver)
+            val self = harness.speakers.saveSelfEmbedding(SpeakerEmbedding(floatArrayOf(1f, 0f), "m"), 3, evening)
+            val other = harness.speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f), "m"), evening)
+            val llm = FakeLlm.organizing()
+            harness.utterances.insert(
+                NewUtterance(evening, evening + 1_000, "請求書、明日までに送ってくれる?", null, evening, other.id, 0.8),
+            )
+            harness.utterances.insert(
+                NewUtterance(evening + minute, evening + minute + 1_000, "はい、送ります。", null, evening, self.id, 0.9),
+            )
+            harness.utterances.insert(
+                NewUtterance(evening + 2 * minute, evening + 2 * minute + 1_000, "うん", null, evening),
+            )
+
+            harness.job(llm).run()
+
+            val expected = "[18:00] 話者1: 請求書、明日までに送ってくれる?\n[18:01] 自分: はい、送ります。\n[18:02] うん"
+            assertEquals(2, llm.received.size)
+            llm.received.forEach { assertTrue(it.user.endsWith(expected), it.user) }
+        }
+    }
+
+    @Test
+    fun `話者の名前は期限の手がかりにしない`() = runTest {
+        openTestDriver(dir.resolve("names.db")).use { driver ->
+            val harness = Harness(driver)
+            val other = harness.speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f), "m"), evening)
+            harness.speakers.setManualName(other.id, "明日香")
+            harness.utterances.insert(NewUtterance(evening, evening + 1_000, "歯医者に行くよ", null, evening, other.id, 0.8))
+
+            harness.job(FakeLlm.organizing(todos = todoJson)).run()
+
+            val memo = harness.memos.listMemos().single()
+            assertEquals(TodoStatus.CANDIDATE, harness.memos.listTodos(memo.id).single().status)
         }
     }
 }

@@ -67,8 +67,10 @@ private class OrganizeConnection(private val context: Context) : ServiceConnecti
     private val finished = CompletableDeferred<OrganizeRunResult>()
     private val client = Messenger(
         Handler(Looper.getMainLooper()) { message ->
-            if (message.what == OrganizeService.MESSAGE_FINISHED) {
-                finished.complete(OrganizeRunResult.entries[message.arg1])
+            when (message.what) {
+                OrganizeService.MESSAGE_FINISHED -> finished.complete(OrganizeRunResult.entries[message.arg1])
+                OrganizeService.MESSAGE_MEMO_CHANGED ->
+                    Engine.get(context).notifyMemoChanged(MemoChange.entries[message.arg1])
             }
             true
         },

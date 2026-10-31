@@ -1,0 +1,31 @@
+{
+ "model": "qwen3-asr-0.6b",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 11.85,
+  "ci95": [
+   9.12,
+   14.77
+  ]
+ },
+ "cer_kana": {
+  "cer": 6.14,
+  "ci95": [
+   4.07,
+   8.38
+  ]
+ },
+ "rtf": 0.1552,
+ "latency_p50_s": 0.791,
+ "latency_p95_s": 1.572,
+ "load_s": 1.15,
+ "disk_mb": 987.0,
+ "rss_base_mb": 78.2,
+ "rss_after_load_mb": 2327.5,
+ "rss_peak_mb": 2990.4,
+ "first_partial_s_mean": null
+}

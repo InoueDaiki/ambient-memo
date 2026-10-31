@@ -7,6 +7,7 @@ import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.InMemoryMemoRepository
+import dev.ambientmemo.engine.domain.testing.InMemorySpeakerRepository
 import dev.ambientmemo.engine.domain.testing.InMemoryUtteranceRepository
 import dev.ambientmemo.engine.llm.LocalLlm
 import dev.ambientmemo.engine.llm.NativeLlm
@@ -39,6 +40,7 @@ class OrganizeSessionTest {
 
     private val utterances = InMemoryUtteranceRepository()
     private val memos = InMemoryMemoRepository(utterances)
+    private val speakers = InMemorySpeakerRepository()
     private var loads = 0
 
     private suspend fun say(startedAtMillis: Long) {
@@ -55,7 +57,7 @@ class OrganizeSessionTest {
     ) = OrganizeSession(
         isModelReady = { isModelReady },
         openLlm = { LocalLlm("stub-1", load) },
-        jobFor = { llm -> OrganizeJob(memos, llm, FakeClock(10 * HOUR), TimeZone.getTimeZone("UTC")) },
+        jobFor = { llm -> OrganizeJob(memos, speakers, llm, FakeClock(10 * HOUR), TimeZone.getTimeZone("UTC")) },
     )
 
     @Test

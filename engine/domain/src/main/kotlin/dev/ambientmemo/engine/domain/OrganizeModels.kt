@@ -48,6 +48,19 @@ enum class TodoStatus {
 
     /** 確定した ToDo。 */
     OPEN,
+
+    /** 完了した。保存の前の [NewTodo] には使わない。 */
+    DONE,
+}
+
+/** [MemoRepository.completeTodo] の結果。 */
+enum class TodoCompletion {
+    COMPLETED,
+
+    /** すでに完了している。何も変えていない。 */
+    ALREADY_DONE,
+
+    NOT_FOUND,
 }
 
 enum class TodoExtraction {
@@ -66,6 +79,7 @@ data class NewTodo(
 ) {
     init {
         require(task.isNotBlank()) { "内容が空です" }
+        require(status != TodoStatus.DONE) { "完了は記録の後に completeTodo で行います" }
     }
 }
 
@@ -77,6 +91,8 @@ data class Todo(
     val dueDate: CalendarDate?,
     val status: TodoStatus,
     val createdAtMillis: Long,
+    /** 完了した時刻。[status] が [TodoStatus.DONE] のときだけある。 */
+    val completedAtMillis: Long? = null,
 )
 
 /** 保存前のメモ。[title] と [summary] は要約に失敗すると null になる。発話は残るので、後からたどれる。 */

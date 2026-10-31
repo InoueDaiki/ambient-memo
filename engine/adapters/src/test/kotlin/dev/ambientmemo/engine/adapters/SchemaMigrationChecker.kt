@@ -71,7 +71,8 @@ internal fun structure(driver: SqlDriver): Map<String, String> =
             "WHERE name NOT LIKE 'sqlite_%' AND sql IS NOT NULL",
     ).associate { row -> row["object"] as String to normalize(row["sql"] as String) }
 
-private fun normalize(sql: String) = sql.replace(Regex("\\s+"), " ").replace("( ", "(").replace(" )", ")")
+private fun normalize(sql: String) =
+    sql.replace(Regex("\\s+"), " ").replace("( ", "(").replace(" )", ")").replace(" ,", ",")
 
 internal fun tables(driver: SqlDriver): List<String> =
     query(driver, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
@@ -93,7 +94,10 @@ private fun readAll(result: ResultSet): List<Row> {
     val columns = (1..result.metaData.columnCount).map { result.metaData.getColumnName(it) }
     val rows = mutableListOf<Row>()
     while (result.next()) {
-        rows += columns.associateWith { result.getObject(it) }
+        // BLOB の配列は == で中身を比べられないので、リストにする
+        rows += columns.associateWith { column ->
+            result.getObject(column).let { value -> (value as? ByteArray)?.toList() ?: value }
+        }
     }
     return rows
 }

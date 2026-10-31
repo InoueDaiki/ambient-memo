@@ -1,0 +1,31 @@
+{
+ "model": "omnilingual-300m",
+ "kind": "offline",
+ "cond": "clean",
+ "threads": 1,
+ "n": 60,
+ "audio_s": 359.5,
+ "cer_surface": {
+  "cer": 23.26,
+  "ci95": [
+   20.37,
+   26.28
+  ]
+ },
+ "cer_kana": {
+  "cer": 15.23,
+  "ci95": [
+   12.96,
+   17.65
+  ]
+ },
+ "rtf": 0.1483,
+ "latency_p50_s": 0.788,
+ "latency_p95_s": 1.518,
+ "load_s": 0.32,
+ "disk_mb": 365.9,
+ "rss_base_mb": 78.2,
+ "rss_after_load_mb": 1183.9,
+ "rss_peak_mb": 1512.8,
+ "first_partial_s_mean": null
+}

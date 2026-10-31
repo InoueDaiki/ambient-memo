@@ -10,12 +10,14 @@ import dev.ambientmemo.engine.domain.testing.FakeSpeakerEmbedder
 import dev.ambientmemo.engine.domain.testing.FakeTranscriber
 import dev.ambientmemo.engine.domain.testing.InMemoryCaptureGapRepository
 import dev.ambientmemo.engine.domain.testing.InMemoryMemoRepository
+import dev.ambientmemo.engine.domain.testing.InMemorySpeakerRepository
 import dev.ambientmemo.engine.domain.testing.InMemoryUtteranceRepository
 import dev.ambientmemo.engine.domain.testing.LlmContract
 import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
 import dev.ambientmemo.engine.domain.testing.OrganizeAttemptsContract
 import dev.ambientmemo.engine.domain.testing.ScriptedVoiceActivityDetector
 import dev.ambientmemo.engine.domain.testing.SpeakerEmbedderContract
+import dev.ambientmemo.engine.domain.testing.SpeakerRepositoryContract
 import dev.ambientmemo.engine.domain.testing.SyntheticAudio
 import dev.ambientmemo.engine.domain.testing.TranscriberContract
 import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
@@ -58,6 +60,10 @@ class FakeSpeakerEmbedderContractTest : SpeakerEmbedderContract() {
 
 class InMemoryUtteranceRepositoryContractTest : UtteranceRepositoryContract() {
     override fun repository() = InMemoryUtteranceRepository()
+}
+
+class InMemorySpeakerRepositoryContractTest : SpeakerRepositoryContract() {
+    override fun repository() = InMemorySpeakerRepository()
 }
 
 class InMemoryCaptureGapRepositoryContractTest : CaptureGapRepositoryContract() {

@@ -16,6 +16,7 @@ import android.os.RemoteException
 import android.util.Log
 import dev.ambientmemo.engine.adapters.FileOrganizeAttempts
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
+import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.OrganizeJob
@@ -73,16 +74,20 @@ class OrganizeService : Service() {
     private var run: Job? = null
 
     @Volatile
+    private var client: Messenger? = null
+
+    @Volatile
     private var stopRequested = false
 
     override fun onBind(intent: Intent?): IBinder = messenger.binder
 
-    private fun start(client: Messenger?) {
+    private fun start(replyTo: Messenger?) {
         if (run?.isActive == true) return
         stopRequested = false
+        client = replyTo
         run = scope.launch {
             val result = session().run(::shouldContinue)
-            reply(client, result)
+            send(MESSAGE_FINISHED, result.ordinal)
         }
     }
 
@@ -103,7 +108,11 @@ class OrganizeService : Service() {
     }
 
     private fun jobFor(llm: Llm) = OrganizeJob(
-        memos = SqliteMemoRepository(database),
+        // 画面はメインのプロセスにあるので、変更は bind を通して知らせる
+        memos = ObservableMemoRepository(SqliteMemoRepository(database)) { change ->
+            send(MESSAGE_MEMO_CHANGED, change.ordinal)
+        },
+        speakers = SqliteSpeakerRepository(database),
         llm = llm,
         clock = SystemClock,
         timeZone = TimeZone.getDefault(),
@@ -122,9 +131,9 @@ class OrganizeService : Service() {
         Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
             getSystemService(PowerManager::class.java).currentThermalStatus >= PowerManager.THERMAL_STATUS_SEVERE
 
-    private fun reply(client: Messenger?, result: OrganizeRunResult) {
+    private fun send(what: Int, value: Int) {
         try {
-            client?.send(Message.obtain(null, MESSAGE_FINISHED, result.ordinal, 0))
+            client?.send(Message.obtain(null, what, value, 0))
         } catch (_: RemoteException) {
             // 相手のプロセスがいないので、知らせる先がない
             Log.w(TAG, "結果を伝えられません")
@@ -141,5 +150,6 @@ class OrganizeService : Service() {
         const val MESSAGE_START = 1
         const val MESSAGE_STOP = 2
         const val MESSAGE_FINISHED = 3
+        const val MESSAGE_MEMO_CHANGED = 4
     }
 }

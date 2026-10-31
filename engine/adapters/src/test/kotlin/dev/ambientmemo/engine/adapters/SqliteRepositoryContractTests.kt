@@ -8,6 +8,7 @@ import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.testing.CaptureGapRepositoryContract
 import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
 import dev.ambientmemo.engine.domain.testing.OrganizeAttemptsContract
+import dev.ambientmemo.engine.domain.testing.SpeakerRepositoryContract
 import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
@@ -43,6 +44,21 @@ class SqliteCaptureGapRepositoryContractTest : CaptureGapRepositoryContract() {
     override fun repository(): SqliteCaptureGapRepository {
         driver = openTestDriver(dir.resolve("test.db"))
         return SqliteCaptureGapRepository(AmbientMemoDatabase(driver))
+    }
+
+    @AfterEach
+    fun closeDriver() = driver.close()
+}
+
+class SqliteSpeakerRepositoryContractTest : SpeakerRepositoryContract() {
+    @TempDir
+    lateinit var dir: Path
+
+    private lateinit var driver: JdbcSqliteDriver
+
+    override fun repository(): SqliteSpeakerRepository {
+        driver = openTestDriver(dir.resolve("test.db"))
+        return SqliteSpeakerRepository(AmbientMemoDatabase(driver))
     }
 
     @AfterEach
@@ -90,11 +106,21 @@ class SqliteRepositoryTest {
     }
 
     @Test
+    fun `自分は DB でも1人だけ`() {
+        openTestDriver(path).use { driver ->
+            val queries = AmbientMemoDatabase(driver).speakerQueries
+            queries.insert("自分", "self", 1, 0)
+
+            assertThrows(Exception::class.java) { queries.insert("もう1人", "self", 1, 0) }
+        }
+    }
+
+    @Test
     fun `時刻が逆転した行は DB でも拒む`() {
         openTestDriver(path).use { driver ->
             val queries = AmbientMemoDatabase(driver).utteranceQueries
 
-            assertThrows(Exception::class.java) { queries.insert(10, 9, "本文", null, 10) }
+            assertThrows(Exception::class.java) { queries.insert(10, 9, "本文", null, 10, null, null) }
         }
     }
 

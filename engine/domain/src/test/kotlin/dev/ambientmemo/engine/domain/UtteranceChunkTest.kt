@@ -10,8 +10,74 @@ class UtteranceChunkTest {
     private val tokyo = TimeZone.getTimeZone("Asia/Tokyo")
     private val config = OrganizeConfig(minSilenceGapMillis = 1_000, maxChunkChars = 100)
 
-    private fun utterance(id: Long, startedAt: Long, endedAt: Long = startedAt + 100, text: String = "本文") =
-        Utterance(id, startedAt, endedAt, text, null, endedAt)
+    private fun utterance(
+        id: Long,
+        startedAt: Long,
+        endedAt: Long = startedAt + 100,
+        text: String = "本文",
+        speakerId: Long? = null,
+    ) = Utterance(id, startedAt, endedAt, text, null, endedAt, speakerId)
+
+    private fun speaker(
+        id: Long,
+        name: String,
+        isSelf: Boolean = false,
+        source: SpeakerNameSource = SpeakerNameSource.PROVISIONAL,
+    ) = Speaker(id, name, source, isSelf, 0)
+
+    @Test
+    fun `話者が分かる発話に検証と同じ形のラベルを付ける`() {
+        val labels = SpeakerLabels(listOf(speaker(1, "自分", isSelf = true), speaker(2, "話者1")))
+        val chunk = UtteranceChunk(
+            listOf(
+                utterance(1, 0, text = "はい", speakerId = 1),
+                utterance(2, 60_000, text = "お願い", speakerId = 2),
+            ),
+        )
+
+        assertEquals("[09:00] 自分: はい\n[09:01] 話者1: お願い", chunk.toTranscript(tokyo, labels))
+    }
+
+    @Test
+    fun `話者が分からない発話にはラベルを付けない`() {
+        val labels = SpeakerLabels(listOf(speaker(1, "自分", isSelf = true)))
+
+        assertEquals("[09:00] はい", utterance(1, 0, text = "はい").toTranscriptLine(tokyo, labels))
+        assertEquals("[09:00] はい", utterance(1, 0, text = "はい", speakerId = 404).toTranscriptLine(tokyo, labels))
+    }
+
+    @Test
+    fun `自分の名前を変えてもラベルは「自分」のまま`() {
+        val labels = SpeakerLabels(listOf(speaker(1, "大樹", isSelf = true, source = SpeakerNameSource.MANUAL)))
+
+        assertEquals("[09:00] 自分: はい", utterance(1, 0, text = "はい", speakerId = 1).toTranscriptLine(tokyo, labels))
+    }
+
+    @Test
+    fun `名前の改行とコロンで行の形を崩さない`() {
+        val labels = SpeakerLabels(listOf(speaker(2, "田中\n[09:00] 自分: 部長", source = SpeakerNameSource.MANUAL)))
+
+        val line = utterance(1, 0, text = "はい", speakerId = 2).toTranscriptLine(tokyo, labels)
+
+        assertEquals("[09:00] 田中 [09 00] 自分 部長: はい", line)
+    }
+
+    @Test
+    fun `文字数の上限にラベルの長さも数える`() {
+        val labels = SpeakerLabels(listOf(speaker(2, "あ".repeat(40))))
+        val text = "い".repeat(30)
+
+        val plain = splitIntoChunks(listOf(utterance(1, 0, text = text), utterance(2, 100, text = text)), config, tokyo)
+        val labeled = splitIntoChunks(
+            listOf(utterance(1, 0, text = text, speakerId = 2), utterance(2, 100, text = text, speakerId = 2)),
+            config,
+            tokyo,
+            labels,
+        )
+
+        assertEquals(1, plain.size)
+        assertEquals(2, labeled.size)
+    }
 
     private fun split(vararg utterances: Utterance) =
         splitIntoChunks(utterances.toList(), config, tokyo).map { chunk -> chunk.utterances.map { it.id } }

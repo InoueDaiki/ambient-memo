@@ -1,0 +1,73 @@
+-- 話者。name_source は SqliteSpeakerRepository の対応表で読み書きする
+CREATE TABLE speaker (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  display_name TEXT NOT NULL,
+  name_source TEXT NOT NULL,
+  is_self INTEGER NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (is_self IN (0, 1))
+);
+
+-- 自分は1人だけ
+CREATE UNIQUE INDEX speaker_self ON speaker (is_self) WHERE is_self = 1;
+
+-- 話者の特徴量。vector はリトルエンディアンの 32 ビット浮動小数の列で、長さ 1 に正規化してある
+-- 端末の中だけで使う。モデルが変わると比べられないので、版ごとに持つ
+CREATE TABLE speaker_embedding (
+  speaker_id INTEGER NOT NULL REFERENCES speaker (id),
+  model_version TEXT NOT NULL,
+  vector BLOB NOT NULL,
+  sample_count INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (speaker_id, model_version),
+  CHECK (sample_count > 0)
+);
+
+CREATE INDEX speaker_embedding_recent ON speaker_embedding (model_version, updated_at_ms);
+
+insert:
+INSERT INTO speaker (display_name, name_source, is_self, created_at_ms)
+VALUES (?, ?, ?, ?);
+
+lastInsertedId:
+SELECT last_insert_rowid();
+
+listAll:
+SELECT *
+FROM speaker
+ORDER BY id;
+
+findSelf:
+SELECT *
+FROM speaker
+WHERE is_self = 1;
+
+countOthers:
+SELECT count(*)
+FROM speaker
+WHERE is_self = 0;
+
+setManualName:
+UPDATE speaker
+SET display_name = :displayName, name_source = :nameSource
+WHERE id = :id;
+
+setInferredName:
+UPDATE speaker
+SET display_name = :displayName, name_source = :nameSource
+WHERE id = :id AND is_self = 0 AND name_source IN :replaceable;
+
+changes:
+SELECT changes();
+
+saveEmbedding:
+INSERT OR REPLACE INTO speaker_embedding (speaker_id, model_version, vector, sample_count, updated_at_ms)
+VALUES (?, ?, ?, ?, ?);
+
+listEmbeddings:
+SELECT speaker_embedding.speaker_id, speaker.is_self, speaker_embedding.vector, speaker_embedding.sample_count
+FROM speaker_embedding
+JOIN speaker ON speaker.id = speaker_embedding.speaker_id
+WHERE speaker_embedding.model_version = :modelVersion
+ORDER BY speaker.is_self DESC, speaker_embedding.updated_at_ms DESC, speaker_embedding.speaker_id DESC
+LIMIT :limit;

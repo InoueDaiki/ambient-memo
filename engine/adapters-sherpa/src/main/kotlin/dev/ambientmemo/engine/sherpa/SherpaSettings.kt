@@ -29,6 +29,12 @@ object SherpaSettings {
     const val ASR_DECODING_METHOD = "greedy_search"
     const val ASR_LANGUAGE = "ja"
 
+    /** 検証は Mac の 1 スレッドで実時間比 0.005。Pixel では測っていない。 */
+    const val SPEAKER_THREADS = 1
+
+    /** これより短い音声からは話者の特徴量を作らない。検証と同じ値。 */
+    const val MIN_SPEAKER_MILLIS = 400L
+
     /** 区間の前後に足す無音の長さ。 */
     const val PADDING_MILLIS = 300L
 
@@ -42,6 +48,9 @@ object SherpaSettings {
     private const val DETECTION_LAG_MILLIS = 300L
 
     private const val MAX_UTTERANCE_MILLIS = 20_000L
+
+    /** 続けて読み上げても登録の発話が揃うように、[MAX_UTTERANCE_MILLIS] より短く分ける。 */
+    private const val MAX_ENROLLMENT_UTTERANCE_MILLIS = 6_000L
 
     /** VAD が無音を判定した後は、すぐ区切る。フレームは 0.1 秒。 */
     private const val MIN_SILENCE_MILLIS = 100L
@@ -60,4 +69,8 @@ object SherpaSettings {
         preRollMillis = CONTEXT_MILLIS + DETECTION_LAG_MILLIS,
         minSpeechMillis = 0,
     )
+
+    /** 自分の声の登録の区切り。短く分ける以外は [captureConfig] と同じにして、照合する区間と同じ形の音声を使う。 */
+    fun enrollmentCaptureConfig(): CaptureConfig =
+        captureConfig().copy(maxUtteranceMillis = MAX_ENROLLMENT_UTTERANCE_MILLIS)
 }

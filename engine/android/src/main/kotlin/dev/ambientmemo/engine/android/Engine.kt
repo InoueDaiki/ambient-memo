@@ -6,16 +6,24 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
 import dev.ambientmemo.engine.adapters.SqliteCaptureGapRepository
+import dev.ambientmemo.engine.adapters.SqliteMemoRepository
+import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.CapturePipeline
+import dev.ambientmemo.engine.domain.EnrollmentOutcome
+import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
+import dev.ambientmemo.engine.domain.SelfEnrollment
+import dev.ambientmemo.engine.domain.Speaker
+import dev.ambientmemo.engine.domain.SpeakerIdentifier
 import dev.ambientmemo.engine.domain.SystemClock
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.sherpa.ModelCatalog
 import dev.ambientmemo.engine.sherpa.ModelStore
 import dev.ambientmemo.engine.sherpa.SherpaSettings
+import dev.ambientmemo.engine.sherpa.android.androidSpeakerEmbedder
 import dev.ambientmemo.engine.sherpa.android.androidTranscriber
 import dev.ambientmemo.engine.sherpa.android.androidVoiceActivityDetector
 import kotlinx.coroutines.CoroutineScope
@@ -31,6 +39,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
+import java.util.concurrent.CopyOnWriteArraySet
 
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
@@ -44,20 +53,39 @@ enum class StartFailure { MICROPHONE_PERMISSION, TRANSCRIPTION_UNAVAILABLE, MICR
 
 class EngineStartException(val failure: StartFailure) : Exception(failure.name)
 
+/** 自分の声の登録の状態。話者のモデルが内部ストレージになければ [UNAVAILABLE]。 */
+enum class SelfEnrollmentStatus { ENROLLED, NOT_ENROLLED, UNAVAILABLE }
+
 /**
  * プロセスに1つのエンジン。Service と engine-bridge はここを通して同じ状態を見る。
  *
  * 依存の組み立てもここで行う。モデルは [ModelCatalog.ACTIVE] で差し替える。
  */
+@Suppress("TooManyFunctions") // Service と engine-bridge の入口をここに集めている
 class Engine private constructor(context: Context) {
     private val context = context.applicationContext
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val models = ModelCatalog.ACTIVE
+    private val speakerModel = ModelCatalog.ACTIVE_SPEAKER
     private val modelStore = ModelStore(File(this.context.filesDir, MODELS_DIRECTORY))
     private val database by lazy { openAndroidDatabase(this.context) }
-    private val utteranceRepository by lazy {
+    internal val utteranceRepository by lazy {
         ObservableUtteranceRepository(SqliteUtteranceRepository(database)) { changes.tryEmit(Unit) }
     }
+    private val speakerRepository by lazy { SqliteSpeakerRepository(database) }
+    private val memoListeners = CopyOnWriteArraySet<(MemoChange) -> Unit>()
+
+    /** メモと ToDo の読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
+    internal val memoRepository: MemoRepository by lazy {
+        ObservableMemoRepository(SqliteMemoRepository(database)) { change ->
+            memoListeners.forEach { it(change) }
+        }
+    }
+
+    /** JS が見るメモと ToDo。 */
+    val memoBridge by lazy { MemoBridge(memoRepository, ::speakers, SystemClock) }
+
+    private val enrollmentRunner = EnrollmentRunner(scope, ::enrollmentPrecondition, ::runEnrollment)
     private val changes = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -71,7 +99,24 @@ class Engine private constructor(context: Context) {
 
     /** モデルの取得。聞き取りとは別に動く。 */
     val modelDownloads =
-        ModelDownloads(this.context, modelStore, models.packages, listOf(ModelCatalog.ACTIVE_LLM.modelPackage))
+        ModelDownloads(this.context, modelStore, ModelCatalog.DOWNLOADS, ModelCatalog.ORGANIZER_DOWNLOADS)
+
+    /**
+     * メモか ToDo が変わると、書いたスレッドで呼ぶ。書き込みが戻る前に届くので、
+     * 完了の Promise を解決するより先に、画面へ知らせられる。
+     */
+    fun addMemoListener(listener: (MemoChange) -> Unit) {
+        memoListeners += listener
+    }
+
+    fun removeMemoListener(listener: (MemoChange) -> Unit) {
+        memoListeners -= listener
+    }
+
+    /** 別のプロセスの整理が書いた変更を、画面へ伝える。 */
+    internal fun notifyMemoChanged(change: MemoChange) {
+        memoListeners.forEach { it(change) }
+    }
 
     val captureState: StateFlow<CaptureState> = runner.state
 
@@ -85,24 +130,77 @@ class Engine private constructor(context: Context) {
         OrganizeSchedule.ensureScheduled(this.context)
     }
 
-    /** ネイティブのメモリは聞き取りの間だけ持つ。パイプラインは文字起こしが終わってから戻るので、ここで解放できる。 */
+    /**
+     * ネイティブのメモリは聞き取りの間だけ持つ。パイプラインは文字起こしが終わってから戻るので、ここで解放できる。
+     *
+     * 話者のモデルがなくても文字起こしは動かす。そのときの発話の話者は不明になる。
+     */
     private suspend fun capture(audioSource: AudioSource) {
+        val canIdentifySpeakers = withContext(Dispatchers.IO) { modelStore.verify(speakerModel) }
         androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
             androidTranscriber(modelStore, models).use { transcriber ->
-                CapturePipeline(
-                    audioSource = audioSource,
-                    voiceActivityDetector = voiceActivityDetector,
-                    transcriber = transcriber,
-                    utterances = utteranceRepository,
-                    captureGaps = SqliteCaptureGapRepository(database),
-                    clock = SystemClock,
-                    config = SherpaSettings.captureConfig(),
-                    processingContext = Dispatchers.Default,
-                    transcriptionFilter = NoiseTextFilter(),
-                ).run()
+                androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
+                    CapturePipeline(
+                        audioSource = audioSource,
+                        voiceActivityDetector = voiceActivityDetector,
+                        transcriber = transcriber,
+                        utterances = utteranceRepository,
+                        captureGaps = SqliteCaptureGapRepository(database),
+                        clock = SystemClock,
+                        config = SherpaSettings.captureConfig(),
+                        processingContext = Dispatchers.Default,
+                        transcriptionFilter = NoiseTextFilter(),
+                        speakerIdentifier = if (canIdentifySpeakers) {
+                            SpeakerIdentifier(embedder, speakerRepository, SystemClock)
+                        } else {
+                            null
+                        },
+                    ).run()
+                }
             }
         }
     }
+
+    suspend fun selfEnrollmentStatus(): SelfEnrollmentStatus = when {
+        !modelStore.isInstalled(speakerModel) -> SelfEnrollmentStatus.UNAVAILABLE
+        speakerRepository.listEmbeddings(speakerModel.version, limit = 1).any { it.isSelf } ->
+            SelfEnrollmentStatus.ENROLLED
+        else -> SelfEnrollmentStatus.NOT_ENROLLED
+    }
+
+    /**
+     * マイクから自分の声を聞き取り、登録する。音声はメモリの中だけで扱い、特徴量を作ったら捨てる。
+     * 画面の操作で呼ぶので、マイクは前面のアプリとして開く。聞き取りとは同時に動かさない。
+     *
+     * @throws SelfEnrollmentException 登録できなかったとき
+     */
+    suspend fun enrollSelf() = enrollmentRunner.run()
+
+    /** 登録の聞き取りを止める。何も記録しない。動いていなければ何もしない。 */
+    fun cancelEnrollment() = enrollmentRunner.cancel()
+
+    private suspend fun enrollmentPrecondition(): EnrollmentFailure? = when {
+        captureState.value !is CaptureState.Stopped -> EnrollmentFailure.LISTENING
+        !withContext(Dispatchers.IO) { modelStore.verify(models) && modelStore.verify(speakerModel) } ->
+            EnrollmentFailure.SPEAKER_MODEL_UNAVAILABLE
+        context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
+            EnrollmentFailure.MICROPHONE_PERMISSION
+        else -> null
+    }
+
+    private suspend fun runEnrollment(): EnrollmentOutcome =
+        androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
+            androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
+                SelfEnrollment(
+                    audioSource = developmentAudioSource(context) ?: microphoneAudioSource(),
+                    voiceActivityDetector = voiceActivityDetector,
+                    embedder = embedder,
+                    speakers = speakerRepository,
+                    clock = SystemClock,
+                    captureConfig = SherpaSettings.enrollmentCaptureConfig(),
+                ).run()
+            }
+        }
 
     /**
      * Foreground Service を開始し、聞き取りが始まるまで待つ。すでに聞き取り中なら何もしない。
@@ -128,6 +226,8 @@ class Engine private constructor(context: Context) {
         !withContext(Dispatchers.IO) { modelStore.verify(models) } -> StartFailure.TRANSCRIPTION_UNAVAILABLE
         context.checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED ->
             StartFailure.MICROPHONE_PERMISSION
+        // 登録の聞き取りとマイクを取り合わない
+        enrollmentRunner.isRunning -> StartFailure.MICROPHONE_UNAVAILABLE
         else -> null
     }
 
@@ -153,6 +253,9 @@ class Engine private constructor(context: Context) {
 
     /** 新しい順に最大 [limit] 件を返す。 */
     suspend fun recentUtterances(limit: Int): List<Utterance> = utteranceRepository.listRecent(limit)
+
+    /** 話者を id から引けるように返す。 */
+    suspend fun speakers(): Map<Long, Speaker> = speakerRepository.listSpeakers().associateBy { it.id }
 
     /** OS に Service を止められたときに、開いたままのマイクを残さず、欠落を記録する。 */
     internal fun stopCaptureInBackground() {

@@ -62,7 +62,7 @@ class ModelStoreTest {
 
     @Test
     fun `アプリが使うモデルは、すべて固定の https の URL から取得できる`() {
-        ModelCatalog.ACTIVE.packages.forEach { modelPackage ->
+        (ModelCatalog.DOWNLOADS + ModelCatalog.ORGANIZER_DOWNLOADS).forEach { modelPackage ->
             val source = checkNotNull(modelPackage.source) { modelPackage.id }
             assertTrue(isModelHost(URL(source.url)), source.url)
             assertTrue(source.sizeBytes > 0, source.url)
@@ -82,10 +82,40 @@ class ModelStoreTest {
     }
 
     @Test
-    fun `許可していない取得先のパッケージは取得できない扱いにする`() {
-        assertTrue(ModelCatalog.ACTIVE.packages.all { it.isDownloadAllowed })
-        assertFalse(ModelCatalog.ACTIVE_LLM.modelPackage.isDownloadAllowed)
-        assertFalse(ModelPackage("source-none", emptyList()).isDownloadAllowed)
+    fun `認める取得先は https の許可した場所だけ`() {
+        val allowed = listOf(
+            "https://huggingface.co/litert-community/x",
+            "https://us.aws.cdn.hf.co/xet-bridge-us/x",
+            "https://github.com/k2-fsa/x",
+        )
+        val refused = listOf(
+            "http://huggingface.co/x",
+            "http://us.aws.cdn.hf.co/x",
+            "https://hf.co/x",
+            "https://evilhf.co/x",
+            "https://hf.co.example.com/x",
+            "https://huggingface.co.example.com/x",
+        )
+
+        allowed.forEach { assertTrue(isModelHost(URL(it)), it) }
+        refused.forEach { assertFalse(isModelHost(URL(it)), it) }
+    }
+
+    @Test
+    fun `文字起こしと話者のモデルを取得の対象にする`() {
+        val expected = ModelCatalog.ACTIVE.packages + ModelCatalog.ACTIVE_SPEAKER.modelPackage
+
+        assertTrue(ModelCatalog.DOWNLOADS.containsAll(expected))
+    }
+
+    @Test
+    fun `話者のモデルは配布元の綴りのタグから、単体のファイルで取得する`() {
+        val modelPackage = ModelCatalog.ACTIVE_SPEAKER.modelPackage
+        val source = modelPackage.source as ModelSource.SingleFile
+
+        assertEquals(ModelCatalog.ACTIVE_SPEAKER.model, source.file)
+        assertTrue(source.url.contains("/speaker-recongition-models/"), source.url)
+        assertTrue(source.url.endsWith("/${source.file.name}"), source.url)
     }
 
     @Test
@@ -99,5 +129,22 @@ class ModelStoreTest {
 
         path.delete()
         assertFalse(store.verify(models))
+    }
+
+    @Test
+    fun `話者のモデルも同じように確かめる`() {
+        val speaker = SpeakerModel(modelPackage, file)
+        assertFalse(store.isInstalled(speaker))
+        assertFalse(store.verify(speaker))
+
+        install()
+
+        assertTrue(store.isInstalled(speaker))
+        assertTrue(store.verify(speaker))
+    }
+
+    @Test
+    fun `話者のモデルの版はパッケージの id`() {
+        assertEquals(ModelCatalog.CAMPPLUS_ADVANCED.modelPackage.id, ModelCatalog.CAMPPLUS_ADVANCED.version)
     }
 }

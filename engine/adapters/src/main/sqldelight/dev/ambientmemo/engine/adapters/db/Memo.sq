@@ -39,6 +39,17 @@ SELECT *
 FROM memo
 ORDER BY started_at_ms, id;
 
+listRecent:
+SELECT *
+FROM memo
+ORDER BY started_at_ms DESC, id DESC
+LIMIT :limit;
+
+findById:
+SELECT *
+FROM memo
+WHERE id = :id;
+
 listUtteranceIds:
 SELECT memo_utterance.utterance_id
 FROM memo_utterance

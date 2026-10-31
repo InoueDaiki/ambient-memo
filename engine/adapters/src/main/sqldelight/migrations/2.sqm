@@ -1,0 +1,29 @@
+-- 版 2 から 3: 話者と特徴量を足す。既存の発話の話者は不明(NULL)のまま
+CREATE TABLE speaker (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  display_name TEXT NOT NULL,
+  name_source TEXT NOT NULL,
+  is_self INTEGER NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (is_self IN (0, 1))
+);
+
+CREATE UNIQUE INDEX speaker_self ON speaker (is_self) WHERE is_self = 1;
+
+CREATE TABLE speaker_embedding (
+  speaker_id INTEGER NOT NULL REFERENCES speaker (id),
+  model_version TEXT NOT NULL,
+  vector BLOB NOT NULL,
+  sample_count INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  PRIMARY KEY (speaker_id, model_version),
+  CHECK (sample_count > 0)
+);
+
+CREATE INDEX speaker_embedding_recent ON speaker_embedding (model_version, updated_at_ms);
+
+ALTER TABLE utterance ADD COLUMN speaker_id INTEGER REFERENCES speaker (id);
+
+ALTER TABLE utterance ADD COLUMN speaker_confidence REAL;
+
+CREATE INDEX utterance_speaker ON utterance (speaker_id);

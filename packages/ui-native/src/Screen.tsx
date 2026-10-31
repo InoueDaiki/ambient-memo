@@ -7,7 +7,14 @@ import { useColors } from "./theme.ts";
 
 // 画面の地。システムバーの下に潜らないよう、端末の安全領域の分だけ内側に置く。
 // 左右の余白は持たない(一覧を端までスクロールさせるため、中身の側で持つ)
-export function Screen({ children }: { children: ReactNode }) {
+// bottomInset は、下に TabBar があるときに false にする(TabBar が安全領域を持つ)
+export function Screen({
+  children,
+  bottomInset = true,
+}: {
+  children: ReactNode;
+  bottomInset?: boolean;
+}) {
   const palette = useColors();
   const scheme = useColorScheme();
   const insets = useSafeAreaInsets();
@@ -17,7 +24,7 @@ export function Screen({ children }: { children: ReactNode }) {
         flex: 1,
         backgroundColor: palette.canvas,
         paddingTop: insets.top + spacing.sm,
-        paddingBottom: insets.bottom + spacing.md,
+        paddingBottom: (bottomInset ? insets.bottom : 0) + spacing.md,
         paddingLeft: insets.left,
         paddingRight: insets.right,
       }}

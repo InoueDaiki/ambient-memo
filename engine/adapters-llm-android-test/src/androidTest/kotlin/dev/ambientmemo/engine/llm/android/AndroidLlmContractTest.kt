@@ -4,6 +4,7 @@ import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
+import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.Llm
@@ -110,7 +111,7 @@ class AndroidLlmContractTest {
         val memos = SqliteMemoRepository(database)
 
         val started = System.currentTimeMillis()
-        val result = OrganizeJob(memos, llm, SystemClock, TimeZone.getDefault()).run()
+        val result = OrganizeJob(memos, SqliteSpeakerRepository(database), llm, SystemClock, TimeZone.getDefault()).run()
         Log.i(TAG, "整理: ${System.currentTimeMillis() - started} ms $result")
 
         assertEquals(OrganizeOutcome.COMPLETED, result.outcome)

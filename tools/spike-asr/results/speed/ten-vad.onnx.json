@@ -1,0 +1,9 @@
+{
+ "kind": "vad",
+ "model": "ten-vad.onnx",
+ "audio_s": 313.4,
+ "rtf_1thread": 0.00234,
+ "rss_base_mb": 74.3,
+ "rss_peak_mb": 121.4,
+ "rss_added_mb": 47.2
+}

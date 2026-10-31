@@ -6,6 +6,7 @@ import dev.ambientmemo.engine.domain.testing.WavAudioSource
 import dev.ambientmemo.engine.sherpa.AsrModel
 import dev.ambientmemo.engine.sherpa.ModelCatalog
 import dev.ambientmemo.engine.sherpa.ModelStore
+import dev.ambientmemo.engine.sherpa.SpeakerModel
 import dev.ambientmemo.engine.sherpa.SpeechModels
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.onEach
@@ -35,14 +36,26 @@ object TestModels {
         return checkNotNull(store)
     }
 
+    /** [model] がなければテストを飛ばす。あれば、そのストアを返す。 */
+    fun storeFor(model: SpeakerModel): ModelStore {
+        val store = root?.let(::ModelStore)
+        val isInstalled = store?.isInstalled(model) == true
+        check(isInstalled || !requireModels) { "モデルがありません: ${model.modelPackage.id}" }
+        assumeTrue(isInstalled, "モデルがありません。mise run models:fetch で取得します")
+        return checkNotNull(store)
+    }
+
     /**
      * モデルの配布物に含まれる発話の音声。リポジトリには入れない。
      * [AsrModel] の検証用の音声はどのモデルでも同じものを使う。
      */
-    fun speech(): ShortArray {
+    fun speech(): ShortArray = speech(number = 3)
+
+    /** 配布物の `test_wavs/<number>.wav`。 */
+    fun speech(number: Int): ShortArray {
         val models = ModelCatalog.ACTIVE
         storeFor(models)
-        val path = File(File(checkNotNull(root), models.asr.modelPackage.id), "test_wavs/3.wav")
+        val path = File(File(checkNotNull(root), models.asr.modelPackage.id), "test_wavs/$number.wav")
         return readWav(path)
     }
 

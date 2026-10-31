@@ -42,7 +42,11 @@ interface Transcriber {
 
 /** 発話区間から話者の特徴量を作る。[segment] の扱いは [Transcriber] と同じ。 */
 interface SpeakerEmbedder {
-    suspend fun embed(segment: SpeechSegment): SpeakerEmbedding
+    /** 作る特徴量のモデルの版。違う版の特徴量は比べられない。 */
+    val modelVersion: String
+
+    /** 音声が短すぎて特徴量を作れないときは null を返す。 */
+    suspend fun embed(segment: SpeechSegment): SpeakerEmbedding?
 }
 
 interface UtteranceRepository {
@@ -60,6 +64,33 @@ interface CaptureGapRepository {
 
     /** `[fromMillis, toMillis)` と重なる欠落を、開始時刻の順に返す。 */
     suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<CaptureGap>
+}
+
+/** 話者と特徴量の記録。特徴量は端末の中だけで使い、この境界の外へ渡さない。 */
+interface SpeakerRepository {
+    /** 話者を id の順に返す。 */
+    suspend fun listSpeakers(): List<Speaker>
+
+    /**
+     * [modelVersion] の特徴量を、自分、更新の新しい順に最大 [limit] 件返す。
+     * 違う版の特徴量は比べられないので返さない。
+     */
+    suspend fun listEmbeddings(modelVersion: String, limit: Int): List<StoredSpeakerEmbedding>
+
+    /** 自分の特徴量を置き換える。自分の話者がなければ作る。過去の発話の話者は変えない。 */
+    suspend fun saveSelfEmbedding(embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long): Speaker
+
+    /** 仮の話者を「話者N」の名前で作り、最初の特徴量を記録する。 */
+    suspend fun createProvisionalSpeaker(embedding: SpeakerEmbedding, nowMillis: Long): Speaker
+
+    /** 既存の話者の特徴量を置き換える。 */
+    suspend fun updateEmbedding(speakerId: Long, embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long)
+
+    /** 手で付けた名前を記録する。推定で上書きされなくなる。話者がいなければ false を返す。 */
+    suspend fun setManualName(speakerId: Long, name: String): Boolean
+
+    /** 推定した名前を記録する。自分と、手で付けた名前は変えずに false を返す。 */
+    suspend fun setInferredName(speakerId: Long, name: String): Boolean
 }
 
 /** プロンプトから文章を生成する。出力の形式は保証しない。解析と検証は `domain` で行う。 */
@@ -98,6 +129,7 @@ interface OrganizeAttempts {
 }
 
 /** 整理の結果の記録。DB に書くのはエンジンだけなので、書き込みはこの境界に閉じる。 */
+@Suppress("TooManyFunctions") // メモ、ToDo、根拠の発話を1つのトランザクションで扱うので分けない
 interface MemoRepository {
     /** 処理済みの印がない発話を、開始時刻、id の順に返す。 */
     suspend fun listUnorganizedUtterances(): List<Utterance>
@@ -119,4 +151,22 @@ interface MemoRepository {
 
     /** [memoId] の ToDo を、記録した順に返す。 */
     suspend fun listTodos(memoId: Long): List<Todo>
+
+    /** メモを開始時刻の新しい順に最大 [limit] 件返す。同時刻は後から記録したものを先にする。 */
+    suspend fun listRecentMemos(limit: Int): List<Memo>
+
+    /** メモがなければ null を返す。 */
+    suspend fun findMemo(memoId: Long): Memo?
+
+    /** [memoId] の根拠の発話を、開始時刻、id の順に返す。 */
+    suspend fun listMemoUtterances(memoId: Long): List<Utterance>
+
+    /**
+     * 画面に出す順で ToDo を最大 [limit] 件返す。
+     * 未完了を先に、期限の早い順。期限がなければ後ろ、同じなら新しい順、それも同じなら記録した順。
+     */
+    suspend fun listTodosByPriority(limit: Int): List<Todo>
+
+    /** ToDo を完了にする。完了の前の状態は取り消しのために残す。すでに完了していれば何も変えない。 */
+    suspend fun completeTodo(todoId: Long, completedAtMillis: Long): TodoCompletion
 }
