@@ -17,13 +17,17 @@ export interface EngineClient {
 
 export type ListeningStatus = "stopped" | "listening";
 
-// 今は「自分」か「それ以外」だけ。名前の推定を足すときに広げる
-export type Speaker = "self" | "other";
+// - self: 登録した自分の声
+// - other: 自分以外。仮の話者か、名前の分かった話者
+// - unknown: 判定していないか、判定できなかった
+export type Speaker = "self" | "other" | "unknown";
 
 export interface Utterance {
   id: string;
   text: string;
   speaker: Speaker;
+  // 表示する話者の名前(「話者1」など)。unknown の発話にはない
+  speakerName?: string;
   // 発話の開始時刻(Unix 時間のミリ秒)
   startedAt: number;
 }
@@ -52,6 +56,34 @@ export class EngineStartError extends Error {
   }
 }
 
+// 自分の声の登録の状態
+// - enrolled: 登録済み
+// - not-enrolled: 未登録
+// - unavailable: 話者のモデルが端末になく、登録できない
+export type SelfEnrollmentStatus = "enrolled" | "not-enrolled" | "unavailable";
+
+export type SelfEnrollmentFailure =
+  // cancelSelfEnrollment で止めた。前の登録はそのまま
+  | "cancelled"
+  // 聞き取り中か、別の登録の途中
+  | "listening"
+  | "microphone-permission"
+  | "microphone-unavailable"
+  // 時間内に十分な長さの発話を聞き取れなかった
+  | "not-enough-speech"
+  | "speaker-model-unavailable";
+
+// enrollSelf の reject で、理由が分かるときに使う
+export class SelfEnrollmentError extends Error {
+  readonly failure: SelfEnrollmentFailure;
+
+  constructor(failure: SelfEnrollmentFailure) {
+    super(failure);
+    this.name = "SelfEnrollmentError";
+    this.failure = failure;
+  }
+}
+
 export type EngineEvent =
   // 画面の操作だけでなく、エンジンの都合(マイクの占有など)でも変わる。
   // interrupted は、操作ではなくエンジンの都合で止まったときに true
@@ -76,6 +108,12 @@ export interface TranscriptEngineClient extends EngineClient {
   stopListening(): Promise<void>;
   // 新しい順に最大 limit 件を返す
   listUtterances(options: { limit: number }): Promise<Utterance[]>;
+  getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
+  // 自分の声を聞き取って登録する。声は端末の中だけで扱い、音声は残さない。
+  // 未許可のマイクの権限があれば OS の確認を出す。登録できないときは SelfEnrollmentError で reject する
+  enrollSelf(): Promise<void>;
+  // 登録の途中なら止める。enrollSelf は cancelled で reject する
+  cancelSelfEnrollment(): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

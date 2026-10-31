@@ -47,6 +47,13 @@ sealed interface AsrModel {
     ) : AsrModel
 }
 
+/** 話者の特徴量のモデル。なくても文字起こしは動くので、[SpeechModels] とは別に扱う。 */
+class SpeakerModel(val modelPackage: ModelPackage, val model: ModelFile) {
+    /** 特徴量に記録する版。モデルを変えると、保存済みの特徴量は比べられなくなる。 */
+    val version: String
+        get() = modelPackage.id
+}
+
 class SpeechModels(val vad: VadModel, val asr: AsrModel) {
     val packages: List<ModelPackage>
         get() = listOf(vad.modelPackage, asr.modelPackage)
@@ -115,8 +122,20 @@ object ModelCatalog {
         )
     }
 
+    val CAMPPLUS_ADVANCED: SpeakerModel = run {
+        val model = ModelFile(
+            "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
+            28_281_164,
+            "aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2",
+        )
+        SpeakerModel(ModelPackage("3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced", listOf(model)), model)
+    }
+
     /** アプリが使うモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
     val ACTIVE: SpeechModels = SpeechModels(SILERO_VAD, ZIPFORMER_REAZON)
+
+    /** アプリが使う話者のモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
+    val ACTIVE_SPEAKER: SpeakerModel = CAMPPLUS_ADVANCED
 }
 
 /** [root] の下にモデルを置く。端末では内部ストレージ、JVM ではテスト用のディレクトリ。 */
@@ -136,6 +155,11 @@ class ModelStore(private val root: File) {
      * 印を信じるのは、同じ版のハッシュの組に対してだけ。
      */
     fun verify(models: SpeechModels): Boolean = models.packages.map(::verify).all { it }
+
+    fun isInstalled(model: SpeakerModel): Boolean =
+        File(pathOf(model.modelPackage, model.model)).length() == model.model.sizeBytes
+
+    fun verify(model: SpeakerModel): Boolean = verify(model.modelPackage)
 
     private fun verify(modelPackage: ModelPackage): Boolean {
         val directory = File(root, modelPackage.id)

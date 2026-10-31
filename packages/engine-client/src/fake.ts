@@ -1,9 +1,12 @@
+import { SelfEnrollmentError } from "./types.ts";
 import type {
   EngineEvent,
   EngineListener,
   EnginePermissions,
   EngineStatus,
   ListeningStatus,
+  SelfEnrollmentFailure,
+  SelfEnrollmentStatus,
   TranscriptEngineClient,
   Utterance,
 } from "./types.ts";
@@ -13,6 +16,7 @@ export interface FakeEngineClientOptions {
   listeningStatus?: ListeningStatus;
   utterances?: Utterance[];
   permissions?: EnginePermissions;
+  selfEnrollment?: SelfEnrollmentStatus;
 }
 
 // エンジンなしで画面を開発・テストするための実装
@@ -24,17 +28,23 @@ export class FakeEngineClient implements TranscriptEngineClient {
   #startError: Error | undefined;
   #permissions: EnginePermissions;
   #settingsOpened = 0;
+  #selfEnrollment: SelfEnrollmentStatus;
+  #enrollmentFailure: SelfEnrollmentFailure | undefined;
+  #finishEnrollment: (() => void) | undefined;
+  #rejectEnrollment: ((error: Error) => void) | undefined;
 
   constructor({
     status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
     listeningStatus = "stopped",
     utterances = [],
     permissions = { microphone: true, notifications: true },
+    selfEnrollment = "enrolled",
   }: FakeEngineClientOptions = {}) {
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
     this.#permissions = permissions;
+    this.#selfEnrollment = selfEnrollment;
   }
 
   getStatus(): Promise<EngineStatus> {
@@ -72,6 +82,36 @@ export class FakeEngineClient implements TranscriptEngineClient {
   listUtterances({ limit }: { limit: number }): Promise<Utterance[]> {
     const newestFirst = [...this.#utterances].sort((a, b) => b.startedAt - a.startedAt);
     return Promise.resolve(newestFirst.slice(0, limit));
+  }
+
+  getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus> {
+    return Promise.resolve(this.#selfEnrollment);
+  }
+
+  // finishEnrollment を呼ぶまで聞き取りの途中のまま待つ
+  enrollSelf(): Promise<void> {
+    if (this.#enrollmentFailure) {
+      const failure = this.#enrollmentFailure;
+      this.#enrollmentFailure = undefined;
+      return Promise.reject(new SelfEnrollmentError(failure));
+    }
+    if (this.#finishEnrollment) return Promise.reject(new SelfEnrollmentError("listening"));
+    if (this.#listeningStatus === "listening") {
+      return Promise.reject(new SelfEnrollmentError("listening"));
+    }
+    return new Promise((resolve, reject) => {
+      this.#finishEnrollment = () => {
+        this.#selfEnrollment = "enrolled";
+        resolve();
+      };
+      this.#rejectEnrollment = reject;
+    });
+  }
+
+  cancelSelfEnrollment(): Promise<void> {
+    this.#rejectEnrollment?.(new SelfEnrollmentError("cancelled"));
+    this.#clearEnrollment();
+    return Promise.resolve();
   }
 
   subscribe(listener: EngineListener): () => void {
@@ -114,6 +154,22 @@ export class FakeEngineClient implements TranscriptEngineClient {
   // 次の startListening を失敗させる
   failNextStart(error: Error): void {
     this.#startError = error;
+  }
+
+  // 登録の聞き取りを成功で終える
+  finishEnrollment(): void {
+    this.#finishEnrollment?.();
+    this.#clearEnrollment();
+  }
+
+  // 次の enrollSelf を失敗させる
+  failNextEnrollment(failure: SelfEnrollmentFailure): void {
+    this.#enrollmentFailure = failure;
+  }
+
+  #clearEnrollment(): void {
+    this.#finishEnrollment = undefined;
+    this.#rejectEnrollment = undefined;
   }
 
   #emit(event: EngineEvent): void {

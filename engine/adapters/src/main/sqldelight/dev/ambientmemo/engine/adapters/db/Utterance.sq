@@ -1,4 +1,5 @@
 -- 文字起こしの最小単位。時刻は UNIX エポックからのミリ秒
+-- confidence は文字起こしの信頼度、speaker_confidence は話者のコサイン類似度。speaker_id が NULL なら話者は不明
 CREATE TABLE utterance (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   started_at_ms INTEGER NOT NULL,
@@ -7,6 +8,8 @@ CREATE TABLE utterance (
   confidence REAL,
   created_at_ms INTEGER NOT NULL,
   organized_at_ms INTEGER,
+  speaker_id INTEGER REFERENCES speaker (id),
+  speaker_confidence REAL,
   CHECK (ended_at_ms >= started_at_ms),
   CHECK (confidence IS NULL OR confidence BETWEEN 0.0 AND 1.0)
 );
@@ -16,9 +19,11 @@ CREATE INDEX utterance_started_at ON utterance (started_at_ms);
 -- 整理ジョブが未処理の発話だけを読む。organized_at_ms が NULL の行が未処理
 CREATE INDEX utterance_unorganized ON utterance (started_at_ms, id) WHERE organized_at_ms IS NULL;
 
+CREATE INDEX utterance_speaker ON utterance (speaker_id);
+
 insert:
-INSERT INTO utterance (started_at_ms, ended_at_ms, body, confidence, created_at_ms)
-VALUES (?, ?, ?, ?, ?);
+INSERT INTO utterance (started_at_ms, ended_at_ms, body, confidence, created_at_ms, speaker_id, speaker_confidence)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 lastInsertedId:
 SELECT last_insert_rowid();

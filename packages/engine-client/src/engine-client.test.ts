@@ -1,7 +1,12 @@
 import { describe, expect, it } from "vitest";
 
 import { FakeEngineClient } from "./fake.ts";
-import type { EngineEvent, TranscriptEngineClient, Utterance } from "./types.ts";
+import {
+  SelfEnrollmentError,
+  type EngineEvent,
+  type TranscriptEngineClient,
+  type Utterance,
+} from "./types.ts";
 
 // 契約テスト。本物の実装を作ったら、同じテストをその実装にも流す
 describe.each<[string, () => TranscriptEngineClient]>([
@@ -55,6 +60,49 @@ describe.each<[string, () => TranscriptEngineClient]>([
 
     expect(events).toEqual([]);
     await client.stopListening();
+  });
+});
+
+describe("FakeEngineClient の声の登録", () => {
+  const notEnrolled = () => new FakeEngineClient({ selfEnrollment: "not-enrolled" });
+
+  it("聞き取りが終わると登録済みになる", async () => {
+    const client = notEnrolled();
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+
+    const done = client.enrollSelf();
+    client.finishEnrollment();
+    await done;
+
+    expect(await client.getSelfEnrollmentStatus()).toBe("enrolled");
+  });
+
+  it("止めると cancelled で reject し、登録しない", async () => {
+    const client = notEnrolled();
+
+    const done = client.enrollSelf();
+    await client.cancelSelfEnrollment();
+
+    await expect(done).rejects.toEqual(new SelfEnrollmentError("cancelled"));
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+  });
+
+  it("聞き取り中は登録できない", async () => {
+    const client = notEnrolled();
+    await client.startListening();
+
+    await expect(client.enrollSelf()).rejects.toEqual(new SelfEnrollmentError("listening"));
+  });
+
+  it("失敗は1回だけ起きる", async () => {
+    const client = notEnrolled();
+    client.failNextEnrollment("not-enough-speech");
+
+    await expect(client.enrollSelf()).rejects.toEqual(new SelfEnrollmentError("not-enough-speech"));
+
+    const done = client.enrollSelf();
+    client.finishEnrollment();
+    await done;
   });
 });
 

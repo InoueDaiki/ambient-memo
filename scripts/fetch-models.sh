@@ -31,6 +31,11 @@ download() {
   fi
 }
 
+speaker_id=3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced
+# 配布元のタグの綴りは recongition のまま
+speaker_url=https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/$speaker_id.onnx
+speaker_sha256=aa3cfc16963a10586a9393f5035d6d6b57e98d358b347f80c2a30bf4f00ceba2
+
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
 
@@ -47,4 +52,10 @@ if [ ! -f "$root/$asr_id/tokens.txt" ]; then
   for file in "${asr_files[@]}"; do
     mv "$work/$asr_id/$file" "$root/$asr_id/"
   done
+fi
+
+mkdir -p "$root/$speaker_id"
+if [ ! -f "$root/$speaker_id/$speaker_id.onnx" ]; then
+  download "$speaker_url" "$speaker_sha256" "$work/$speaker_id.onnx"
+  mv "$work/$speaker_id.onnx" "$root/$speaker_id/"
 fi

@@ -64,6 +64,19 @@ describe("文字起こしの画面", () => {
     expect(screen.queryByText("まだ発話はありません")).toBeNull();
   });
 
+  it("仮の話者は名前で出し、話者が分からない発話は不明と出す", async () => {
+    const client = new FakeEngineClient({
+      utterances: [
+        utterance({ id: "1", text: "予定を確かめます", speaker: "other", speakerName: "話者1" }),
+        utterance({ id: "2", text: "はい", speaker: "unknown" }),
+      ],
+    });
+    await renderApp(client);
+
+    await screen.findByText("話者1");
+    screen.getByText("不明");
+  });
+
   it("聞き取り中に発話が届くと一覧が更新される", async () => {
     const client = new FakeEngineClient({ listeningStatus: "listening" });
     await renderApp(client);
@@ -195,5 +208,79 @@ describe("文字起こしの画面", () => {
 
     await screen.findByText("止まっています");
     screen.getByRole("button", { name: "聞き取りを始める" });
+  });
+});
+
+describe("自分の声の登録", () => {
+  const notEnrolled = () => new FakeEngineClient({ selfEnrollment: "not-enrolled" });
+
+  it("登録済みなら案内を出さない", async () => {
+    await renderApp(new FakeEngineClient());
+
+    await screen.findByText("まだ発話はありません");
+    expect(screen.queryByText("自分の声を登録する")).toBeNull();
+  });
+
+  it("モデルがなければ案内を出さない", async () => {
+    await renderApp(new FakeEngineClient({ selfEnrollment: "unavailable" }));
+
+    await screen.findByText("まだ発話はありません");
+    expect(screen.queryByText("自分の声を登録する")).toBeNull();
+  });
+
+  it("読み上げる文を出して聞き取り、終わると案内が消える", async () => {
+    const client = notEnrolled();
+    await renderApp(client);
+    await screen.findByText("自分の声を登録する");
+
+    await press("声を登録する");
+
+    await screen.findByText(/今日の予定を確認してから/);
+
+    await act(async () => {
+      client.finishEnrollment();
+    });
+
+    expect(screen.queryByText("自分の声を登録する")).toBeNull();
+    expect(await client.getSelfEnrollmentStatus()).toBe("enrolled");
+  });
+
+  it("やめると元に戻り、エラーを出さない", async () => {
+    const client = notEnrolled();
+    await renderApp(client);
+    await screen.findByText("自分の声を登録する");
+
+    await press("声を登録する");
+    await press("登録をやめる");
+
+    await screen.findByRole("button", { name: "声を登録する" });
+    expect(screen.queryByText(/登録できませんでした/)).toBeNull();
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+  });
+
+  it("声が足りなければ理由を知らせて、やり直せる", async () => {
+    const client = notEnrolled();
+    client.failNextEnrollment("not-enough-speech");
+    await renderApp(client);
+    await screen.findByText("自分の声を登録する");
+
+    await press("声を登録する");
+
+    await screen.findByText(
+      "声を十分に聞き取れませんでした。静かな場所で、もう一度試してください。",
+    );
+    await press("声を登録する");
+    expect(screen.queryByText(/声を十分に聞き取れませんでした/)).toBeNull();
+  });
+
+  it("聞き取り中は登録を始められない", async () => {
+    await renderApp(
+      new FakeEngineClient({ selfEnrollment: "not-enrolled", listeningStatus: "listening" }),
+    );
+    await screen.findByText("自分の声を登録する");
+
+    expect(
+      screen.getByRole("button", { name: "声を登録する" }).props.accessibilityState?.disabled,
+    ).toBe(true);
   });
 });

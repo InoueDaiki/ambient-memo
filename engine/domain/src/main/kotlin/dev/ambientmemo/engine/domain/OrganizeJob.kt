@@ -17,6 +17,7 @@ private const val MAX_TITLE_CHARS = 30
  */
 class OrganizeJob(
     private val memos: MemoRepository,
+    private val speakers: SpeakerRepository,
     private val llm: Llm,
     private val clock: Clock,
     private val timeZone: TimeZone,
@@ -29,11 +30,12 @@ class OrganizeJob(
      * LLM の例外は [OrganizeOutcome.LLM_FAILED] で返す。DB の例外とキャンセルはそのまま投げる。
      */
     suspend fun run(shouldContinue: () -> Boolean = { true }): OrganizeResult {
-        val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone)
+        val labels = SpeakerLabels(speakers.listSpeakers())
+        val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, labels)
             .withoutOngoing(clock.nowMillis(), config)
         val tally = Tally()
         val stoppedBy = chunks.firstNotNullOfOrNull { chunk ->
-            if (shouldContinue()) process(chunk, tally) else OrganizeOutcome.STOPPED
+            if (shouldContinue()) process(chunk, labels, tally) else OrganizeOutcome.STOPPED
         }
         return OrganizeResult(stoppedBy ?: OrganizeOutcome.COMPLETED, tally.memoCount, tally.todoCount)
     }
@@ -41,8 +43,8 @@ class OrganizeJob(
     private class Tally(var memoCount: Int = 0, var todoCount: Int = 0)
 
     /** まとまりを1つ記録する。続けられないときは止まった理由を返す。 */
-    private suspend fun process(chunk: UtteranceChunk, tally: Tally): OrganizeOutcome? {
-        val memo = if (chunk.isBlank) null else draftOrNull(chunk)
+    private suspend fun process(chunk: UtteranceChunk, labels: SpeakerLabels, tally: Tally): OrganizeOutcome? {
+        val memo = if (chunk.isBlank) null else draftOrNull(chunk, labels)
         when {
             chunk.isBlank -> memos.markOrganized(chunk.utterances.map { it.id }, clock.nowMillis())
             memo == null -> return OrganizeOutcome.LLM_FAILED
@@ -56,16 +58,18 @@ class OrganizeJob(
 
     // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private suspend fun draftOrNull(chunk: UtteranceChunk): NewMemo? = try {
-        draft(chunk)
+    private suspend fun draftOrNull(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo? = try {
+        draft(chunk, labels)
     } catch (e: Exception) {
         // キャンセルかどうかは例外の型ではなく状態で判断する。アダプターの内側の withTimeout で止めないため
         currentCoroutineContext().ensureActive()
         null
     }
 
-    private suspend fun draft(chunk: UtteranceChunk): NewMemo {
-        val transcript = chunk.toTranscript(timeZone)
+    private suspend fun draft(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo {
+        val transcript = chunk.toTranscript(timeZone, labels)
+        // 話者の名前は日付の手がかりにしない。「明日香」などを「明日」と読まないように、本文だけで確かめる
+        val spokenText = chunk.toTranscript(timeZone)
         val spokenOn = CalendarDate.of(chunk.startedAtMillis, timeZone)
         val endedOn = CalendarDate.of(chunk.endedAtMillis, timeZone)
         val summary = summarize(spokenOn, transcript)
@@ -81,7 +85,7 @@ class OrganizeJob(
             utteranceIds = chunk.utterances.map { it.id },
             todos = parsed.items
                 .distinctBy { item -> item.task.filterNot(Char::isWhitespace) }
-                .map { item -> item.toNewTodo(assessDue(item.due, spokenOn, endedOn, transcript)) },
+                .map { item -> item.toNewTodo(assessDue(item.due, spokenOn, endedOn, spokenText)) },
         )
     }
 

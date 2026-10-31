@@ -22,6 +22,7 @@ import {
 import { FlatList, View } from "react-native";
 
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
+import { SelfEnrollmentCard } from "./SelfEnrollmentCard.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
 const UTTERANCE_LIMIT = 200;
@@ -75,7 +76,7 @@ function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | und
       )}
       <ListItem
         text={item.text}
-        label={speakerLabels[item.speaker]}
+        label={item.speakerName ?? speakerLabels[item.speaker]}
         meta={formatTime(item.startedAt)}
       />
     </View>
@@ -101,6 +102,7 @@ export function TranscriptScreen() {
         <Text variant="title" accessibilityRole="header">
           文字起こし
         </Text>
+        <SelfEnrollmentCard isListening={isListening} />
         {transcriptionMode === "unavailable" && (
           <StatusBanner tone="neutral" message="文字起こしのモデルが端末にありません。" />
         )}

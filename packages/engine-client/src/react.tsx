@@ -1,12 +1,15 @@
 // 画面からエンジンを使う hooks。engine-bridge と Fake のどちらの実装でも同じように動く
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import type {
-  EnginePermissions,
-  ListeningStatus,
-  TranscriptEngineClient,
-  TranscriptionMode,
-  Utterance,
+import {
+  SelfEnrollmentError,
+  type EnginePermissions,
+  type ListeningStatus,
+  type SelfEnrollmentFailure,
+  type SelfEnrollmentStatus,
+  type TranscriptEngineClient,
+  type TranscriptionMode,
+  type Utterance,
 } from "./types.ts";
 
 const EngineClientContext = createContext<TranscriptEngineClient | undefined>(undefined);
@@ -143,6 +146,56 @@ export function useTranscriptionMode(): TranscriptionMode | undefined {
   }, [client]);
 
   return mode;
+}
+
+export interface UseSelfEnrollmentResult {
+  // 最初の取得が終わるまでと、取得に失敗したときは undefined
+  status: SelfEnrollmentStatus | undefined;
+  // 聞き取りの途中は true
+  isEnrolling: boolean;
+  // 最後の登録の失敗。止める操作は失敗に含めない。次の操作で消える
+  failure: SelfEnrollmentFailure | "unknown" | undefined;
+  enroll: () => void;
+  cancel: () => void;
+}
+
+export function useSelfEnrollment(): UseSelfEnrollmentResult {
+  const client = useEngineClient();
+  const [status, setStatus] = useState<SelfEnrollmentStatus>();
+  const [isEnrolling, setIsEnrolling] = useState(false);
+  const [failure, setFailure] = useState<UseSelfEnrollmentResult["failure"]>();
+
+  useEffect(() => {
+    let active = true;
+    client
+      .getSelfEnrollmentStatus()
+      .then((current) => {
+        if (active) setStatus(current);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client]);
+
+  const enroll = useCallback(() => {
+    setIsEnrolling(true);
+    setFailure(undefined);
+    client
+      .enrollSelf()
+      .then(() => setStatus("enrolled"))
+      .catch((e: unknown) => {
+        const reason = e instanceof SelfEnrollmentError ? e.failure : "unknown";
+        if (reason !== "cancelled") setFailure(reason);
+      })
+      .finally(() => setIsEnrolling(false));
+  }, [client]);
+
+  const cancel = useCallback(() => {
+    client.cancelSelfEnrollment().catch(() => undefined);
+  }, [client]);
+
+  return { status, isEnrolling, failure, enroll, cancel };
 }
 
 export interface UseUtterancesResult {

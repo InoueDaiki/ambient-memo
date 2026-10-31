@@ -1,6 +1,6 @@
 export { FakeEngineClient } from "./fake.ts";
 export type { FakeEngineClientOptions } from "./fake.ts";
-export { EngineStartError } from "./types.ts";
+export { EngineStartError, SelfEnrollmentError } from "./types.ts";
 export type {
   EngineClient,
   EngineEvent,
@@ -9,6 +9,8 @@ export type {
   EngineStartFailure,
   EngineStatus,
   ListeningStatus,
+  SelfEnrollmentFailure,
+  SelfEnrollmentStatus,
   Speaker,
   TranscriptEngineClient,
   TranscriptionMode,

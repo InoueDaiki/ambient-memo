@@ -19,7 +19,7 @@ import kotlin.math.abs
  * 文字起こしは [processingContext] で別に動かすので、遅れても読み取りは止まらない。
  *
  * 音声のバッファは次のどの経路でも解放する。
- * - 文字起こしが終わった発話: 成功、失敗、中断を問わず [process] の `use` で解放する
+ * - 文字起こしと話者の判定が終わった発話: 成功、失敗、中断を問わず [process] の `use` で解放する
  * - 追いつかずに捨てた発話: [SegmentBacklog] が解放する
  * - 中断で残った発話と語頭のバッファ: [run] の `finally` で解放する
  */
@@ -34,6 +34,7 @@ class CapturePipeline(
     private val config: CaptureConfig = CaptureConfig(),
     private val processingContext: CoroutineContext = EmptyCoroutineContext,
     private val transcriptionFilter: TranscriptionFilter = TranscriptionFilter { _, _ -> true },
+    private val speakerIdentifier: SpeakerIdentifier? = null,
 ) {
     /**
      * 音声の終わりまで処理する。
@@ -119,7 +120,7 @@ class CapturePipeline(
             val transcription = transcriber.transcribe(segment)
             val durationMillis = segment.endedAtMillis - segment.startedAtMillis
             if (transcription.text.isNotBlank() && transcriptionFilter.shouldSave(transcription.text, durationMillis)) {
-                utterances.insert(segment.toUtterance(transcription))
+                utterances.insert(segment.toUtterance(transcription, identifySpeaker(segment)))
             }
         } catch (e: Exception) {
             val isStopping = !currentCoroutineContext().isActive
@@ -129,12 +130,26 @@ class CapturePipeline(
         }
     }
 
-    private fun SpeechSegment.toUtterance(transcription: Transcription) = NewUtterance(
+    /**
+     * 話者が分からなくても文字起こしは残す。音声を残さないので、ここで諦めると文字起こしもやり直せない。
+     * キャンセルかどうかは [process] と同じく、このコルーチンの状態で判断する。
+     */
+    @Suppress("TooGenericExceptionCaught", "SwallowedException") // 例外の中身に音声由来の情報を持ち出さない
+    private suspend fun identifySpeaker(segment: SpeechSegment): SpeakerAssignment? = try {
+        speakerIdentifier?.identify(segment)
+    } catch (e: Exception) {
+        currentCoroutineContext().ensureActive()
+        null
+    }
+
+    private fun SpeechSegment.toUtterance(transcription: Transcription, speaker: SpeakerAssignment?) = NewUtterance(
         startedAtMillis = startedAtMillis,
         endedAtMillis = endedAtMillis,
         text = transcription.text,
         confidence = transcription.confidence,
         createdAtMillis = clock.nowMillis(),
+        speakerId = speaker?.speakerId,
+        speakerConfidence = speaker?.confidence,
     )
 
     /** 例外やキャンセルで抜けたときに残った音声を消す。正常に終わったときは語頭のバッファだけを消す。 */

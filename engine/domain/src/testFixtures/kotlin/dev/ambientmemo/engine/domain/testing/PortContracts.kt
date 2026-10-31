@@ -192,14 +192,19 @@ abstract class TranscriberContract {
 abstract class SpeakerEmbedderContract {
     protected abstract fun embedder(): SpeakerEmbedder
 
+    /** 発話の音声。音声の中身を見る本物の実装は、本物の発話に差し替える。 */
+    protected open fun speech(): ShortArray = SyntheticAudio.tone(500)
+
     @Test
     fun `同じ音声から同じ特徴量と版を返す`() = runTest {
         val embedder = embedder()
 
-        val first = embedder.embed(segment())
-        val second = embedder.embed(segment())
+        val first = checkNotNull(embedder.embed(segment(speech())))
+        val second = checkNotNull(embedder.embed(segment(speech())))
 
         assertTrue(first.vector.isNotEmpty())
+        assertTrue(first.vector.all { it.isFinite() })
+        assertEquals(embedder.modelVersion, first.modelVersion)
         assertTrue(first.modelVersion.isNotBlank())
         assertArrayEquals(first.vector, second.vector)
         assertEquals(first.modelVersion, second.modelVersion)
@@ -207,11 +212,21 @@ abstract class SpeakerEmbedderContract {
 
     @Test
     fun `バッファの解放は呼び出し側に任せる`() = runTest {
-        val segment = segment()
+        val segment = segment(speech())
 
         embedder().embed(segment)
 
         assertFalse(segment.isReleased)
+    }
+
+    @Test
+    fun `渡された音声を書き換えない`() = runTest {
+        val samples = speech()
+        val segment = segment(samples.copyOf())
+
+        embedder().embed(segment)
+
+        assertArrayEquals(samples, segment.samples)
     }
 }
 

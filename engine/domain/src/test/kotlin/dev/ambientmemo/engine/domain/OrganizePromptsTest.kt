@@ -10,7 +10,7 @@ import org.junit.jupiter.api.Test
  */
 class OrganizePromptsTest {
     private val date = CalendarDate(2026, 11, 2)
-    private val transcript = "[18:02] 歯医者の予約、あさってに取れた\n[18:03] 帰りに牛乳を買う\n"
+    private val transcript = "[18:02] 自分: 歯医者の予約、あさってに取れた\n[18:03] 話者1: 帰りに牛乳を買ってきて\n"
 
     private fun golden(name: String) = javaClass.getResource("/prompt-golden/PromptGolden-$name.txt")!!.readText()
 

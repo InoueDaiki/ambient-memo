@@ -3,8 +3,10 @@ package dev.ambientmemo.engine.sherpa.android
 import android.util.Log
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import androidx.test.platform.app.InstrumentationRegistry
+import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.VoiceActivityDetector
+import dev.ambientmemo.engine.domain.testing.SpeakerEmbedderContract
 import dev.ambientmemo.engine.domain.testing.TranscriberContract
 import dev.ambientmemo.engine.domain.testing.VoiceActivityDetectorContract
 import dev.ambientmemo.engine.sherpa.ModelCatalog
@@ -32,6 +34,15 @@ private class AndroidTranscriberContract : TranscriberContract() {
     public override fun speech(): ShortArray = TestModels.speech()
 
     public override fun transcriber(): Transcriber = transcriber
+}
+
+private class AndroidSpeakerEmbedderContract : SpeakerEmbedderContract() {
+    private val model = ModelCatalog.ACTIVE_SPEAKER
+    private val embedder by lazy { androidSpeakerEmbedder(TestModels.storeFor(model), model) }
+
+    public override fun speech(): ShortArray = TestModels.speech()
+
+    public override fun embedder(): SpeakerEmbedder = embedder
 }
 
 /**
@@ -72,4 +83,7 @@ class AndroidSpeechContractTest {
 
     @Test
     fun transcriber() = runContract(AndroidTranscriberContract())
+
+    @Test
+    fun speakerEmbedder() = runContract(AndroidSpeakerEmbedderContract())
 }

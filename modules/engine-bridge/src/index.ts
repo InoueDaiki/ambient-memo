@@ -1,15 +1,21 @@
 import {
   EngineStartError,
+  SelfEnrollmentError,
   type EngineEvent,
   type EngineListener,
   type EnginePermissions,
   type EngineStartFailure,
   type EngineStatus,
   type ListeningStatus,
+  type SelfEnrollmentFailure,
+  type SelfEnrollmentStatus,
   type TranscriptEngineClient,
   type Utterance,
 } from "@ambient-memo/engine-client";
 import { requireNativeModule, type EventSubscription } from "expo";
+
+// ネイティブの null は、名前がないことを表す
+type NativeUtterance = Omit<Utterance, "speakerName"> & { speakerName: string | null };
 
 interface EngineBridgeNativeModule {
   getStatus(): Promise<EngineStatus>;
@@ -18,7 +24,10 @@ interface EngineBridgeNativeModule {
   openPermissionSettings(): Promise<void>;
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
-  listUtterances(limit: number): Promise<Utterance[]>;
+  listUtterances(limit: number): Promise<NativeUtterance[]>;
+  getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
+  enrollSelf(): Promise<void>;
+  cancelSelfEnrollment(): Promise<void>;
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): EventSubscription;
 }
 
@@ -35,6 +44,25 @@ function toStartError(error: unknown): unknown {
   return failure === undefined ? error : new EngineStartError(failure);
 }
 
+const ENROLLMENT_FAILURES: readonly SelfEnrollmentFailure[] = [
+  "cancelled",
+  "listening",
+  "microphone-permission",
+  "microphone-unavailable",
+  "not-enough-speech",
+  "speaker-model-unavailable",
+];
+
+function toEnrollmentError(error: unknown): unknown {
+  const code = (error as { code?: unknown } | undefined)?.code;
+  const failure = ENROLLMENT_FAILURES.find((item) => item === code);
+  return failure === undefined ? error : new SelfEnrollmentError(failure);
+}
+
+function toUtterance({ speakerName, ...rest }: NativeUtterance): Utterance {
+  return speakerName === null ? rest : { ...rest, speakerName };
+}
+
 export function createEngineClient(): TranscriptEngineClient {
   const native = requireNativeModule<EngineBridgeNativeModule>("EngineBridge");
   return {
@@ -47,7 +75,14 @@ export function createEngineClient(): TranscriptEngineClient {
         throw toStartError(error);
       }),
     stopListening: () => native.stopListening(),
-    listUtterances: ({ limit }) => native.listUtterances(limit),
+    listUtterances: ({ limit }) =>
+      native.listUtterances(limit).then((items) => items.map(toUtterance)),
+    getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),
+    enrollSelf: () =>
+      native.enrollSelf().catch((error: unknown) => {
+        throw toEnrollmentError(error);
+      }),
+    cancelSelfEnrollment: () => native.cancelSelfEnrollment(),
     subscribe: (listener: EngineListener) => {
       const subscription = native.addListener("engine", listener);
       return () => subscription.remove();

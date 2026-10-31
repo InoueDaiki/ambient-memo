@@ -93,7 +93,10 @@ private fun readAll(result: ResultSet): List<Row> {
     val columns = (1..result.metaData.columnCount).map { result.metaData.getColumnName(it) }
     val rows = mutableListOf<Row>()
     while (result.next()) {
-        rows += columns.associateWith { result.getObject(it) }
+        // BLOB の配列は == で中身を比べられないので、リストにする
+        rows += columns.associateWith { column ->
+            result.getObject(column).let { value -> (value as? ByteArray)?.toList() ?: value }
+        }
     }
     return rows
 }

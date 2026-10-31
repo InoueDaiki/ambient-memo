@@ -10,18 +10,24 @@ import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NewMemo
 import dev.ambientmemo.engine.domain.NewTodo
 import dev.ambientmemo.engine.domain.NewUtterance
+import dev.ambientmemo.engine.domain.SpeakerEmbedding
+import dev.ambientmemo.engine.domain.SpeakerNameSource
+import dev.ambientmemo.engine.domain.SpeakerRepository
 import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.TodoKind
 import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.UtteranceRepository
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertArrayEquals
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertNotEquals
 import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
 /** [UtteranceRepository] の Fake と本物の両方に流す契約テスト。 */
+@Suppress("TooManyFunctions") // 契約の項目を 1 つずつテストにしている
 abstract class UtteranceRepositoryContract {
     protected abstract fun repository(): UtteranceRepository
 
@@ -41,6 +47,18 @@ abstract class UtteranceRepositoryContract {
         assertEquals(new.confidence, saved.confidence)
         assertEquals(new.createdAtMillis, saved.createdAtMillis)
         assertEquals(listOf(saved), repository.listOverlapping(0, 10_000))
+    }
+
+    @Test
+    fun `話者と話者の信頼度を保存して読み出せる`() = runTest {
+        val repository = repository()
+        val new = NewUtterance(0, 100, "本文", null, 100, speakerId = 7, speakerConfidence = 0.625)
+
+        val saved = repository.insert(new)
+
+        assertEquals(7L, saved.speakerId)
+        assertEquals(0.625, saved.speakerConfidence)
+        assertEquals(listOf(saved), repository.listRecent(1))
     }
 
     @Test
@@ -114,6 +132,169 @@ abstract class UtteranceRepositoryContract {
 }
 
 /** [CaptureGapRepository] の Fake と本物の両方に流す契約テスト。 */
+/** [SpeakerRepository] の Fake と本物の両方に流す契約テスト。 */
+@Suppress("TooManyFunctions") // 契約の項目を 1 つずつテストにしている
+abstract class SpeakerRepositoryContract {
+    protected abstract fun repository(): SpeakerRepository
+
+    private val model = "model-1"
+    private val first = SpeakerEmbedding(floatArrayOf(0.6f, 0.8f), model)
+    private val second = SpeakerEmbedding(floatArrayOf(1f, 0f), model)
+
+    @Test
+    fun `最初は誰もいない`() = runTest {
+        val repository = repository()
+
+        assertTrue(repository.listSpeakers().isEmpty())
+        assertTrue(repository.listEmbeddings(model, 10).isEmpty())
+    }
+
+    @Test
+    fun `自分の特徴量を読み出せる`() = runTest {
+        val repository = repository()
+
+        val self = repository.saveSelfEmbedding(first, 3, 100)
+
+        assertTrue(self.isSelf)
+        assertEquals("自分", self.displayName)
+        assertEquals(SpeakerNameSource.SELF, self.nameSource)
+        assertEquals(listOf(self), repository.listSpeakers())
+        val stored = repository.listEmbeddings(model, 10).single()
+        assertEquals(self.id, stored.speakerId)
+        assertTrue(stored.isSelf)
+        assertEquals(3, stored.sampleCount)
+        assertArrayEquals(first.vector, stored.vector)
+    }
+
+    @Test
+    fun `登録し直すと自分は増えず、特徴量を置き換える`() = runTest {
+        val repository = repository()
+        val before = repository.saveSelfEmbedding(first, 3, 100)
+
+        val after = repository.saveSelfEmbedding(second, 4, 200)
+
+        assertEquals(before.id, after.id)
+        assertEquals(1, repository.listSpeakers().size)
+        assertArrayEquals(second.vector, repository.listEmbeddings(model, 10).single().vector)
+    }
+
+    @Test
+    fun `仮の話者に順番の名前を付ける`() = runTest {
+        val repository = repository()
+        repository.saveSelfEmbedding(first, 3, 100)
+
+        val names = List(2) { repository.createProvisionalSpeaker(second, 200L + it) }
+
+        assertEquals(listOf("話者1", "話者2"), names.map { it.displayName })
+        assertTrue(names.none { it.isSelf })
+        assertEquals(SpeakerNameSource.PROVISIONAL, names.first().nameSource)
+    }
+
+    @Test
+    fun `別の版の特徴量は返さない`() = runTest {
+        val repository = repository()
+        repository.saveSelfEmbedding(first, 3, 100)
+
+        assertTrue(repository.listEmbeddings("model-2", 10).isEmpty())
+    }
+
+    @Test
+    fun `別の版で登録し直しても前の版は残る`() = runTest {
+        val repository = repository()
+        repository.saveSelfEmbedding(first, 3, 100)
+
+        repository.saveSelfEmbedding(SpeakerEmbedding(second.vector, "model-2"), 3, 200)
+
+        assertArrayEquals(first.vector, repository.listEmbeddings(model, 10).single().vector)
+    }
+
+    @Test
+    fun `上限があっても自分を残し、更新の新しい話者を優先する`() = runTest {
+        val repository = repository()
+        val old = repository.createProvisionalSpeaker(first, 100)
+        val recent = repository.createProvisionalSpeaker(first, 200)
+        val self = repository.saveSelfEmbedding(first, 3, 50)
+
+        repository.updateEmbedding(old.id, second, 2, 300)
+        val ids = repository.listEmbeddings(model, 2).map { it.speakerId }
+        repository.updateEmbedding(recent.id, second, 2, 400)
+        val after = repository.listEmbeddings(model, 2).map { it.speakerId }
+
+        assertEquals(listOf(self.id, old.id), ids)
+        assertEquals(listOf(self.id, recent.id), after)
+    }
+
+    @Test
+    fun `特徴量を更新すると標本の数も変わる`() = runTest {
+        val repository = repository()
+        val speaker = repository.createProvisionalSpeaker(first, 100)
+
+        repository.updateEmbedding(speaker.id, second, 2, 200)
+
+        val stored = repository.listEmbeddings(model, 10).single()
+        assertEquals(2, stored.sampleCount)
+        assertArrayEquals(second.vector, stored.vector)
+    }
+
+    @Test
+    fun `推定の名前は仮の名前と推定の名前を置き換える`() = runTest {
+        val repository = repository()
+        val speaker = repository.createProvisionalSpeaker(first, 100)
+
+        assertTrue(repository.setInferredName(speaker.id, "田中"))
+        assertTrue(repository.setInferredName(speaker.id, "佐藤"))
+
+        val renamed = repository.listSpeakers().single()
+        assertEquals("佐藤", renamed.displayName)
+        assertEquals(SpeakerNameSource.INFERRED, renamed.nameSource)
+    }
+
+    @Test
+    fun `推定の名前で手動の名前を上書きしない`() = runTest {
+        val repository = repository()
+        val speaker = repository.createProvisionalSpeaker(first, 100)
+        assertTrue(repository.setManualName(speaker.id, "母"))
+
+        assertFalse(repository.setInferredName(speaker.id, "田中"))
+
+        val kept = repository.listSpeakers().single()
+        assertEquals("母", kept.displayName)
+        assertEquals(SpeakerNameSource.MANUAL, kept.nameSource)
+    }
+
+    @Test
+    fun `推定の名前で自分を変えない`() = runTest {
+        val repository = repository()
+        val self = repository.saveSelfEmbedding(first, 3, 100)
+
+        assertFalse(repository.setInferredName(self.id, "田中"))
+
+        assertEquals("自分", repository.listSpeakers().single().displayName)
+    }
+
+    @Test
+    fun `手動の名前は推定の名前を置き換え、自分にも付けられる`() = runTest {
+        val repository = repository()
+        val self = repository.saveSelfEmbedding(first, 3, 100)
+        val speaker = repository.createProvisionalSpeaker(first, 100)
+        repository.setInferredName(speaker.id, "田中")
+
+        assertTrue(repository.setManualName(speaker.id, "母"))
+        assertTrue(repository.setManualName(self.id, "大樹"))
+
+        assertEquals(listOf("大樹", "母"), repository.listSpeakers().map { it.displayName })
+        assertTrue(repository.listSpeakers().first().isSelf)
+    }
+
+    @Test
+    fun `いない話者の名前は変えられない`() = runTest {
+        val repository = repository()
+
+        assertFalse(repository.setManualName(404, "母"))
+        assertFalse(repository.setInferredName(404, "田中"))
+    }
+}
+
 abstract class CaptureGapRepositoryContract {
     protected abstract fun repository(): CaptureGapRepository
 

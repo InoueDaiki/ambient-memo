@@ -20,9 +20,7 @@ class SqliteMemoRepository(
 ) : MemoRepository {
     override suspend fun listUnorganizedUtterances(): List<Utterance> = withContext(ioContext) {
         database.utteranceQueries
-            .listUnorganized { id, startedAt, endedAt, body, confidence, createdAt, _ ->
-                Utterance(id, startedAt, endedAt, body, confidence, createdAt)
-            }
+            .listUnorganized(::toUtterance)
             .executeAsList()
     }
 

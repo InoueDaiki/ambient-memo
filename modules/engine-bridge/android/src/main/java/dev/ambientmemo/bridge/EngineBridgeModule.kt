@@ -11,6 +11,9 @@ import android.provider.Settings
 import dev.ambientmemo.engine.android.CaptureState
 import dev.ambientmemo.engine.android.Engine
 import dev.ambientmemo.engine.android.EngineStartException
+import dev.ambientmemo.engine.android.EnrollmentFailure
+import dev.ambientmemo.engine.android.SelfEnrollmentException
+import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
 import dev.ambientmemo.engine.android.TranscriptionMode
 import dev.ambientmemo.engine.domain.currentEngineStatus
@@ -37,6 +40,19 @@ private class StartFailedException(failure: StartFailure) : CodedException(
     StartFailure.MICROPHONE_PERMISSION -> "microphone-permission"
     StartFailure.TRANSCRIPTION_UNAVAILABLE -> "transcription-unavailable"
     StartFailure.MICROPHONE_UNAVAILABLE -> "microphone-unavailable"
+  },
+  message = failure.name,
+  cause = null,
+)
+
+private class EnrollmentFailedException(failure: EnrollmentFailure) : CodedException(
+  code = when (failure) {
+    EnrollmentFailure.MICROPHONE_PERMISSION -> "microphone-permission"
+    EnrollmentFailure.MICROPHONE_UNAVAILABLE -> "microphone-unavailable"
+    EnrollmentFailure.SPEAKER_MODEL_UNAVAILABLE -> "speaker-model-unavailable"
+    EnrollmentFailure.LISTENING -> "listening"
+    EnrollmentFailure.NOT_ENOUGH_SPEECH -> "not-enough-speech"
+    EnrollmentFailure.CANCELLED -> "cancelled"
   },
   message = failure.name,
   cause = null,
@@ -124,15 +140,44 @@ class EngineBridgeModule : Module() {
     }
 
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
+      val speakers = engine.speakers()
       engine.recentUtterances(limit).map {
+        // 特徴量は JS へ渡さない。JS が知るのは表示に使う名前だけ
+        val speaker = it.speakerId?.let(speakers::get)
         mapOf(
           "id" to it.id.toString(),
           "text" to it.text,
-          // 話者識別ができるまでは、自分の声と見分けられないので「それ以外」にする
-          "speaker" to "other",
+          "speaker" to when {
+            speaker == null -> "unknown"
+            speaker.isSelf -> "self"
+            else -> "other"
+          },
+          "speakerName" to speaker?.displayName,
           "startedAt" to it.startedAtMillis.toDouble(),
         )
       }
+    }
+
+    AsyncFunction("getSelfEnrollmentStatus") Coroutine { ->
+      when (engine.selfEnrollmentStatus()) {
+        SelfEnrollmentStatus.ENROLLED -> "enrolled"
+        SelfEnrollmentStatus.NOT_ENROLLED -> "not-enrolled"
+        SelfEnrollmentStatus.UNAVAILABLE -> "unavailable"
+      }
+    }
+
+    AsyncFunction("enrollSelf") Coroutine { ->
+      requestPermissions()
+      publishPermissions()
+      try {
+        engine.enrollSelf()
+      } catch (e: SelfEnrollmentException) {
+        throw EnrollmentFailedException(e.failure)
+      }
+    }
+
+    AsyncFunction("cancelSelfEnrollment") {
+      engine.cancelEnrollment()
     }
   }
 

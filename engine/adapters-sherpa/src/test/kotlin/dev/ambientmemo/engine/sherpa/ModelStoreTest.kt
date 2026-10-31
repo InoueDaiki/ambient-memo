@@ -2,6 +2,7 @@
 
 package dev.ambientmemo.engine.sherpa
 
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -69,5 +70,22 @@ class ModelStoreTest {
 
         path.delete()
         assertFalse(store.verify(models))
+    }
+
+    @Test
+    fun `話者のモデルも同じように確かめる`() {
+        val speaker = SpeakerModel(modelPackage, file)
+        assertFalse(store.isInstalled(speaker))
+        assertFalse(store.verify(speaker))
+
+        install()
+
+        assertTrue(store.isInstalled(speaker))
+        assertTrue(store.verify(speaker))
+    }
+
+    @Test
+    fun `話者のモデルの版はパッケージの id`() {
+        assertEquals(ModelCatalog.CAMPPLUS_ADVANCED.modelPackage.id, ModelCatalog.CAMPPLUS_ADVANCED.version)
     }
 }

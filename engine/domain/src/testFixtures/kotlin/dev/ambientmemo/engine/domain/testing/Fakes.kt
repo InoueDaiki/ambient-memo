@@ -11,9 +11,13 @@ import dev.ambientmemo.engine.domain.Memo
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NewMemo
 import dev.ambientmemo.engine.domain.NewUtterance
+import dev.ambientmemo.engine.domain.Speaker
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
+import dev.ambientmemo.engine.domain.SpeakerNameSource
+import dev.ambientmemo.engine.domain.SpeakerRepository
 import dev.ambientmemo.engine.domain.SpeechSegment
+import dev.ambientmemo.engine.domain.StoredSpeakerEmbedding
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.Todo
 import dev.ambientmemo.engine.domain.Transcription
@@ -102,12 +106,20 @@ class FakeTranscriber(
     }
 }
 
+/** [respond] の特徴量を返す。null は短くて作れない音声。受け取った発話は解放の確認用に [received] に残す。 */
 class FakeSpeakerEmbedder(
-    private val vector: FloatArray = floatArrayOf(1f, 0f, 0f),
-    private val modelVersion: String = "fake-1",
+    override val modelVersion: String = "fake-1",
+    private val respond: suspend (index: Int, segment: SpeechSegment) -> FloatArray? = { _, _ ->
+        floatArrayOf(1f, 0f, 0f)
+    },
 ) : SpeakerEmbedder {
-    override suspend fun embed(segment: SpeechSegment): SpeakerEmbedding =
-        SpeakerEmbedding(vector.copyOf(), modelVersion)
+    val received: MutableList<SpeechSegment> = CopyOnWriteArrayList()
+
+    override suspend fun embed(segment: SpeechSegment): SpeakerEmbedding? {
+        val index = received.size
+        received += segment
+        return respond(index, segment)?.let { SpeakerEmbedding(it, modelVersion) }
+    }
 }
 
 class InMemoryUtteranceRepository : UtteranceRepository {
@@ -122,6 +134,8 @@ class InMemoryUtteranceRepository : UtteranceRepository {
             text = utterance.text,
             confidence = utterance.confidence,
             createdAtMillis = utterance.createdAtMillis,
+            speakerId = utterance.speakerId,
+            speakerConfidence = utterance.speakerConfidence,
         )
         rows += row
         return row
@@ -134,6 +148,90 @@ class InMemoryUtteranceRepository : UtteranceRepository {
     override suspend fun listRecent(limit: Int): List<Utterance> = rows
         .sortedWith(compareByDescending<Utterance> { it.startedAtMillis }.thenByDescending { it.id })
         .take(limit)
+}
+
+class InMemorySpeakerRepository : SpeakerRepository {
+    private class Saved(val embedding: SpeakerEmbedding, val sampleCount: Int, val updatedAtMillis: Long)
+
+    private val lock = Mutex()
+    private val speakers = mutableListOf<Speaker>()
+    private val embeddings = mutableMapOf<Pair<Long, String>, Saved>()
+
+    private fun add(name: String, source: SpeakerNameSource, isSelf: Boolean, nowMillis: Long): Speaker {
+        val speaker = Speaker(speakers.size + 1L, name, source, isSelf, nowMillis)
+        speakers += speaker
+        return speaker
+    }
+
+    private fun save(speakerId: Long, embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long) {
+        embeddings[speakerId to embedding.modelVersion] = Saved(embedding, sampleCount, nowMillis)
+    }
+
+    private fun rename(speakerId: Long, name: String, source: SpeakerNameSource) {
+        speakers.replaceAll { if (it.id == speakerId) it.copy(displayName = name, nameSource = source) else it }
+    }
+
+    override suspend fun listSpeakers(): List<Speaker> = lock.withLock { speakers.toList() }
+
+    override suspend fun listEmbeddings(modelVersion: String, limit: Int): List<StoredSpeakerEmbedding> =
+        lock.withLock {
+            val isSelf = speakers.filter { it.isSelf }.map { it.id }.toSet()
+            embeddings.entries
+                .filter { (key, _) -> key.second == modelVersion }
+                .sortedWith(
+                    compareByDescending<Map.Entry<Pair<Long, String>, Saved>> { it.key.first in isSelf }
+                        .thenByDescending { it.value.updatedAtMillis }
+                        .thenByDescending { it.key.first },
+                )
+                .take(limit)
+                .map { (key, saved) ->
+                    StoredSpeakerEmbedding(
+                        key.first,
+                        key.first in isSelf,
+                        saved.embedding.vector.copyOf(),
+                        saved.sampleCount,
+                    )
+                }
+        }
+
+    override suspend fun saveSelfEmbedding(embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long): Speaker =
+        lock.withLock {
+            val self = speakers.firstOrNull { it.isSelf } ?: add("自分", SpeakerNameSource.SELF, true, nowMillis)
+            save(self.id, embedding, sampleCount, nowMillis)
+            self
+        }
+
+    override suspend fun createProvisionalSpeaker(embedding: SpeakerEmbedding, nowMillis: Long): Speaker =
+        lock.withLock {
+            val number = speakers.count { !it.isSelf } + 1
+            val speaker = add("話者$number", SpeakerNameSource.PROVISIONAL, false, nowMillis)
+            save(speaker.id, embedding, 1, nowMillis)
+            speaker
+        }
+
+    override suspend fun updateEmbedding(
+        speakerId: Long,
+        embedding: SpeakerEmbedding,
+        sampleCount: Int,
+        nowMillis: Long,
+    ) {
+        lock.withLock { save(speakerId, embedding, sampleCount, nowMillis) }
+    }
+
+    override suspend fun setManualName(speakerId: Long, name: String): Boolean = lock.withLock {
+        val exists = speakers.any { it.id == speakerId }
+        if (exists) rename(speakerId, name, SpeakerNameSource.MANUAL)
+        exists
+    }
+
+    override suspend fun setInferredName(speakerId: Long, name: String): Boolean = lock.withLock {
+        val speaker = speakers.firstOrNull { it.id == speakerId }
+        val isReplaceable = speaker != null &&
+            !speaker.isSelf &&
+            speaker.nameSource in setOf(SpeakerNameSource.PROVISIONAL, SpeakerNameSource.INFERRED)
+        if (isReplaceable) rename(speakerId, name, SpeakerNameSource.INFERRED)
+        isReplaceable
+    }
 }
 
 class InMemoryCaptureGapRepository : CaptureGapRepository {

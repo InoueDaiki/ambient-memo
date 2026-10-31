@@ -35,13 +35,17 @@ data class NewUtterance(
     val text: String,
     val confidence: Double?,
     val createdAtMillis: Long,
+    val speakerId: Long? = null,
+    val speakerConfidence: Double? = null,
 ) {
     init {
         require(endedAtMillis >= startedAtMillis) { "終了時刻が開始時刻より前です" }
         requireConfidence(confidence)
+        requireConfidence(speakerConfidence)
     }
 }
 
+/** [speakerId] が null の発話は、話者を判定していないか、判定できなかった。[confidence] は文字起こしの信頼度。 */
 data class Utterance(
     val id: Long,
     val startedAtMillis: Long,
@@ -49,6 +53,8 @@ data class Utterance(
     val text: String,
     val confidence: Double?,
     val createdAtMillis: Long,
+    val speakerId: Long? = null,
+    val speakerConfidence: Double? = null,
 )
 
 /** 記録できなかった時間。 */
@@ -76,6 +82,6 @@ enum class CaptureGapReason {
     PIPELINE_STOPPED,
 }
 
-private fun requireConfidence(confidence: Double?) {
+internal fun requireConfidence(confidence: Double?) {
     require(confidence == null || confidence in 0.0..1.0) { "信頼度は 0 から 1 の範囲です" }
 }
