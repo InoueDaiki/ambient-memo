@@ -93,12 +93,15 @@ class JvmSpeakerEmbedderContractTest : SpeakerEmbedderContract() {
     }
 
     @Test
-    fun `計算できない短い音声は null か、数の特徴量を返す`() = runTest {
-        for (millis in listOf(1, 10, 50, 100, 250)) {
-            val embedding = embedder().embed(segment(speech().copyOf(millis * TEST_SAMPLE_RATE_HZ / 1_000)))
+    fun `短い音声は null を返し、下限の長さなら数の特徴量を返す`() = runTest {
+        for (millis in listOf(1, 10, 50, 100, 250, 399)) {
+            val samples = speech().copyOf(millis * TEST_SAMPLE_RATE_HZ / 1_000)
 
-            assertTrue(embedding == null || embedding.vector.all { it.isFinite() }, "$millis ミリ秒")
+            assertEquals(null, embedder().embed(segment(samples))?.vector, "$millis ミリ秒")
         }
+
+        val embedding = embedder().embed(segment(speech().copyOf(4 * TEST_SAMPLE_RATE_HZ / 10)))
+        assertTrue(embedding == null || embedding.vector.all { it.isFinite() })
     }
 
     @Test

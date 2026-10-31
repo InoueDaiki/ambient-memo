@@ -101,10 +101,14 @@ class SherpaTranscriber(
 /**
  * 発話区間全体から1つの特徴量を作る。作業用の配列は 0 で塗りつぶす。
  *
+ * [minMillis] より短い音声はネイティブへ渡さず null を返す。ごく短い音声では、CI の Linux の x64 で
+ * `isReady` が true のまま数でない値が返った。Mac の arm64 では起きなかったので、値も確かめる。
+ *
  * 読み込みとキャンセルの扱いは [SherpaTranscriber] と同じ。自分の声が登録されるまで呼ばれないので、モデルも読み込まない。
  */
 class SherpaSpeakerEmbedder(
     override val modelVersion: String,
+    private val minMillis: Long = SherpaSettings.MIN_SPEAKER_MILLIS,
     private val createExtractor: () -> NativeSpeakerExtractor,
 ) : SpeakerEmbedder, AutoCloseable {
     private val lock = Any()
@@ -113,10 +117,11 @@ class SherpaSpeakerEmbedder(
 
     override suspend fun embed(segment: SpeechSegment): SpeakerEmbedding? {
         val source = segment.samples
+        if (source.size * MILLIS_PER_SECOND < minMillis * segment.sampleRateHz) return null
         val samples = FloatArray(source.size) { source[it] / FULL_SCALE }
         try {
             val vector = synchronized(lock) { loaded().compute(samples, segment.sampleRateHz) }
-            return vector?.let { SpeakerEmbedding(it, modelVersion) }
+            return vector?.takeIf { it.all(Float::isFinite) }?.let { SpeakerEmbedding(it, modelVersion) }
         } finally {
             samples.fill(0f)
         }

@@ -32,6 +32,9 @@ object SherpaSettings {
     /** 検証は Mac の 1 スレッドで実時間比 0.005。Pixel では測っていない。 */
     const val SPEAKER_THREADS = 1
 
+    /** これより短い音声からは話者の特徴量を作らない。検証と同じ値。 */
+    const val MIN_SPEAKER_MILLIS = 400L
+
     /** 区間の前後に足す無音の長さ。 */
     const val PADDING_MILLIS = 300L
 
