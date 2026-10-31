@@ -1,6 +1,7 @@
 import {
   useListening,
   useModelDownload,
+  useOrganizerModel,
   usePermissions,
   useTranscriptionMode,
   useUtterances,
@@ -23,7 +24,11 @@ import {
 import { FlatList, View } from "react-native";
 
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
-import { ModelDownloadButton, ModelDownloadNotice } from "./ModelDownload.tsx";
+import {
+  ModelDownloadButton,
+  ModelDownloadNotice,
+  OrganizerModelSection,
+} from "./ModelDownload.tsx";
 import { SelfEnrollmentCard } from "./SelfEnrollmentCard.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
@@ -91,6 +96,7 @@ export function TranscriptScreen() {
   const { permissions, openSettings } = usePermissions();
   const transcriptionMode = useTranscriptionMode();
   const modelDownload = useModelDownload();
+  const organizerModel = useOrganizerModel();
   const needsModels = transcriptionMode === "unavailable";
   // 文字起こしのモデルだけを入れた端末では、話者のモデルが残っている
   const needsSpeakerModel =
@@ -118,6 +124,10 @@ export function TranscriptScreen() {
             <ModelDownloadNotice status={modelDownload.status} missing="speaker" />
             <ModelDownloadButton {...modelDownload} variant="secondary" />
           </>
+        )}
+        {/* 取得は同時に 1 本だけなので、話者のモデルの案内が終わってから出す */}
+        {transcriptionMode === "ready" && !needsSpeakerModel && (
+          <OrganizerModelSection {...organizerModel} />
         )}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (

@@ -22,4 +22,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "engine"
 
-include(":domain", ":adapters", ":adapters-sherpa", ":adapters-sherpa-jvm", ":adapters-sherpa-android", ":adapters-sherpa-android-test", ":android")
+include(":domain", ":adapters", ":adapters-sherpa", ":adapters-sherpa-jvm", ":adapters-sherpa-android", ":adapters-sherpa-android-test", ":adapters-llm", ":adapters-llm-android", ":adapters-llm-android-test", ":android")

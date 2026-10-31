@@ -98,7 +98,7 @@ class ModelDownloadService : Service() {
             stopForeground(STOP_FOREGROUND_REMOVE)
             when {
                 finished is ModelDownloadState.Failed -> notifications.showFailed()
-                downloads.plan().isComplete -> notifications.showFinished()
+                downloads.plan(downloads.activeGroup).isComplete -> notifications.showFinished()
             }
             stopSelf(startId)
         }

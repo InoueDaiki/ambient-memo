@@ -8,9 +8,13 @@ import java.security.MessageDigest
 
 private const val HASH_BUFFER_BYTES = 1 shl 20
 private const val VERIFIED_STAMP = ".verified"
+private const val REVISION_CHARS = 8
 
 /** sherpa-onnx の配布物の置き場所。 */
 private const val SHERPA_RELEASES = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
+
+/** Gemma の配布物の置き場所。Apache-2.0 で、ログインも利用規約の同意も要らない(2026-11-01 に確認)。 */
+private const val LITERT_COMMUNITY = "https://huggingface.co/litert-community"
 
 /** 話者のモデルの置き場所。配布元のタグの綴りは recongition のまま。 */
 private const val SPEAKER_RELEASES =
@@ -81,6 +85,9 @@ sealed interface AsrModel {
         override val tokens: ModelFile,
     ) : AsrModel
 }
+
+/** 整理に使う LLM のモデル。[version] はメモに残す版。 */
+class LlmModel(val modelPackage: ModelPackage, val model: ModelFile, val version: String)
 
 /** 話者の特徴量のモデル。なくても文字起こしは動くので、[SpeechModels] とは別に扱う。 */
 class SpeakerModel(val modelPackage: ModelPackage, val model: ModelFile) {
@@ -175,6 +182,28 @@ object ModelCatalog {
         )
     }
 
+    /** 検証の第一候補。リビジョンは検証(`tools/spike-llm/results/models.json`)と同じ。 */
+    val GEMMA_4_E4B: LlmModel = gemma(
+        repository = "gemma-4-E4B-it-litert-lm",
+        revision = "e6a3892a8c22cf87ff99583996149cf3cb32452b",
+        file = ModelFile(
+            "gemma-4-E4B-it.litertlm",
+            3_659_530_240,
+            "0b2a8980ce155fd97673d8e820b4d29d9c7d99b8fa6806f425d969b145bd52e0",
+        ),
+    )
+
+    /** 次善。品質は落ちるが、小さく速い。 */
+    val GEMMA_4_E2B: LlmModel = gemma(
+        repository = "gemma-4-E2B-it-litert-lm",
+        revision = "1caa527c1e88b55f046fcd8d2b4265606680663d",
+        file = ModelFile(
+            "gemma-4-E2B-it.litertlm",
+            2_588_147_712,
+            "181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c",
+        ),
+    )
+
     val CAMPPLUS_ADVANCED: SpeakerModel = run {
         val model = ModelFile(
             "3dspeaker_speech_campplus_sv_zh_en_16k-common_advanced.onnx",
@@ -189,11 +218,23 @@ object ModelCatalog {
     /** アプリが使うモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
     val ACTIVE: SpeechModels = SpeechModels(SILERO_VAD, ZIPFORMER_REAZON)
 
+    /** 整理に使うモデル。数 GB あるので [ACTIVE] とは分けて、利用者が別に取得する。 */
+    val ACTIVE_LLM: LlmModel = GEMMA_4_E4B
+
+    private fun gemma(repository: String, revision: String, file: ModelFile): LlmModel {
+        val id = "${file.name.removeSuffix(".litertlm")}-${revision.take(REVISION_CHARS)}"
+        val url = "$LITERT_COMMUNITY/$repository/resolve/$revision/${file.name}"
+        return LlmModel(ModelPackage(id, listOf(file), ModelSource.SingleFile(url, file)), file, id)
+    }
+
     /** アプリが使う話者のモデル。差し替えるときはここを変える。`scripts/fetch-models.sh` も合わせる。 */
     val ACTIVE_SPEAKER: SpeakerModel = CAMPPLUS_ADVANCED
 
     /** アプリが取得するパッケージ。すべてに [ModelPackage.source] が要る。 */
     val DOWNLOADS: List<ModelPackage> = ACTIVE.packages + ACTIVE_SPEAKER.modelPackage
+
+    /** 整理のモデル。数 GB あるので [DOWNLOADS] とは分けて、利用者が別に選ぶ。すべてに [ModelPackage.source] が要る。 */
+    val ORGANIZER_DOWNLOADS: List<ModelPackage> = listOf(ACTIVE_LLM.modelPackage)
 }
 
 /** [root] の下にモデルを置く。端末では内部ストレージ、JVM ではテスト用のディレクトリ。 */

@@ -21,15 +21,25 @@ private val REDIRECTS = setOf(
     HTTP_PERMANENT_REDIRECT,
 )
 
-/** GitHub Releases の配布物は、github.com から署名付きの URL へ転送される。 */
+/**
+ * GitHub Releases の配布物は、github.com から署名付きの URL へ転送される。
+ * Gemma も同じで、huggingface.co から `*.hf.co` の CDN へ転送される。どちらもログインは使わない。
+ */
 private val MODEL_HOSTS = setOf(
     "github.com",
     "release-assets.githubusercontent.com",
     "objects.githubusercontent.com",
+    "huggingface.co",
 )
 
+/** CDN の名前は地域で変わるかもしれないので、仮にドメインごと認める。 */
+private const val MODEL_HOST_SUFFIX = ".hf.co"
+
 /** カタログの URL と、その転送先として認める場所。 */
-fun isModelHost(url: URL): Boolean = url.protocol == "https" && url.host in MODEL_HOSTS
+fun isModelHost(url: URL): Boolean {
+    val host = url.host.lowercase()
+    return url.protocol == "https" && (host in MODEL_HOSTS || host.endsWith(MODEL_HOST_SUFFIX))
+}
 
 /** [offsetBytes] は [body] の先頭の位置。続きを頼んでも、取得先が先頭から返すことがある。 */
 class ModelResponse(

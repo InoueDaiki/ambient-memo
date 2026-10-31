@@ -7,6 +7,7 @@ import dev.ambientmemo.engine.domain.CaptureGapReason
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.testing.CaptureGapRepositoryContract
 import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
+import dev.ambientmemo.engine.domain.testing.OrganizeAttemptsContract
 import dev.ambientmemo.engine.domain.testing.SpeakerRepositoryContract
 import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import kotlinx.coroutines.test.runTest
@@ -15,6 +16,8 @@ import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
+import java.io.File
+import java.nio.file.Files
 import java.nio.file.Path
 
 class SqliteUtteranceRepositoryContractTest : UtteranceRepositoryContract() {
@@ -131,5 +134,18 @@ class SqliteRepositoryTest {
                 runTest { SqliteCaptureGapRepository(database).listOverlapping(0, 100) }
             }
         }
+    }
+}
+
+class FileOrganizeAttemptsContractTest : OrganizeAttemptsContract() {
+    private val directory = Files.createTempDirectory("organize-attempts").toFile().apply { deleteOnExit() }
+
+    override fun attempts() = FileOrganizeAttempts(File(directory, "attempts.properties"))
+
+    @Test
+    fun `別のインスタンスからも回数を読める`() {
+        attempts().set(7, 2)
+
+        assertEquals(2, attempts().count(7))
     }
 }

@@ -2,6 +2,7 @@ package dev.ambientmemo.engine.domain
 
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.isActive
 import java.util.TimeZone
 
 private const val MAX_TITLE_CHARS = 30
@@ -14,7 +15,10 @@ private const val MAX_TITLE_CHARS = 30
  *
  * [timeZone] は発話の日付を決める。「今日」は実行時ではなく、話した日にする。
  * 夜の充電中に整理するので、実行が日付をまたぐと「明日」がずれるため。
+ *
+ * 失敗の回数は [attempts] に残す。アプリでは実行をまたいで残る実装を渡す。
  */
+@Suppress("TooManyFunctions", "LongParameterList") // まとまりの処理の流れを1か所で読めるようにする
 class OrganizeJob(
     private val memos: MemoRepository,
     private val speakers: SpeakerRepository,
@@ -22,48 +26,145 @@ class OrganizeJob(
     private val clock: Clock,
     private val timeZone: TimeZone,
     private val config: OrganizeConfig = OrganizeConfig(),
+    private val attempts: OrganizeAttempts = InMemoryOrganizeAttempts(),
 ) {
     /**
      * 処理できるまとまりを古い順に処理する。[shouldContinue] はまとまりの間で確かめる。
      * 充電が終わったらここで止める。すぐに止めたいときはコルーチンをキャンセルする。
      *
      * LLM の例外は [OrganizeOutcome.LLM_FAILED] で返す。DB の例外とキャンセルはそのまま投げる。
+     * 特定のまとまりで止まり続けないように、読めないまとまりは要約のないメモとして記録して先へ進む。
      */
     suspend fun run(shouldContinue: () -> Boolean = { true }): OrganizeResult {
         val labels = SpeakerLabels(speakers.listSpeakers())
         val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, labels)
             .withoutOngoing(clock.nowMillis(), config)
-        val tally = Tally()
+        val pass = Pass(labels)
         val stoppedBy = chunks.firstNotNullOfOrNull { chunk ->
-            if (shouldContinue()) process(chunk, labels, tally) else OrganizeOutcome.STOPPED
+            if (shouldContinue()) process(chunk, pass) else OrganizeOutcome.STOPPED
         }
-        return OrganizeResult(stoppedBy ?: OrganizeOutcome.COMPLETED, tally.memoCount, tally.todoCount)
+        // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
+        val finished = if (pass.suspects.isEmpty()) OrganizeOutcome.COMPLETED else OrganizeOutcome.LLM_FAILED
+        return OrganizeResult(stoppedBy ?: finished, pass.memoCount, pass.todoCount, pass.unreadableCount)
     }
 
-    private class Tally(var memoCount: Int = 0, var todoCount: Int = 0)
+    private class Pass(
+        val labels: SpeakerLabels,
+        var memoCount: Int = 0,
+        var todoCount: Int = 0,
+        var unreadableCount: Int = 0,
+        val suspects: MutableList<UtteranceChunk> = mutableListOf(),
+    )
+
+    private sealed interface Draft {
+        class Ready(val memo: NewMemo) : Draft
+
+        data object TooLong : Draft
+
+        data object Failed : Draft
+    }
 
     /** まとまりを1つ記録する。続けられないときは止まった理由を返す。 */
-    private suspend fun process(chunk: UtteranceChunk, labels: SpeakerLabels, tally: Tally): OrganizeOutcome? {
-        val memo = if (chunk.isBlank) null else draftOrNull(chunk, labels)
-        when {
-            chunk.isBlank -> memos.markOrganized(chunk.utterances.map { it.id }, clock.nowMillis())
-            memo == null -> return OrganizeOutcome.LLM_FAILED
-            memos.recordMemo(memo) != null -> {
-                tally.memoCount++
-                tally.todoCount += memo.todos.size
+    private suspend fun process(chunk: UtteranceChunk, pass: Pass): OrganizeOutcome? = when {
+        chunk.isBlank -> {
+            memos.markOrganized(chunk.utterances.map { it.id }, clock.nowMillis())
+            null
+        }
+        attempts.count(chunk.utterances.first().id) >= config.maxChunkAttempts -> {
+            pass.suspects += chunk
+            null
+        }
+        else -> attempt(chunk, pass)
+    }
+
+    private suspend fun attempt(chunk: UtteranceChunk, pass: Pass): OrganizeOutcome? {
+        val key = chunk.utterances.first().id
+        val attempted = attempts.count(key)
+        // クラッシュでは後の処理が動かないので、始める前に数える
+        attempts.set(key, attempted + 1)
+        return when (val draft = draftOf(chunk, pass.labels, key, attempted)) {
+            is Draft.Ready -> {
+                record(draft.memo, key, pass)
+                resolveSuspects(pass)
+                null
+            }
+            Draft.TooLong -> {
+                attempts.clear(key)
+                processTooLong(chunk, pass)
+            }
+            Draft.Failed -> if (attempted + 1 < config.maxChunkAttempts) {
+                OrganizeOutcome.LLM_FAILED
+            } else {
+                pass.suspects += chunk
+                null
             }
         }
-        return null
+    }
+
+    private suspend fun record(memo: NewMemo, key: Long, pass: Pass) {
+        if (memos.recordMemo(memo) != null) {
+            pass.memoCount++
+            pass.todoCount += memo.todos.size
+        }
+        attempts.clear(key)
+    }
+
+    /** 同じ実行基盤が次のまとまりを処理できたので、飛ばしたまとまりの問題はそのまとまりにあった。 */
+    private suspend fun resolveSuspects(pass: Pass) {
+        pass.suspects.forEach { recordUnreadable(it, pass) }
+        pass.suspects.clear()
+    }
+
+    /** 半分に分けて入力を短くする。発話が1つなら切ると文が壊れるので、読めなかったものとして記録する。 */
+    private suspend fun processTooLong(chunk: UtteranceChunk, pass: Pass): OrganizeOutcome? {
+        if (chunk.utterances.size < 2) {
+            recordUnreadable(chunk, pass)
+            return null
+        }
+        val half = chunk.utterances.size / 2
+        return process(UtteranceChunk(chunk.utterances.take(half)), pass)
+            ?: process(UtteranceChunk(chunk.utterances.drop(half)), pass)
+    }
+
+    /** 発話は残るので、要約のないメモにして先へ進む。根拠の発話はメモからたどれる。 */
+    private suspend fun recordUnreadable(chunk: UtteranceChunk, pass: Pass) {
+        val memo = NewMemo(
+            startedAtMillis = chunk.startedAtMillis,
+            endedAtMillis = chunk.endedAtMillis,
+            title = null,
+            summary = null,
+            todoExtraction = TodoExtraction.INCOMPLETE,
+            modelVersion = llm.modelVersion,
+            createdAtMillis = clock.nowMillis(),
+            utteranceIds = chunk.utterances.map { it.id },
+            todos = emptyList(),
+        )
+        if (memos.recordMemo(memo) != null) {
+            pass.memoCount++
+            pass.unreadableCount++
+        }
+        attempts.clear(chunk.utterances.first().id)
     }
 
     // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
     @Suppress("TooGenericExceptionCaught", "SwallowedException")
-    private suspend fun draftOrNull(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo? = try {
-        draft(chunk, labels)
+    private suspend fun draftOf(chunk: UtteranceChunk, labels: SpeakerLabels, key: Long, attempted: Int): Draft = try {
+        Draft.Ready(draft(chunk, labels))
+    } catch (e: LlmInputTooLongException) {
+        ensureNotCancelled(key, attempted)
+        Draft.TooLong
     } catch (e: Exception) {
-        // キャンセルかどうかは例外の型ではなく状態で判断する。アダプターの内側の withTimeout で止めないため
+        ensureNotCancelled(key, attempted)
+        Draft.Failed
+    }
+
+    /**
+     * キャンセルかどうかは例外の型ではなく状態で判断する。アダプターの内側の withTimeout で止めないため。
+     * キャンセルはまとまりのせいではないので、回数を戻す。
+     */
+    private suspend fun ensureNotCancelled(key: Long, attempted: Int) {
+        if (!currentCoroutineContext().isActive) attempts.set(key, attempted)
         currentCoroutineContext().ensureActive()
-        null
     }
 
     private suspend fun draft(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo {
@@ -123,4 +224,19 @@ class OrganizeJob(
         dueDate = due.date,
         status = if (due.isConfident) TodoStatus.OPEN else TodoStatus.CANDIDATE,
     )
+}
+
+/** プロセスの中でだけ数える。実行をまたいで数えなくてよい場面の既定値。 */
+class InMemoryOrganizeAttempts : OrganizeAttempts {
+    private val counts = HashMap<Long, Int>()
+
+    override fun count(firstUtteranceId: Long): Int = counts[firstUtteranceId] ?: 0
+
+    override fun set(firstUtteranceId: Long, count: Int) {
+        counts[firstUtteranceId] = count
+    }
+
+    override fun clear(firstUtteranceId: Long) {
+        counts.remove(firstUtteranceId)
+    }
 }

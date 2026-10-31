@@ -8,6 +8,7 @@ import type {
   SelfEnrollmentFailure,
   SelfEnrollmentStatus,
   ModelDownloadStatus,
+  OrganizerModelStatus,
   Memo,
   MemoDetail,
   MemoEngineClient,
@@ -24,6 +25,7 @@ export interface FakeEngineClientOptions {
   permissions?: EnginePermissions;
   selfEnrollment?: SelfEnrollmentStatus;
   modelDownload?: ModelDownloadStatus;
+  organizerModel?: OrganizerModelStatus;
   memoMode?: MemoMode;
   memos?: MemoDetail[];
 }
@@ -60,6 +62,8 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   #rejectEnrollment: ((error: Error) => void) | undefined;
   #modelDownload: ModelDownloadStatus;
   #modelDownloadStarts = 0;
+  #organizerModel: OrganizerModelStatus;
+  #organizerModelStarts = 0;
   readonly #memoMode: MemoMode;
   #memos: MemoDetail[];
   #memoReadError: Error | undefined;
@@ -72,9 +76,11 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     permissions = { microphone: true, notifications: true },
     selfEnrollment = "enrolled",
     modelDownload,
+    organizerModel = { state: "installed", downloadedBytes: 0, totalBytes: 0 },
     memoMode = "ready",
     memos = [],
   }: FakeEngineClientOptions = {}) {
+    this.#organizerModel = organizerModel;
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
@@ -174,6 +180,14 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   }
 
   cancelModelDownload(): Promise<void> {
+    const organizer = this.#organizerModel;
+    if (organizer.state === "running") {
+      this.setOrganizerModel({
+        state: "idle",
+        downloadedBytes: organizer.completedBytes,
+        totalBytes: organizer.totalBytes,
+      });
+    }
     const current = this.#modelDownload;
     if (current.state === "running") {
       this.setModelDownload({
@@ -183,6 +197,23 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
         totalBytes: current.totalBytes,
       });
     }
+    return Promise.resolve();
+  }
+
+  getOrganizerModelStatus(): Promise<OrganizerModelStatus> {
+    return Promise.resolve(this.#organizerModel);
+  }
+
+  startOrganizerModelDownload(): Promise<void> {
+    const current = this.#organizerModel;
+    if (current.state === "running" || current.state === "installed") return Promise.resolve();
+    this.#organizerModelStarts += 1;
+    this.setOrganizerModel({
+      state: "running",
+      phase: "downloading",
+      completedBytes: current.downloadedBytes,
+      totalBytes: current.totalBytes,
+    });
     return Promise.resolve();
   }
 
@@ -277,6 +308,15 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     }
     if (status.state === "idle") this.#status = { ...this.#status, transcription: "unavailable" };
     this.#emit({ type: "model-download-changed", status });
+  }
+
+  setOrganizerModel(status: OrganizerModelStatus): void {
+    this.#organizerModel = status;
+    this.#emit({ type: "organizer-model-changed", status });
+  }
+
+  get organizerModelStarts(): number {
+    return this.#organizerModelStarts;
   }
 
   get modelDownloadStarts(): number {

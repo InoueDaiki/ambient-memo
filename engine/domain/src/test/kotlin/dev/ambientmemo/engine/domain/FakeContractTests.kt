@@ -14,6 +14,7 @@ import dev.ambientmemo.engine.domain.testing.InMemorySpeakerRepository
 import dev.ambientmemo.engine.domain.testing.InMemoryUtteranceRepository
 import dev.ambientmemo.engine.domain.testing.LlmContract
 import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
+import dev.ambientmemo.engine.domain.testing.OrganizeAttemptsContract
 import dev.ambientmemo.engine.domain.testing.ScriptedVoiceActivityDetector
 import dev.ambientmemo.engine.domain.testing.SpeakerEmbedderContract
 import dev.ambientmemo.engine.domain.testing.SpeakerRepositoryContract
@@ -23,6 +24,10 @@ import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import dev.ambientmemo.engine.domain.testing.VoiceActivityDetectorContract
 import dev.ambientmemo.engine.domain.testing.WavAudioSource
 import java.io.ByteArrayInputStream
+
+class InMemoryOrganizeAttemptsContractTest : OrganizeAttemptsContract() {
+    override fun attempts() = InMemoryOrganizeAttempts()
+}
 
 class FakeAudioSourceContractTest : AudioSourceContract() {
     override fun source(samples: ShortArray) = FakeAudioSource(samples)

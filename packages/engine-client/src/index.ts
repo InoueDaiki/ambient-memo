@@ -17,6 +17,7 @@ export type {
   ModelDownloadFailure,
   ModelDownloadPhase,
   ModelDownloadStatus,
+  OrganizerModelStatus,
   SelfEnrollmentFailure,
   SelfEnrollmentStatus,
   Speaker,
