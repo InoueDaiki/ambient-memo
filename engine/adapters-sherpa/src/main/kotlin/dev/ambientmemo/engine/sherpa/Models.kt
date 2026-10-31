@@ -9,17 +9,48 @@ import java.security.MessageDigest
 private const val HASH_BUFFER_BYTES = 1 shl 20
 private const val VERIFIED_STAMP = ".verified"
 
+/** sherpa-onnx の配布物の置き場所。 */
+private const val SHERPA_RELEASES = "https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models"
+
 class ModelFile(
     val name: String,
     val sizeBytes: Long,
     val sha256: String,
 )
 
-/** 1つのディレクトリに置くモデルのファイルの組。ディレクトリの名前は [id]。 */
+/**
+ * 1つのディレクトリに置くモデルのファイルの組。ディレクトリの名前は [id]。
+ *
+ * [source] がないパッケージはアプリから取得できない。[ModelCatalog.ACTIVE] には必ず持たせる。
+ */
 class ModelPackage(
     val id: String,
     val files: List<ModelFile>,
+    val source: ModelSource? = null,
 )
+
+/** モデルの配布物。アプリが通信する先はカタログのこの URL だけ。 */
+sealed interface ModelSource {
+    val url: String
+    val sizeBytes: Long
+    val sha256: String
+
+    /** 配布物がモデルのファイルそのもの。Gemma のように数 GB でも、取得と確認だけで済む。 */
+    class SingleFile(override val url: String, val file: ModelFile) : ModelSource {
+        override val sizeBytes: Long
+            get() = file.sizeBytes
+        override val sha256: String
+            get() = file.sha256
+    }
+
+    /** 使わないファイルも含む tar.bz2。[directory] の下から、パッケージのファイルだけを取り出す。 */
+    class TarBz2(
+        override val url: String,
+        override val sizeBytes: Long,
+        override val sha256: String,
+        val directory: String,
+    ) : ModelSource
+}
 
 /** 発話の検知のモデル。 */
 class VadModel(val modelPackage: ModelPackage, val model: ModelFile)
@@ -52,7 +83,7 @@ class SpeechModels(val vad: VadModel, val asr: AsrModel) {
         get() = listOf(vad.modelPackage, asr.modelPackage)
 }
 
-/** 使えるモデルの一覧。SHA-256 と大きさは、配布物から取り出したファイルの値。 */
+/** 使えるモデルの一覧。[ModelFile] の SHA-256 と大きさは、配布物から取り出したファイルの値。 */
 object ModelCatalog {
     val SILERO_VAD: VadModel = run {
         val model = ModelFile(
@@ -60,7 +91,8 @@ object ModelCatalog {
             643_854,
             "9e2449e1087496d8d4caba907f23e0bd3f78d91fa552479bb9c23ac09cbb1fd6",
         )
-        VadModel(ModelPackage("silero-vad", listOf(model)), model)
+        val source = ModelSource.SingleFile("$SHERPA_RELEASES/silero_vad.onnx", model)
+        VadModel(ModelPackage("silero-vad", listOf(model), source), model)
     }
 
     val ZIPFORMER_REAZON: AsrModel = run {
@@ -84,10 +116,17 @@ object ModelCatalog {
             45_754,
             "2c3ac659818a48a0c04010e0593bbc4d7c8a24a054340b01131499c05fd52def",
         )
+        val id = "sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01"
         AsrModel.Transducer(
             ModelPackage(
-                "sherpa-onnx-zipformer-ja-reazonspeech-2024-08-01",
+                id,
                 listOf(encoder, decoder, joiner, tokens),
+                ModelSource.TarBz2(
+                    "$SHERPA_RELEASES/$id.tar.bz2",
+                    713_097_333,
+                    "e0981d0d5d7b446d41010831b59091ebf57d2aa7b79980f67ca37af460b5842d",
+                    id,
+                ),
             ),
             encoder,
             decoder,
@@ -108,8 +147,18 @@ object ModelCatalog {
             315_894,
             "f449eb28dc567533d7fa59be34e2abca8784f771850c78a47fb731a31429a1dc",
         )
+        val id = "sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17"
         AsrModel.SenseVoice(
-            ModelPackage("sherpa-onnx-sense-voice-zh-en-ja-ko-yue-int8-2024-07-17", listOf(model, tokens)),
+            ModelPackage(
+                id,
+                listOf(model, tokens),
+                ModelSource.TarBz2(
+                    "$SHERPA_RELEASES/$id.tar.bz2",
+                    163_002_883,
+                    "7d1efa2138a65b0b488df37f8b89e3d91a60676e416f515b952358d83dfd347e",
+                    id,
+                ),
+            ),
             model,
             tokens,
         )
@@ -125,9 +174,10 @@ class ModelStore(private val root: File) {
         File(File(root, modelPackage.id), file.name).path
 
     /** ファイルが揃っているかを大きさだけで見る。中身まで確かめるのは [verify]。 */
-    fun isInstalled(models: SpeechModels): Boolean = models.packages.all { modelPackage ->
+    fun isInstalled(models: SpeechModels): Boolean = models.packages.all { isInstalled(it) }
+
+    fun isInstalled(modelPackage: ModelPackage): Boolean =
         modelPackage.files.all { File(pathOf(modelPackage, it)).length() == it.sizeBytes }
-    }
 
     /**
      * SHA-256 を確かめる。合わないファイルは消す。
@@ -135,12 +185,12 @@ class ModelStore(private val root: File) {
      * 160 MB の計算に時間がかかるので、一度通ったパッケージは印を残して計算を省く。
      * 印を信じるのは、同じ版のハッシュの組に対してだけ。
      */
-    fun verify(models: SpeechModels): Boolean = models.packages.map(::verify).all { it }
+    fun verify(models: SpeechModels): Boolean = models.packages.map { verify(it) }.all { it }
 
-    private fun verify(modelPackage: ModelPackage): Boolean {
+    fun verify(modelPackage: ModelPackage): Boolean {
         val directory = File(root, modelPackage.id)
         val stamp = File(directory, VERIFIED_STAMP)
-        val expected = modelPackage.files.joinToString("\n") { "${it.name} ${it.sizeBytes} ${it.sha256}" }
+        val expected = stampOf(modelPackage)
         val hasStamp = stamp.isFile && stamp.readText() == expected
         val installed = modelPackage.files.all { File(directory, it.name).length() == it.sizeBytes }
         if (hasStamp && installed) return true
@@ -153,19 +203,43 @@ class ModelStore(private val root: File) {
         return isValid
     }
 
-    private fun hasExpectedHash(file: File, expected: ModelFile): Boolean =
-        file.length() == expected.sizeBytes && sha256(file) == expected.sha256
-
-    private fun sha256(file: File): String {
-        val digest = MessageDigest.getInstance("SHA-256")
-        FileInputStream(file).use { input ->
-            val buffer = ByteArray(HASH_BUFFER_BYTES)
-            while (true) {
-                val count = input.read(buffer)
-                if (count < 0) break
-                digest.update(buffer, 0, count)
-            }
+    /**
+     * [staged] の下の、確かめ終えたファイルを移す。
+     *
+     * 開始の判定は大きさを見るので、書きかけのファイルをここへ置かない。名前の変更で移すので、
+     * [staged] は同じファイルシステムに置く。
+     */
+    internal fun install(modelPackage: ModelPackage, staged: File) {
+        val directory = File(root, modelPackage.id)
+        check(directory.isDirectory || directory.mkdirs()) { "ディレクトリを作れません" }
+        modelPackage.files.forEach { file ->
+            check(File(staged, file.name).renameTo(File(directory, file.name))) { "ファイルを移せません" }
         }
-        return digest.digest().joinToString("") { "%02x".format(it) }
+        File(directory, VERIFIED_STAMP).writeText(stampOf(modelPackage))
     }
+
+    private fun stampOf(modelPackage: ModelPackage): String =
+        modelPackage.files.joinToString("\n") { "${it.name} ${it.sizeBytes} ${it.sha256}" }
+
+    private fun hasExpectedHash(file: File, expected: ModelFile): Boolean =
+        file.length() == expected.sizeBytes && sha256Of(file) == expected.sha256
 }
+
+/** [onRead] は読んだバイト数の累計を受け取る。中断するときは例外を投げる。 */
+internal fun sha256Of(file: File, onRead: (Long) -> Unit = {}): String {
+    val digest = MessageDigest.getInstance("SHA-256")
+    FileInputStream(file).use { input ->
+        val buffer = ByteArray(HASH_BUFFER_BYTES)
+        var total = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            digest.update(buffer, 0, count)
+            total += count
+            onRead(total)
+        }
+    }
+    return digest.hex()
+}
+
+internal fun MessageDigest.hex(): String = digest().joinToString("") { "%02x".format(it) }

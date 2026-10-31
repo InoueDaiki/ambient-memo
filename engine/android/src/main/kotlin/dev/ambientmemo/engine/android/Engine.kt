@@ -69,6 +69,9 @@ class Engine private constructor(context: Context) {
         audioSource = { developmentAudioSource(this.context) ?: microphoneAudioSource() },
     )
 
+    /** モデルの取得。聞き取りとは別に動く。 */
+    val modelDownloads = ModelDownloads(this.context, modelStore, models.packages)
+
     val captureState: StateFlow<CaptureState> = runner.state
 
     /** 発話が保存されるたびに流れる。 */

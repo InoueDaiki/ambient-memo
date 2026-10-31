@@ -9,4 +9,14 @@
     <string name="reboot_text">記録するには起動してください</string>
     <string name="interrupted_title">聞き取りが止まりました</string>
     <string name="interrupted_text">マイクを使えなくなりました。再開するにはアプリを開いてください</string>
+    <string name="channel_model_download">モデルの取得</string>
+    <string name="download_title">モデルを取得しています</string>
+    <string name="download_downloading">取得中</string>
+    <string name="download_verifying">確かめています</string>
+    <string name="download_extracting">展開しています</string>
+    <string name="download_stop">中止</string>
+    <string name="download_finished_title">モデルの取得が終わりました</string>
+    <string name="download_finished_text">聞き取りを始められます</string>
+    <string name="download_failed_title">モデルを取得できませんでした</string>
+    <string name="download_failed_text">アプリを開いて、もう一度試してください</string>
 </resources>

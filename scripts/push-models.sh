@@ -2,7 +2,7 @@
 # engine/.cache/models のモデルを、接続した端末の Debug ビルドの内部ストレージへ入れる。
 # 先に mise run models:fetch と、Debug ビルドのインストールを済ませる。
 # run-as は debuggable なアプリにしか使えないので、Release には入れられない。
-# 取得は開発機で行い、アプリには取得のコードも通信も持たせない。端末では最初の開始のときに SHA-256 を確かめる
+# アプリの中の取得を待たずに試すための開発用。端末では最初の開始のときに SHA-256 を確かめる
 set -euo pipefail
 
 package=${1:-dev.ambientmemo.app.dev}

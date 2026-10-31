@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 開発で使うモデルを engine/.cache/models に取得する。すでにあれば何もしない。
 # 配布物の SHA-256 を確かめてから、使うファイルだけを取り出す。ファイルごとの値は ModelCatalog にあり、
-# 端末(ModelStore.verify)が確かめる。モデルは sherpa-onnx の GitHub Releases にしかないので、アプリからは取得しない。
-# モデルを変えたら ModelCatalog と一緒に変える
+# 端末(ModelStore.verify)が確かめる。JVM のテストと adb で入れる開発用で、アプリは自分で取得する(ModelDownloader)。
+# 配布物の URL と SHA-256 は ModelCatalog にもあるので、モデルを変えたら一緒に変える
 set -euo pipefail
 
 releases=https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models

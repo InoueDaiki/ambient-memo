@@ -16,6 +16,7 @@ private const val REQUEST_OPEN_APP = 0
 private const val REQUEST_STOP = 1
 
 internal const val CAPTURE_NOTIFICATION_ID = 1
+internal const val CHANNEL_MODEL_DOWNLOAD = "model-download"
 
 /** エンジンの通知。POST_NOTIFICATIONS がないと表示されないが、呼んでも失敗はしない。 */
 internal class EngineNotifications(private val context: Context) {
@@ -58,7 +59,7 @@ internal class EngineNotifications(private val context: Context) {
         manager.cancel(ID_INTERRUPTED)
     }
 
-    private fun show(id: Int, title: Int, text: Int) {
+    fun show(id: Int, title: Int, text: Int) {
         val notification = builder(CHANNEL_REMINDER)
             .setContentTitle(context.getString(title))
             .setContentText(context.getString(text))
@@ -68,7 +69,7 @@ internal class EngineNotifications(private val context: Context) {
         manager.notify(id, notification)
     }
 
-    private fun builder(channelId: String): Notification.Builder {
+    fun builder(channelId: String): Notification.Builder {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
             @Suppress("DEPRECATION") // API 26 未満にはチャンネルがない
             return Notification.Builder(context).setSmallIcon(R.drawable.ic_stat_engine)
@@ -90,11 +91,16 @@ internal class EngineNotifications(private val context: Context) {
                     context.getString(R.string.channel_reminder),
                     NotificationManager.IMPORTANCE_DEFAULT,
                 ),
+                NotificationChannel(
+                    CHANNEL_MODEL_DOWNLOAD,
+                    context.getString(R.string.channel_model_download),
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
             ),
         )
     }
 
-    private fun openApp(): PendingIntent {
+    fun openApp(): PendingIntent {
         val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
         return PendingIntent.getActivity(
             context,
