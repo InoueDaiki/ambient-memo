@@ -18,13 +18,24 @@ class SpeakerIdentifierTest {
     private val model = "fake-1"
     private val speakers = InMemorySpeakerRepository()
     private val clock = FakeClock(1_000)
-    private val config = SpeakerConfig(selfThreshold = 0.6f, provisionalThreshold = 0.7f, minReliableMillis = 2_000)
+    // 窓を 1 つにして、まとまりの照合だけを見る。窓の動きは SpeakerTurnPipelineTest で確かめる
+    private val config = SpeakerConfig(
+        selfThreshold = 0.6f,
+        provisionalThreshold = 0.7f,
+        windowMillis = 60_000,
+        trailingSilenceMillis = 0,
+        minReliableMillis = 2_000,
+        minReliableRunMillis = 0,
+    )
     private val self = floatArrayOf(1f, 0f, 0f)
 
     /** self とのコサイン類似度が [similarity] の、長さ 1 のベクトル。 */
     private fun nearSelf(similarity: Float) = floatArrayOf(similarity, sqrt(1 - similarity * similarity), 0f)
 
     private fun segment(millis: Long = 3_000) = SpeechSegment(0, millis, TEST_SAMPLE_RATE_HZ, ShortArray(16))
+
+    private suspend fun SpeakerIdentifier.identify(segment: SpeechSegment): SpeakerAssignment? =
+        identify(segment, TimedTranscription(Transcription("本文"))).single().speaker
 
     private fun identifier(
         vararg vectors: FloatArray?,
@@ -58,9 +69,9 @@ class SpeakerIdentifierTest {
     }
 
     @Test
-    fun `しきい値より低ければ仮の話者を作る`() = runTest {
+    fun `不明の帯より低ければ仮の話者を作る`() = runTest {
         val selfId = enroll()
-        val (identifier, _) = identifier(nearSelf(0.59f))
+        val (identifier, _) = identifier(nearSelf(0.44f))
 
         val assignment = checkNotNull(identifier.identify(segment()))
 
@@ -84,10 +95,11 @@ class SpeakerIdentifierTest {
     }
 
     @Test
-    fun `最も近い話者を選ぶ`() = runTest {
+    fun `最も近い仮の話者を選ぶ`() = runTest {
         enroll()
-        val other = speakers.createProvisionalSpeaker(SpeakerEmbedding(nearSelf(0.8f), model), 0)
-        val (identifier, _) = identifier(nearSelf(0.78f))
+        speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f, 0f), model), 0)
+        val other = speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 0.6f, 0.8f), model), 0)
+        val (identifier, _) = identifier(floatArrayOf(0f, 0.5f, sqrt(0.75f)))
 
         assertEquals(other.id, identifier.identify(segment())?.speakerId)
     }
@@ -169,6 +181,15 @@ class SpeakerIdentifierTest {
     }
 
     @Test
+    fun `自分との類似度がしきい値以上なら、より近い仮の話者がいても自分にする`() = runTest {
+        val selfId = enroll()
+        speakers.createProvisionalSpeaker(SpeakerEmbedding(nearSelf(0.8f), model), 0)
+        val (identifier, _) = identifier(nearSelf(0.78f))
+
+        assertEquals(selfId, identifier.identify(segment())?.speakerId)
+    }
+
+    @Test
     fun `正規化していない特徴量でも比べられる`() = runTest {
         val selfId = enroll()
         val (identifier, _) = identifier(floatArrayOf(30f, 0f, 0f))
@@ -181,7 +202,7 @@ class SpeakerIdentifierTest {
 
     @Test
     fun `照合する話者の上限を守る`() = runTest {
-        val limited = SpeakerConfig(minReliableMillis = 0, maxComparedSpeakers = 2)
+        val limited = config.copy(minReliableMillis = 0, provisionalThreshold = 0.6f, maxComparedSpeakers = 2)
         enroll()
         val first = speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f, 0f), model), 1)
         speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 0f, 1f), model), 2)

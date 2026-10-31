@@ -63,6 +63,17 @@ abstract class UtteranceRepositoryContract {
     }
 
     @Test
+    fun `まとめて保存すると渡した順に id が付き、開始時刻の順に読み出せる`() = runTest {
+        val repository = repository()
+
+        val saved = repository.insertAll(listOf(utterance(0, 100, "前"), utterance(100, 200, "後")))
+
+        assertEquals(listOf("前", "後"), saved.map { it.text })
+        assertTrue(saved[0].id < saved[1].id)
+        assertEquals(saved, repository.listOverlapping(0, 1_000))
+    }
+
+    @Test
     fun `信頼度がなくても保存できる`() = runTest {
         val repository = repository()
 

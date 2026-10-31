@@ -18,10 +18,12 @@ import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerRepository
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.StoredSpeakerEmbedding
+import dev.ambientmemo.engine.domain.TimedTranscription
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.Todo
 import dev.ambientmemo.engine.domain.TodoCompletion
 import dev.ambientmemo.engine.domain.TodoStatus
+import dev.ambientmemo.engine.domain.TranscriptToken
 import dev.ambientmemo.engine.domain.Transcription
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.domain.UtteranceRepository
@@ -93,20 +95,31 @@ class ScriptedVoiceActivityDetector(
     }
 }
 
-/** [respond] の結果を返す。受け取った発話は解放の確認用に [received] に残す。 */
+/**
+ * [respond] の結果を返す。受け取った発話は解放の確認用に [received] に残す。
+ * トークンは [tokens] で指定する。既定は本文の文字を区間に均等に並べる。
+ */
 class FakeTranscriber(
+    private val tokens: (text: String, durationMillis: Long) -> List<TranscriptToken> = ::evenTokens,
     private val respond: suspend (index: Int, segment: SpeechSegment) -> Transcription = { index, _ ->
         Transcription("発話${index + 1}")
     },
 ) : Transcriber {
     val received: MutableList<SpeechSegment> = CopyOnWriteArrayList()
 
-    override suspend fun transcribe(segment: SpeechSegment): Transcription {
+    override suspend fun transcribe(segment: SpeechSegment): TimedTranscription {
         val index = received.size
         received += segment
-        return respond(index, segment)
+        val transcription = respond(index, segment)
+        val durationMillis = segment.endedAtMillis - segment.startedAtMillis
+        return TimedTranscription(transcription, tokens(transcription.text, durationMillis))
     }
 }
+
+private fun evenTokens(text: String, durationMillis: Long): List<TranscriptToken> =
+    text.mapIndexed { index, character ->
+        TranscriptToken(character.toString(), index * durationMillis / text.length)
+    }
 
 /** [respond] の特徴量を返す。null は短くて作れない音声。受け取った発話は解放の確認用に [received] に残す。 */
 class FakeSpeakerEmbedder(
@@ -142,6 +155,8 @@ class InMemoryUtteranceRepository : UtteranceRepository {
         rows += row
         return row
     }
+
+    override suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance> = utterances.map { insert(it) }
 
     override suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance> = rows
         .filter { it.startedAtMillis < toMillis && it.endedAtMillis > fromMillis }

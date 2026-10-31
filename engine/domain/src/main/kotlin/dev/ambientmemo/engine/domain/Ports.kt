@@ -37,7 +37,7 @@ interface VoiceActivityDetector {
  * [segment] は呼び出し側が解放するので、実装は解放せず、戻った後に参照を残さない。
  */
 interface Transcriber {
-    suspend fun transcribe(segment: SpeechSegment): Transcription
+    suspend fun transcribe(segment: SpeechSegment): TimedTranscription
 }
 
 /** 発話区間から話者の特徴量を作る。[segment] の扱いは [Transcriber] と同じ。 */
@@ -51,6 +51,9 @@ interface SpeakerEmbedder {
 
 interface UtteranceRepository {
     suspend fun insert(utterance: NewUtterance): Utterance
+
+    /** 1 つの発話区間から分けた行を、渡した順に、すべて保存するか何も保存しないかのどちらかで記録する。 */
+    suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance>
 
     /** `[fromMillis, toMillis)` と重なる発話を、開始時刻、id の順に返す。 */
     suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance>

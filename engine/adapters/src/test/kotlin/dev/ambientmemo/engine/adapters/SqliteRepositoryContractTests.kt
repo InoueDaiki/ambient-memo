@@ -13,6 +13,7 @@ import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -87,6 +88,30 @@ class SqliteRepositoryTest {
 
     private val path: Path
         get() = dir.resolve("test.db")
+
+    @Test
+    fun `まとめて保存の途中で失敗すると 1 行も残さない`() = runTest {
+        openTestDriver(path).use { driver ->
+            driver.execute(
+                null,
+                """
+                CREATE TRIGGER reject BEFORE INSERT ON utterance WHEN NEW.body = '失敗'
+                BEGIN SELECT RAISE(ABORT, 'reject'); END
+                """.trimIndent(),
+                0,
+            )
+            val repository = SqliteUtteranceRepository(AmbientMemoDatabase(driver))
+
+            val result = runCatching {
+                repository.insertAll(
+                    listOf(NewUtterance(0, 100, "前", null, 100), NewUtterance(100, 200, "失敗", null, 200)),
+                )
+            }
+
+            assertTrue(result.isFailure)
+            assertTrue(repository.listOverlapping(0, 1_000).isEmpty())
+        }
+    }
 
     @Test
     fun `閉じて開き直しても残っている`() = runTest {

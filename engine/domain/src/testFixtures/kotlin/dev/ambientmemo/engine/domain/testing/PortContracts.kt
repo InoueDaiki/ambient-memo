@@ -171,6 +171,21 @@ abstract class TranscriberContract {
     }
 
     @Test
+    fun `トークンは区間の中で時刻の順に並び、つなげると本文になる`() = runTest {
+        val segment = segment(speech())
+
+        val transcription = transcriber().transcribe(segment)
+
+        val tokens = transcription.tokens
+        val offsets = tokens.map { it.offsetMillis }
+        val joined = tokens.joinToString("") { it.text }
+        assertTrue(tokens.isNotEmpty())
+        assertEquals(transcription.text.filterNot(Char::isWhitespace), joined.filterNot(Char::isWhitespace))
+        assertEquals(offsets.sorted(), offsets)
+        assertTrue(offsets.all { it in 0..segment.endedAtMillis }, offsets.toString())
+    }
+
+    @Test
     fun `バッファの解放は呼び出し側に任せる`() = runTest {
         val segment = segment(speech())
 

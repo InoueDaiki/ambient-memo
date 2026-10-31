@@ -4,6 +4,8 @@ import dev.ambientmemo.engine.domain.AudioFrame
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.SpeechSegment
+import dev.ambientmemo.engine.domain.TimedTranscription
+import dev.ambientmemo.engine.domain.TranscriptToken
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.Transcription
 import dev.ambientmemo.engine.domain.VoiceActivityDetector
@@ -23,9 +25,16 @@ interface NativeVad : AutoCloseable {
     fun reset()
 }
 
+/** 認識の結果。[timestampSeconds] は渡した音声の先頭からの、[tokens] の開始時刻。 */
+class NativeRecognition(
+    val text: String,
+    val tokens: List<String>,
+    val timestampSeconds: List<Float>,
+)
+
 /** sherpa-onnx の `OfflineRecognizer` のうち、使う部分。 */
 interface NativeRecognizer : AutoCloseable {
-    fun decode(samples: FloatArray, sampleRateHz: Int): String
+    fun decode(samples: FloatArray, sampleRateHz: Int): NativeRecognition
 }
 
 /** sherpa-onnx の `SpeakerEmbeddingExtractor` のうち、使う部分。 */
@@ -70,16 +79,24 @@ class SherpaTranscriber(
     private var recognizer: NativeRecognizer? = null
     private var closed = false
 
-    override suspend fun transcribe(segment: SpeechSegment): Transcription {
+    override suspend fun transcribe(segment: SpeechSegment): TimedTranscription {
         val padding = (segment.sampleRateHz * paddingMillis / MILLIS_PER_SECOND).toInt()
         val source = segment.samples
         val samples = FloatArray(padding + source.size + padding)
         source.forEachIndexed { index, sample -> samples[padding + index] = sample / FULL_SCALE }
         try {
-            val text = synchronized(lock) { loaded().decode(samples, segment.sampleRateHz) }
-            return Transcription(text.trim())
+            val recognition = synchronized(lock) { loaded().decode(samples, segment.sampleRateHz) }
+            return TimedTranscription(Transcription(recognition.text.trim()), tokensOf(recognition))
         } finally {
             samples.fill(0f)
+        }
+    }
+
+    /** 時刻は足した無音のぶんを引いて、区間の先頭からにする。数が揃わなければ時刻がないものとして扱う。 */
+    private fun tokensOf(recognition: NativeRecognition): List<TranscriptToken> {
+        if (recognition.tokens.size != recognition.timestampSeconds.size) return emptyList()
+        return recognition.tokens.zip(recognition.timestampSeconds) { text, seconds ->
+            TranscriptToken(text, ((seconds * MILLIS_PER_SECOND).toLong() - paddingMillis).coerceAtLeast(0))
         }
     }
 

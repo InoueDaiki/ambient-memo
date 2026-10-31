@@ -14,6 +14,7 @@ import com.k2fsa.sherpa.onnx.VadModelConfig
 import dev.ambientmemo.engine.sherpa.AsrModel
 import dev.ambientmemo.engine.sherpa.ModelFile
 import dev.ambientmemo.engine.sherpa.ModelStore
+import dev.ambientmemo.engine.sherpa.NativeRecognition
 import dev.ambientmemo.engine.sherpa.NativeRecognizer
 import dev.ambientmemo.engine.sherpa.NativeSpeakerExtractor
 import dev.ambientmemo.engine.sherpa.NativeVad
@@ -75,12 +76,13 @@ private class AndroidRecognizer(store: ModelStore, model: AsrModel) : NativeReco
         ),
     )
 
-    override fun decode(samples: FloatArray, sampleRateHz: Int): String {
+    override fun decode(samples: FloatArray, sampleRateHz: Int): NativeRecognition {
         val stream = recognizer.createStream()
         try {
             stream.acceptWaveform(samples, sampleRateHz)
             recognizer.decode(stream)
-            return recognizer.getResult(stream).text
+            val result = recognizer.getResult(stream)
+            return NativeRecognition(result.text, result.tokens.toList(), result.timestamps.toList())
         } finally {
             stream.release()
         }

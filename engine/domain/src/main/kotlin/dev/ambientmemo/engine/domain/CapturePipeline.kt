@@ -120,7 +120,10 @@ class CapturePipeline(
             val transcription = transcriber.transcribe(segment)
             val durationMillis = segment.endedAtMillis - segment.startedAtMillis
             if (transcription.text.isNotBlank() && transcriptionFilter.shouldSave(transcription.text, durationMillis)) {
-                utterances.insert(segment.toUtterance(transcription, identifySpeaker(segment)))
+                val createdAtMillis = clock.nowMillis()
+                utterances.insertAll(
+                    identifySpeakers(segment, transcription).map { it.toUtterance(transcription, createdAtMillis) },
+                )
             }
         } catch (e: Exception) {
             val isStopping = !currentCoroutineContext().isActive
@@ -135,19 +138,24 @@ class CapturePipeline(
      * キャンセルかどうかは [process] と同じく、このコルーチンの状態で判断する。
      */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 例外の中身に音声由来の情報を持ち出さない
-    private suspend fun identifySpeaker(segment: SpeechSegment): SpeakerAssignment? = try {
-        speakerIdentifier?.identify(segment)
-    } catch (e: Exception) {
-        currentCoroutineContext().ensureActive()
-        null
+    private suspend fun identifySpeakers(segment: SpeechSegment, transcription: TimedTranscription): List<SpeakerTurn> {
+        val unidentified = listOf(
+            SpeakerTurn(segment.startedAtMillis, segment.endedAtMillis, transcription.text, speaker = null),
+        )
+        return try {
+            speakerIdentifier?.identify(segment, transcription) ?: unidentified
+        } catch (e: Exception) {
+            currentCoroutineContext().ensureActive()
+            unidentified
+        }
     }
 
-    private fun SpeechSegment.toUtterance(transcription: Transcription, speaker: SpeakerAssignment?) = NewUtterance(
+    private fun SpeakerTurn.toUtterance(transcription: TimedTranscription, createdAtMillis: Long) = NewUtterance(
         startedAtMillis = startedAtMillis,
         endedAtMillis = endedAtMillis,
-        text = transcription.text,
-        confidence = transcription.confidence,
-        createdAtMillis = clock.nowMillis(),
+        text = text,
+        confidence = transcription.transcription.confidence,
+        createdAtMillis = createdAtMillis,
         speakerId = speaker?.speakerId,
         speakerConfidence = speaker?.confidence,
     )
