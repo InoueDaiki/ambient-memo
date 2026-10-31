@@ -2,9 +2,12 @@
 
 package dev.ambientmemo.engine.sherpa.jvm
 
+import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.VoiceActivityDetector
+import dev.ambientmemo.engine.domain.testing.SpeakerEmbedderContract
+import dev.ambientmemo.engine.domain.testing.SyntheticAudio
 import dev.ambientmemo.engine.domain.testing.TEST_SAMPLE_RATE_HZ
 import dev.ambientmemo.engine.domain.testing.TranscriberContract
 import dev.ambientmemo.engine.domain.testing.VoiceActivityDetectorContract
@@ -14,6 +17,7 @@ import dev.ambientmemo.engine.sherpa.SherpaTranscriber
 import dev.ambientmemo.engine.sherpa.SpeechModels
 import dev.ambientmemo.engine.sherpa.testing.TestModels
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Assumptions.assumeTrue
 import org.junit.jupiter.api.Test
@@ -24,6 +28,11 @@ private val transcribers = HashMap<SpeechModels, SherpaTranscriber>()
 private fun sharedTranscriber(models: SpeechModels): SherpaTranscriber {
     val store = TestModels.storeFor(models)
     return transcribers.getOrPut(models) { jvmTranscriber(store, models) }
+}
+
+private val speakerEmbedder by lazy {
+    val model = ModelCatalog.ACTIVE_SPEAKER
+    jvmSpeakerEmbedder(TestModels.storeFor(model), model)
 }
 
 class JvmVoiceActivityDetectorContractTest : VoiceActivityDetectorContract() {
@@ -62,5 +71,45 @@ class JvmSenseVoiceTranscriberContractTest : TranscriberContract() {
         // CI の必須のモデルには含めないので、storeFor を通さず飛ばす
         assumeTrue(TestModels.root?.let { ModelStore(it).isInstalled(models) } == true)
         return sharedTranscriber(models)
+    }
+}
+
+class JvmSpeakerEmbedderContractTest : SpeakerEmbedderContract() {
+    override fun speech(): ShortArray = TestModels.speech()
+
+    override fun embedder(): SpeakerEmbedder {
+        TestModels.storeFor(ModelCatalog.ACTIVE_SPEAKER)
+        return speakerEmbedder
+    }
+
+    private fun segment(samples: ShortArray) =
+        SpeechSegment(0, samples.size * 1_000L / TEST_SAMPLE_RATE_HZ, TEST_SAMPLE_RATE_HZ, samples)
+
+    @Test
+    fun `モデルの次元の特徴量を返す`() = runTest {
+        val embedding = checkNotNull(embedder().embed(segment(speech())))
+
+        assertEquals(EMBEDDING_DIMENSIONS, embedding.vector.size)
+    }
+
+    @Test
+    fun `短い音声は null を返し、下限の長さなら数の特徴量を返す`() = runTest {
+        for (millis in listOf(1, 10, 50, 100, 250, 399)) {
+            val samples = speech().copyOf(millis * TEST_SAMPLE_RATE_HZ / 1_000)
+
+            assertEquals(null, embedder().embed(segment(samples))?.vector, "$millis ミリ秒")
+        }
+
+        val embedding = embedder().embed(segment(speech().copyOf(4 * TEST_SAMPLE_RATE_HZ / 10)))
+        assertTrue(embedding == null || embedding.vector.all { it.isFinite() })
+    }
+
+    @Test
+    fun `無音でも落ちない`() = runTest {
+        embedder().embed(segment(SyntheticAudio.silence(1_000)))
+    }
+
+    private companion object {
+        const val EMBEDDING_DIMENSIONS = 192
     }
 }

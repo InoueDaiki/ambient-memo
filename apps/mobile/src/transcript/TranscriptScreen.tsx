@@ -24,6 +24,7 @@ import { FlatList, View } from "react-native";
 
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
 import { ModelDownloadButton, ModelDownloadNotice } from "./ModelDownload.tsx";
+import { SelfEnrollmentCard } from "./SelfEnrollmentCard.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
 const UTTERANCE_LIMIT = 200;
@@ -77,7 +78,7 @@ function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | und
       )}
       <ListItem
         text={item.text}
-        label={speakerLabels[item.speaker]}
+        label={item.speakerName ?? speakerLabels[item.speaker]}
         meta={formatTime(item.startedAt)}
       />
     </View>
@@ -91,6 +92,11 @@ export function TranscriptScreen() {
   const transcriptionMode = useTranscriptionMode();
   const modelDownload = useModelDownload();
   const needsModels = transcriptionMode === "unavailable";
+  // 文字起こしのモデルだけを入れた端末では、話者のモデルが残っている
+  const needsSpeakerModel =
+    transcriptionMode === "ready" &&
+    modelDownload.status !== undefined &&
+    modelDownload.status.state !== "installed";
   const { status, isChanging, start, stop } = listening;
   const isListening = status === "listening";
   // 開始を試すと OS の確認が出るので、断られた後にだけ設定へ案内する
@@ -100,12 +106,19 @@ export function TranscriptScreen() {
     listening.error.failure === "microphone-permission";
 
   return (
-    <Screen>
+    <Screen bottomInset={false}>
       <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm }}>
         <Text variant="title" accessibilityRole="header">
           文字起こし
         </Text>
+        <SelfEnrollmentCard isListening={isListening} />
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
+        {needsSpeakerModel && (
+          <>
+            <ModelDownloadNotice status={modelDownload.status} missing="speaker" />
+            <ModelDownloadButton {...modelDownload} variant="secondary" />
+          </>
+        )}
         <StatusBanner {...listeningBanner(status)} />
         {listening.interrupted && (
           <StatusBanner

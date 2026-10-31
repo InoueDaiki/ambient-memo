@@ -1,6 +1,7 @@
 export { FakeEngineClient } from "./fake.ts";
 export type { FakeEngineClientOptions } from "./fake.ts";
-export { EngineStartError } from "./types.ts";
+export { sampleMemos } from "./sample-memos.ts";
+export { EngineStartError, SelfEnrollmentError } from "./types.ts";
 export type {
   EngineClient,
   EngineEvent,
@@ -9,10 +10,20 @@ export type {
   EngineStartFailure,
   EngineStatus,
   ListeningStatus,
+  Memo,
+  MemoDetail,
+  MemoEngineClient,
+  MemoMode,
   ModelDownloadFailure,
   ModelDownloadPhase,
   ModelDownloadStatus,
+  SelfEnrollmentFailure,
+  SelfEnrollmentStatus,
   Speaker,
+  Todo,
+  TodoExtraction,
+  TodoKind,
+  TodoStatus,
   TranscriptEngineClient,
   TranscriptionMode,
   Utterance,

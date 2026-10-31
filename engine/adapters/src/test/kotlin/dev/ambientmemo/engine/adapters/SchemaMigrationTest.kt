@@ -6,6 +6,9 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.SqlSchema
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.ambientmemo.engine.adapters.db.AmbientMemoDatabase
+import dev.ambientmemo.engine.domain.TodoStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
@@ -70,6 +73,50 @@ class SchemaMigrationTest {
             val rows = AmbientMemoDatabase(driver).utteranceQueries.listOverlapping(Long.MAX_VALUE, 0).executeAsList()
 
             assertTrue(rows.isNotEmpty())
+        }
+    }
+
+    @TestFactory
+    fun `移行した ToDo は未完了のまま読めて、完了できる`(): List<DynamicTest> =
+        (2 until schema.version).map { version ->
+            dynamicTest("版 $version から") {
+                val path = dir.resolve("todo-$version.db")
+                Files.copy(snapshot(version), path)
+                JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+                    seedStatements(seed(version)!!).forEach { driver.execute(null, it, 0) }
+                    driver.execute(null, "PRAGMA user_version = $version", 0)
+                }
+
+                openTestDriver(path).use { driver ->
+                    val repository = SqliteMemoRepository(AmbientMemoDatabase(driver), Dispatchers.Unconfined)
+                    runTest {
+                        val todos = repository.listTodos(memoId = 1)
+                        assertTrue(todos.isNotEmpty())
+                        assertTrue(todos.all { it.status != TodoStatus.DONE && it.completedAtMillis == null })
+
+                        repository.completeTodo(todos.first().id, 10_000)
+
+                        val completed = repository.listTodos(memoId = 1).first()
+                        assertEquals(TodoStatus.DONE, completed.status)
+                        assertEquals(10_000L, completed.completedAtMillis)
+                    }
+                }
+            }
+        }
+
+    @Test
+    fun `完了の前の状態を、取り消しのために残す`() {
+        openTestDriver(dir.resolve("from-status.db")).use { driver ->
+            val database = AmbientMemoDatabase(driver)
+            database.memoQueries.insert(1, 2, null, null, "complete", "fake-1", 3)
+            database.todoQueries.insert(1, "作業", "todo", null, "candidate", 3)
+
+            database.todoQueries.complete(4, 1)
+
+            val row = database.todoQueries.listByMemo(1).executeAsOne()
+            assertEquals("done", row.status)
+            assertEquals("candidate", row.completed_from_status)
+            assertEquals(4L, row.completed_at_ms)
         }
     }
 

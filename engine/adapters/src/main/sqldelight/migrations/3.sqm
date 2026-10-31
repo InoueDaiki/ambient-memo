@@ -1,0 +1,4 @@
+-- 版 3 から 4: ToDo の完了を足す。既存の ToDo は未完了のまま
+ALTER TABLE todo ADD COLUMN completed_at_ms INTEGER;
+
+ALTER TABLE todo ADD COLUMN completed_from_status TEXT;

@@ -7,6 +7,7 @@ import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.testing.TEST_SAMPLE_RATE_HZ
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertSame
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -42,6 +43,22 @@ private class RecordingRecognizer(private val text: String = " こんにちは "
         received = samples.copyOf()
         kept = samples
         return text
+    }
+
+    override fun close() {
+        closed = true
+    }
+}
+
+private class RecordingExtractor(private val vector: FloatArray? = floatArrayOf(0.6f, 0.8f)) : NativeSpeakerExtractor {
+    var received: FloatArray? = null
+    var kept: FloatArray? = null
+    var closed = false
+
+    override fun compute(samples: FloatArray, sampleRateHz: Int): FloatArray? {
+        received = samples.copyOf()
+        kept = samples
+        return vector
     }
 
     override fun close() {
@@ -159,5 +176,95 @@ class SherpaTranscriberTest {
         }.close()
 
         assertEquals(0, loads)
+    }
+}
+
+class SherpaSpeakerEmbedderTest {
+    private fun segment(samples: ShortArray = ShortArray(4) { 16_384 }) =
+        SpeechSegment(0, 100, TEST_SAMPLE_RATE_HZ, samples)
+
+    @Test
+    fun `区間全体を -1 から 1 にして渡し、版を付けて返す`() = runTest {
+        val extractor = RecordingExtractor()
+
+        val embedding = SherpaSpeakerEmbedder("model-1", minMillis = 0) { extractor }.embed(segment())
+
+        assertEquals(listOf(0.5f, 0.5f, 0.5f, 0.5f), checkNotNull(extractor.received).toList())
+        assertEquals("model-1", embedding?.modelVersion)
+        assertEquals(listOf(0.6f, 0.8f), embedding?.vector?.toList())
+    }
+
+    @Test
+    fun `計算できない長さなら null を返す`() = runTest {
+        val embedder = SherpaSpeakerEmbedder("model-1", minMillis = 0) { RecordingExtractor(vector = null) }
+
+        assertNull(embedder.embed(segment()))
+    }
+
+    @Test
+    fun `数でない特徴量は null にする`() = runTest {
+        val nan = RecordingExtractor(vector = floatArrayOf(0.6f, Float.NaN))
+
+        assertNull(SherpaSpeakerEmbedder("model-1", minMillis = 0) { nan }.embed(segment()))
+    }
+
+    @Test
+    fun `短い音声はネイティブへ渡さず、モデルも読み込まない`() = runTest {
+        var loads = 0
+        val embedder = SherpaSpeakerEmbedder("model-1", minMillis = 400) {
+            loads++
+            RecordingExtractor()
+        }
+
+        assertNull(embedder.embed(segment(ShortArray(TEST_SAMPLE_RATE_HZ * 399 / 1_000))))
+        assertEquals(0, loads)
+
+        embedder.embed(segment(ShortArray(TEST_SAMPLE_RATE_HZ * 400 / 1_000)))
+        assertEquals(1, loads)
+    }
+
+    @Test
+    fun `渡した作業用の配列を 0 で塗りつぶす`() = runTest {
+        val extractor = RecordingExtractor()
+
+        SherpaSpeakerEmbedder("model-1", minMillis = 0) { extractor }.embed(segment())
+
+        assertTrue(checkNotNull(extractor.kept).all { it == 0f })
+    }
+
+    @Test
+    fun `例外のときも作業用の配列を 0 で塗りつぶす`() = runTest {
+        var kept: FloatArray? = null
+        val extractor = object : NativeSpeakerExtractor {
+            override fun compute(samples: FloatArray, sampleRateHz: Int): FloatArray? {
+                kept = samples
+                error("失敗")
+            }
+
+            override fun close() = Unit
+        }
+
+        val result = runCatching { SherpaSpeakerEmbedder("model-1", minMillis = 0) { extractor }.embed(segment()) }
+
+        assertTrue(result.isFailure)
+        assertTrue(checkNotNull(kept).all { it == 0f })
+    }
+
+    @Test
+    fun `モデルは最初の発話まで読み込まず、閉じると解放する`() = runTest {
+        var loads = 0
+        val extractor = RecordingExtractor()
+        val embedder = SherpaSpeakerEmbedder("model-1", minMillis = 0) {
+            loads++
+            extractor
+        }
+        assertEquals(0, loads)
+
+        repeat(2) { embedder.embed(segment()) }
+        embedder.close()
+
+        assertEquals(1, loads)
+        assertTrue(extractor.closed)
+        assertTrue(runCatching { embedder.embed(segment()) }.isFailure)
     }
 }

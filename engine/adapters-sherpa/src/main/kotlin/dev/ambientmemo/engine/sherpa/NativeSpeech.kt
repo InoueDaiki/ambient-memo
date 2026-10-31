@@ -1,6 +1,8 @@
 package dev.ambientmemo.engine.sherpa
 
 import dev.ambientmemo.engine.domain.AudioFrame
+import dev.ambientmemo.engine.domain.SpeakerEmbedder
+import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.Transcriber
 import dev.ambientmemo.engine.domain.Transcription
@@ -24,6 +26,12 @@ interface NativeVad : AutoCloseable {
 /** sherpa-onnx の `OfflineRecognizer` のうち、使う部分。 */
 interface NativeRecognizer : AutoCloseable {
     fun decode(samples: FloatArray, sampleRateHz: Int): String
+}
+
+/** sherpa-onnx の `SpeakerEmbeddingExtractor` のうち、使う部分。 */
+interface NativeSpeakerExtractor : AutoCloseable {
+    /** 特徴量を返す。音声が短すぎて計算できないときは null を返す。ストリームは内側で解放する。 */
+    fun compute(samples: FloatArray, sampleRateHz: Int): FloatArray?
 }
 
 /** [NativeVad] の判定をそのまま発話か無音かにする。スレッドセーフではない。 */
@@ -86,6 +94,50 @@ class SherpaTranscriber(
             closed = true
             recognizer?.close()
             recognizer = null
+        }
+    }
+}
+
+/**
+ * 発話区間全体から1つの特徴量を作る。作業用の配列は 0 で塗りつぶす。
+ *
+ * [minMillis] より短い音声はネイティブへ渡さず null を返す。ごく短い音声では、CI の Linux の x64 で
+ * `isReady` が true のまま数でない値が返った。Mac の arm64 では起きなかったので、値も確かめる。
+ *
+ * 読み込みとキャンセルの扱いは [SherpaTranscriber] と同じ。自分の声が登録されるまで呼ばれないので、モデルも読み込まない。
+ */
+class SherpaSpeakerEmbedder(
+    override val modelVersion: String,
+    private val minMillis: Long = SherpaSettings.MIN_SPEAKER_MILLIS,
+    private val createExtractor: () -> NativeSpeakerExtractor,
+) : SpeakerEmbedder, AutoCloseable {
+    private val lock = Any()
+    private var extractor: NativeSpeakerExtractor? = null
+    private var closed = false
+
+    override suspend fun embed(segment: SpeechSegment): SpeakerEmbedding? {
+        val source = segment.samples
+        if (source.size * MILLIS_PER_SECOND < minMillis * segment.sampleRateHz) return null
+        val samples = FloatArray(source.size) { source[it] / FULL_SCALE }
+        try {
+            val vector = synchronized(lock) { loaded().compute(samples, segment.sampleRateHz) }
+            return vector?.takeIf { it.all(Float::isFinite) }?.let { SpeakerEmbedding(it, modelVersion) }
+        } finally {
+            samples.fill(0f)
+        }
+    }
+
+    private fun loaded(): NativeSpeakerExtractor {
+        check(!closed) { "解放済みです" }
+        return extractor ?: createExtractor().also { extractor = it }
+    }
+
+    /** 処理中の発話があれば、終わるまで待ってから解放する。 */
+    override fun close() {
+        synchronized(lock) {
+            closed = true
+            extractor?.close()
+            extractor = null
         }
     }
 }

@@ -17,13 +17,17 @@ export interface EngineClient {
 
 export type ListeningStatus = "stopped" | "listening";
 
-// 今は「自分」か「それ以外」だけ。名前の推定を足すときに広げる
-export type Speaker = "self" | "other";
+// - self: 登録した自分の声
+// - other: 自分以外。仮の話者か、名前の分かった話者
+// - unknown: 判定していないか、判定できなかった
+export type Speaker = "self" | "other" | "unknown";
 
 export interface Utterance {
   id: string;
   text: string;
   speaker: Speaker;
+  // 表示する話者の名前(「話者1」など)。unknown の発話にはない
+  speakerName?: string;
   // 発話の開始時刻(Unix 時間のミリ秒)
   startedAt: number;
 }
@@ -48,6 +52,34 @@ export class EngineStartError extends Error {
   constructor(failure: EngineStartFailure) {
     super(failure);
     this.name = "EngineStartError";
+    this.failure = failure;
+  }
+}
+
+// 自分の声の登録の状態
+// - enrolled: 登録済み
+// - not-enrolled: 未登録
+// - unavailable: 話者のモデルが端末になく、登録できない
+export type SelfEnrollmentStatus = "enrolled" | "not-enrolled" | "unavailable";
+
+export type SelfEnrollmentFailure =
+  // cancelSelfEnrollment で止めた。前の登録はそのまま
+  | "cancelled"
+  // 聞き取り中か、別の登録の途中
+  | "listening"
+  | "microphone-permission"
+  | "microphone-unavailable"
+  // 時間内に十分な長さの発話を聞き取れなかった
+  | "not-enough-speech"
+  | "speaker-model-unavailable";
+
+// enrollSelf の reject で、理由が分かるときに使う
+export class SelfEnrollmentError extends Error {
+  readonly failure: SelfEnrollmentFailure;
+
+  constructor(failure: SelfEnrollmentFailure) {
+    super(failure);
+    this.name = "SelfEnrollmentError";
     this.failure = failure;
   }
 }
@@ -95,7 +127,11 @@ export type EngineEvent =
   // 受け取ったら getPermissions で取り直す
   | { type: "permissions-changed" }
   // 進み具合もこれで届く
-  | { type: "model-download-changed"; status: ModelDownloadStatus };
+  | { type: "model-download-changed"; status: ModelDownloadStatus }
+  // メモの追加のほか、根拠の発話の更新でも届く。受け取ったら listMemos と getMemo で取り直す
+  | { type: "memos-changed" }
+  // ToDo の追加や完了で届く。受け取ったら listTodos と getMemo で取り直す
+  | { type: "todos-changed" };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -112,12 +148,79 @@ export interface TranscriptEngineClient extends EngineClient {
   stopListening(): Promise<void>;
   // 新しい順に最大 limit 件を返す
   listUtterances(options: { limit: number }): Promise<Utterance[]>;
+  getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
+  // 自分の声を聞き取って登録する。声は端末の中だけで扱い、音声は残さない。
+  // 未許可のマイクの権限があれば OS の確認を出す。登録できないときは SelfEnrollmentError で reject する
+  enrollSelf(): Promise<void>;
+  // 登録の途中なら止める。enrollSelf は cancelled で reject する
+  cancelSelfEnrollment(): Promise<void>;
   getModelDownloadStatus(): Promise<ModelDownloadStatus>;
-  // 取得を始めて、終わるのを待たずに解決する。結果は model-download-changed で届く。
+  // 文字起こしと話者のモデルが対象。取得を始めて、終わるのを待たずに解決する。結果は model-download-changed で届く。
   // 通信はここからしか始まらないので、利用者の操作でだけ呼ぶ。取得中とモデルが揃っているときは何もしない
   startModelDownload(): Promise<void>;
   // 途中までのファイルは残るので、次は続きから取得する
   cancelModelDownload(): Promise<void>;
+  // 戻り値を呼ぶと購読をやめる
+  subscribe(listener: EngineListener): () => void;
+}
+
+// メモと ToDo の実装の状態。意味は TranscriptionMode と同じ
+export type MemoMode = "ready" | "development" | "unavailable";
+
+// ToDo を最後まで読み取れたか。incomplete のメモは ToDo が欠けているかもしれない
+export type TodoExtraction = "complete" | "incomplete";
+
+export interface Memo {
+  id: string;
+  // 要約に失敗すると null。根拠の発話は残る
+  title: string | null;
+  summary: string | null;
+  todoExtraction: TodoExtraction;
+  // 最初の発話の開始時刻と、最後の発話の終了時刻(Unix 時間のミリ秒)
+  startedAt: number;
+  endedAt: number;
+}
+
+// - todo: 自分がこれからやること
+// - reminder: 自分が日時を覚えておくべき予定
+export type TodoKind = "todo" | "reminder";
+
+// - candidate: 期限の確度が低い。人が確かめるまでリマインドしない。日付を捨てた場合は dueDate が null
+// - open: 確定した ToDo。期限がないこともある
+// - done: 完了した
+export type TodoStatus = "candidate" | "open" | "done";
+
+export interface Todo {
+  id: string;
+  memoId: string;
+  task: string;
+  kind: TodoKind;
+  // 時差を持たない端末の日付(YYYY-MM-DD)
+  dueDate: string | null;
+  status: TodoStatus;
+  // 記録した時刻(Unix 時間のミリ秒)
+  createdAt: number;
+}
+
+export interface MemoDetail extends Memo {
+  // 根拠の発話。古い順
+  utterances: Utterance[];
+  // このメモから抽出した ToDo。記録した順
+  todos: Todo[];
+}
+
+// メモと ToDo を扱う実装。engine-bridge にはまだなく、今は Fake だけが提供する
+export interface MemoEngineClient {
+  getMemoMode(): Promise<MemoMode>;
+  // 開始時刻の新しい順に最大 limit 件を返す
+  listMemos(options: { limit: number }): Promise<Memo[]>;
+  // ないメモは null を返す
+  getMemo(id: string): Promise<MemoDetail | null>;
+  // 未完了、期限の早い順、新しい順に最大 limit 件を返す。期限のない ToDo は同じ状態の中で最後にする
+  listTodos(options: { limit: number }): Promise<Todo[]>;
+  // すでに完了していれば何もせず成功する。ない ToDo は reject する。
+  // 状態が変わるときは todos-changed を届けてから解決する
+  completeTodo(id: string): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

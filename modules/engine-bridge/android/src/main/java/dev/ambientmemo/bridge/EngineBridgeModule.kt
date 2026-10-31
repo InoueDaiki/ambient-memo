@@ -11,8 +11,14 @@ import android.provider.Settings
 import dev.ambientmemo.engine.android.CaptureState
 import dev.ambientmemo.engine.android.Engine
 import dev.ambientmemo.engine.android.EngineStartException
+import dev.ambientmemo.engine.android.EnrollmentFailure
+import dev.ambientmemo.engine.android.MemoChange
+import dev.ambientmemo.engine.android.SelfEnrollmentException
+import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
+import dev.ambientmemo.engine.android.TodoNotFoundException
 import dev.ambientmemo.engine.android.TranscriptionMode
+import dev.ambientmemo.engine.android.toWire
 import dev.ambientmemo.engine.domain.ModelDownloadFailure
 import dev.ambientmemo.engine.domain.ModelDownloadPhase
 import dev.ambientmemo.engine.domain.ModelDownloadState
@@ -45,6 +51,25 @@ private class StartFailedException(failure: StartFailure) : CodedException(
   cause = null,
 )
 
+private class EnrollmentFailedException(failure: EnrollmentFailure) : CodedException(
+  code = when (failure) {
+    EnrollmentFailure.MICROPHONE_PERMISSION -> "microphone-permission"
+    EnrollmentFailure.MICROPHONE_UNAVAILABLE -> "microphone-unavailable"
+    EnrollmentFailure.SPEAKER_MODEL_UNAVAILABLE -> "speaker-model-unavailable"
+    EnrollmentFailure.LISTENING -> "listening"
+    EnrollmentFailure.NOT_ENOUGH_SPEECH -> "not-enough-speech"
+    EnrollmentFailure.CANCELLED -> "cancelled"
+  },
+  message = failure.name,
+  cause = null,
+)
+
+private class TodoNotFoundCodedException : CodedException(
+  code = "todo-not-found",
+  message = "ToDo がありません",
+  cause = null,
+)
+
 class EngineBridgeModule : Module() {
   private val context: Context
     get() = appContext.reactContext ?: throw Exceptions.ReactContextLost()
@@ -54,6 +79,15 @@ class EngineBridgeModule : Module() {
 
   private var scope: CoroutineScope? = null
   private val publishLock = Any()
+
+  // 書き込みが戻る前に呼ばれるので、完了の Promise より先にイベントが届く
+  private val memoListener: (MemoChange) -> Unit = { change ->
+    val type = when (change) {
+      MemoChange.MEMOS -> "memos-changed"
+      MemoChange.TODOS -> "todos-changed"
+    }
+    sendEvent(EVENT_ENGINE, mapOf("type" to type))
+  }
   private var publishedStatus: String? = null
 
   override fun definition() = ModuleDefinition {
@@ -69,10 +103,12 @@ class EngineBridgeModule : Module() {
       moduleScope.launch {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
+      engine.addMemoListener(memoListener)
     }
 
     OnDestroy {
       scope?.cancel()
+      engine.removeMemoListener(memoListener)
     }
 
     // 設定の画面で権限を変えて戻ってきたときに、案内を更新する
@@ -145,15 +181,50 @@ class EngineBridgeModule : Module() {
     }
 
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
-      engine.recentUtterances(limit).map {
-        mapOf(
-          "id" to it.id.toString(),
-          "text" to it.text,
-          // 話者識別ができるまでは、自分の声と見分けられないので「それ以外」にする
-          "speaker" to "other",
-          "startedAt" to it.startedAtMillis.toDouble(),
-        )
+      val speakers = engine.speakers()
+      engine.recentUtterances(limit).map { it.toWire(speakers) }
+    }
+
+    AsyncFunction("listMemos") Coroutine { limit: Int ->
+      engine.memoBridge.listMemos(limit)
+    }
+
+    AsyncFunction("getMemo") Coroutine { id: String ->
+      engine.memoBridge.getMemo(id)
+    }
+
+    AsyncFunction("listTodos") Coroutine { limit: Int ->
+      engine.memoBridge.listTodos(limit)
+    }
+
+    AsyncFunction("completeTodo") Coroutine { id: String ->
+      try {
+        engine.memoBridge.completeTodo(id)
+      } catch (_: TodoNotFoundException) {
+        throw TodoNotFoundCodedException()
       }
+    }
+
+    AsyncFunction("getSelfEnrollmentStatus") Coroutine { ->
+      when (engine.selfEnrollmentStatus()) {
+        SelfEnrollmentStatus.ENROLLED -> "enrolled"
+        SelfEnrollmentStatus.NOT_ENROLLED -> "not-enrolled"
+        SelfEnrollmentStatus.UNAVAILABLE -> "unavailable"
+      }
+    }
+
+    AsyncFunction("enrollSelf") Coroutine { ->
+      requestPermissions()
+      publishPermissions()
+      try {
+        engine.enrollSelf()
+      } catch (e: SelfEnrollmentException) {
+        throw EnrollmentFailedException(e.failure)
+      }
+    }
+
+    AsyncFunction("cancelSelfEnrollment") {
+      engine.cancelEnrollment()
     }
   }
 

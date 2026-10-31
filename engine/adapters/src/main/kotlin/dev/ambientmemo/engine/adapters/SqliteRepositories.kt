@@ -23,6 +23,8 @@ class SqliteUtteranceRepository(
                 utterance.text,
                 utterance.confidence,
                 utterance.createdAtMillis,
+                utterance.speakerId,
+                utterance.speakerConfidence,
             )
             database.utteranceQueries.lastInsertedId().executeAsOne()
         }
@@ -33,26 +35,38 @@ class SqliteUtteranceRepository(
             text = utterance.text,
             confidence = utterance.confidence,
             createdAtMillis = utterance.createdAtMillis,
+            speakerId = utterance.speakerId,
+            speakerConfidence = utterance.speakerConfidence,
         )
     }
 
     override suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance> =
         withContext(ioContext) {
             database.utteranceQueries
-                .listOverlapping(toMillis, fromMillis) { id, startedAt, endedAt, body, confidence, createdAt, _ ->
-                    Utterance(id, startedAt, endedAt, body, confidence, createdAt)
-                }
+                .listOverlapping(toMillis, fromMillis, ::toUtterance)
                 .executeAsList()
         }
 
     override suspend fun listRecent(limit: Int): List<Utterance> = withContext(ioContext) {
         database.utteranceQueries
-            .listRecent(limit.toLong()) { id, startedAt, endedAt, body, confidence, createdAt, _ ->
-                Utterance(id, startedAt, endedAt, body, confidence, createdAt)
-            }
+            .listRecent(limit.toLong(), ::toUtterance)
             .executeAsList()
     }
 }
+
+/** SQLDelight の行の順に受ける。読み出す場所はすべてここを通す。 */
+@Suppress("LongParameterList", "UnusedParameter") // 引数は utterance の列
+internal fun toUtterance(
+    id: Long,
+    startedAtMillis: Long,
+    endedAtMillis: Long,
+    body: String,
+    confidence: Double?,
+    createdAtMillis: Long,
+    organizedAtMillis: Long?,
+    speakerId: Long?,
+    speakerConfidence: Double?,
+) = Utterance(id, startedAtMillis, endedAtMillis, body, confidence, createdAtMillis, speakerId, speakerConfidence)
 
 class SqliteCaptureGapRepository(
     private val database: AmbientMemoDatabase,

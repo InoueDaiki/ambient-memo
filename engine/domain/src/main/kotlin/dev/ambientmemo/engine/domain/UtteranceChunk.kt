@@ -17,23 +17,24 @@ private const val MINUTES_PER_HOUR = 60L
 private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
 
 /**
- * 話者ラベルのない今の発話を、検証の文字起こしと同じ `[HH:mm] 本文` の形にする。
- * 話者識別を足したら、ここで `[HH:mm] 自分: 本文` の形にする。
+ * 発話を、検証の文字起こしと同じ `[HH:mm] 自分: 本文` の形にする。
+ * 話者が分からない発話は、話者識別の前と同じ `[HH:mm] 本文` の形にする。
  */
-internal fun Utterance.toTranscriptLine(timeZone: TimeZone): String {
+internal fun Utterance.toTranscriptLine(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String {
     val localMillis = startedAtMillis + timeZone.getOffset(startedAtMillis)
     val minutes = Math.floorMod(Math.floorDiv(localMillis, MILLIS_PER_MINUTE), MINUTES_PER_DAY)
     return String.format(
         Locale.ROOT,
-        "[%02d:%02d] %s",
+        "[%02d:%02d] %s%s",
         minutes / MINUTES_PER_HOUR,
         minutes % MINUTES_PER_HOUR,
+        labels.of(this)?.let { "$it: " }.orEmpty(),
         text.trim(),
     )
 }
 
-internal fun UtteranceChunk.toTranscript(timeZone: TimeZone): String =
-    utterances.filter { it.text.isNotBlank() }.joinToString("\n") { it.toTranscriptLine(timeZone) }
+internal fun UtteranceChunk.toTranscript(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String =
+    utterances.filter { it.text.isNotBlank() }.joinToString("\n") { it.toTranscriptLine(timeZone, labels) }
 
 /**
  * [sorted] を、無音の長さと文字数の上限でまとまりに分ける。[sorted] は開始時刻、id の順に並んでいること。
@@ -44,13 +45,14 @@ internal fun splitIntoChunks(
     sorted: List<Utterance>,
     config: OrganizeConfig,
     timeZone: TimeZone,
+    labels: SpeakerLabels = SpeakerLabels.NONE,
 ): List<UtteranceChunk> {
     val chunks = mutableListOf<UtteranceChunk>()
     var current = mutableListOf<Utterance>()
     var currentChars = 0
     var currentEndedAt = Long.MIN_VALUE
     for (utterance in sorted) {
-        val chars = utterance.toTranscriptLine(timeZone).length + 1
+        val chars = utterance.toTranscriptLine(timeZone, labels).length + 1
         val isSilent = utterance.startedAtMillis - currentEndedAt >= config.minSilenceGapMillis
         if (current.isNotEmpty() && (isSilent || currentChars + chars > config.maxChunkChars)) {
             chunks += UtteranceChunk(current)
