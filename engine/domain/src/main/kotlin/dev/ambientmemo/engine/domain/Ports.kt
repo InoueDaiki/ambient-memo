@@ -50,6 +50,9 @@ interface UtteranceRepository {
 
     /** `[fromMillis, toMillis)` と重なる発話を、開始時刻、id の順に返す。 */
     suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance>
+
+    /** 開始時刻の新しい順に最大 [limit] 件を返す。同時刻は後から保存したものを先にする。 */
+    suspend fun listRecent(limit: Int): List<Utterance>
 }
 
 interface CaptureGapRepository {

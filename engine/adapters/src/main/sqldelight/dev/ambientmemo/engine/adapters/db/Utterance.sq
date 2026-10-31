@@ -24,3 +24,9 @@ SELECT *
 FROM utterance
 WHERE started_at_ms < :toMillis AND ended_at_ms > :fromMillis
 ORDER BY started_at_ms, id;
+
+listRecent:
+SELECT *
+FROM utterance
+ORDER BY started_at_ms DESC, id DESC
+LIMIT :limit;

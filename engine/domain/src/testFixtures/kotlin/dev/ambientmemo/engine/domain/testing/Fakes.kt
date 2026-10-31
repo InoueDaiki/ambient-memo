@@ -122,6 +122,10 @@ class InMemoryUtteranceRepository : UtteranceRepository {
     override suspend fun listOverlapping(fromMillis: Long, toMillis: Long): List<Utterance> = rows
         .filter { it.startedAtMillis < toMillis && it.endedAtMillis > fromMillis }
         .sortedWith(compareBy(Utterance::startedAtMillis, Utterance::id))
+
+    override suspend fun listRecent(limit: Int): List<Utterance> = rows
+        .sortedWith(compareByDescending<Utterance> { it.startedAtMillis }.thenByDescending { it.id })
+        .take(limit)
 }
 
 class InMemoryCaptureGapRepository : CaptureGapRepository {

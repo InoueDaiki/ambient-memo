@@ -1,7 +1,13 @@
 // 画面からエンジンを使う hooks。engine-bridge と Fake のどちらの実装でも同じように動く
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 
-import type { ListeningStatus, TranscriptEngineClient, Utterance } from "./types.ts";
+import type {
+  EnginePermissions,
+  ListeningStatus,
+  TranscriptEngineClient,
+  TranscriptionMode,
+  Utterance,
+} from "./types.ts";
 
 const EngineClientContext = createContext<TranscriptEngineClient | undefined>(undefined);
 
@@ -28,6 +34,8 @@ export interface UseListeningResult {
   isChanging: boolean;
   // 最後の取得、開始、停止の失敗。次の操作で消える
   error: unknown;
+  // エンジンの都合で止まったときに true。次の操作で消える
+  interrupted: boolean;
   start: () => void;
   stop: () => void;
 }
@@ -37,6 +45,7 @@ export function useListening(): UseListeningResult {
   const [status, setStatus] = useState<ListeningStatus>();
   const [isChanging, setIsChanging] = useState(false);
   const [error, setError] = useState<unknown>();
+  const [interrupted, setInterrupted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -46,6 +55,7 @@ export function useListening(): UseListeningResult {
       if (event.type !== "listening-changed") return;
       hasEvent = true;
       setStatus(event.status);
+      setInterrupted(event.interrupted === true);
     });
     client
       .getListeningStatus()
@@ -64,6 +74,7 @@ export function useListening(): UseListeningResult {
   const change = useCallback((action: () => Promise<void>) => {
     setIsChanging(true);
     setError(undefined);
+    setInterrupted(false);
     action()
       .catch(setError)
       .finally(() => setIsChanging(false));
@@ -72,7 +83,66 @@ export function useListening(): UseListeningResult {
   const start = useCallback(() => change(() => client.startListening()), [change, client]);
   const stop = useCallback(() => change(() => client.stopListening()), [change, client]);
 
-  return { status, isChanging, error, start, stop };
+  return { status, isChanging, error, interrupted, start, stop };
+}
+
+export interface UsePermissionsResult {
+  // 最初の取得が終わるまでは undefined
+  permissions: EnginePermissions | undefined;
+  openSettings: () => void;
+}
+
+export function usePermissions(): UsePermissionsResult {
+  const client = useEngineClient();
+  const [permissions, setPermissions] = useState<EnginePermissions>();
+
+  useEffect(() => {
+    let active = true;
+    const load = () => {
+      client
+        .getPermissions()
+        .then((current) => {
+          if (active) setPermissions(current);
+        })
+        // 案内が出ないだけで、開始の操作のときに改めて確かめる
+        .catch(() => undefined);
+    };
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "permissions-changed") load();
+    });
+    load();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [client]);
+
+  const openSettings = useCallback(() => {
+    client.openPermissionSettings().catch(() => undefined);
+  }, [client]);
+
+  return { permissions, openSettings };
+}
+
+// 最初の取得が終わるまでと、取得に失敗したときは undefined
+export function useTranscriptionMode(): TranscriptionMode | undefined {
+  const client = useEngineClient();
+  const [mode, setMode] = useState<TranscriptionMode>();
+
+  useEffect(() => {
+    let active = true;
+    client
+      .getStatus()
+      .then((status) => {
+        if (active) setMode(status.transcription);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client]);
+
+  return mode;
 }
 
 export interface UseUtterancesResult {

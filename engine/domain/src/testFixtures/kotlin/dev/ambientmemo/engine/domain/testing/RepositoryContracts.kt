@@ -85,6 +85,24 @@ abstract class UtteranceRepositoryContract {
     fun `該当がなければ空を返す`() = runTest {
         assertTrue(repository().listOverlapping(0, 1_000).isEmpty())
     }
+
+    @Test
+    fun `最近の発話を新しい順に上限まで返し、同時刻は後の保存を先にする`() = runTest {
+        val repository = repository()
+        repository.insert(utterance(100, 200, "古い"))
+        repository.insert(utterance(300, 400, "新しい"))
+        repository.insert(utterance(200, 300, "同時刻の先"))
+        repository.insert(utterance(200, 300, "同時刻の後"))
+
+        val texts = repository.listRecent(3).map { it.text }
+
+        assertEquals(listOf("新しい", "同時刻の後", "同時刻の先"), texts)
+    }
+
+    @Test
+    fun `最近の発話がなければ空を返す`() = runTest {
+        assertTrue(repository().listRecent(10).isEmpty())
+    }
 }
 
 /** [CaptureGapRepository] の Fake と本物の両方に流す契約テスト。 */

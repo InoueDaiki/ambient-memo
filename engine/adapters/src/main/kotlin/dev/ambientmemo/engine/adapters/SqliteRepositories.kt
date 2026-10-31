@@ -44,6 +44,14 @@ class SqliteUtteranceRepository(
                 }
                 .executeAsList()
         }
+
+    override suspend fun listRecent(limit: Int): List<Utterance> = withContext(ioContext) {
+        database.utteranceQueries
+            .listRecent(limit.toLong()) { id, startedAt, endedAt, body, confidence, createdAt ->
+                Utterance(id, startedAt, endedAt, body, confidence, createdAt)
+            }
+            .executeAsList()
+    }
 }
 
 class SqliteCaptureGapRepository(

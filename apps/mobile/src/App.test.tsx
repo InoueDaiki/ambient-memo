@@ -1,4 +1,4 @@
-import { FakeEngineClient, type Utterance } from "@ambient-memo/engine-client";
+import { EngineStartError, FakeEngineClient, type Utterance } from "@ambient-memo/engine-client";
 import { describe, expect, it } from "@jest/globals";
 import { act, render, screen, userEvent } from "@testing-library/react-native";
 
@@ -13,7 +13,7 @@ const utterance = (overrides: Partial<Utterance> & { id: string }): Utterance =>
 
 async function renderApp(client: FakeEngineClient) {
   await render(<App client={client} />);
-  await screen.findByText(/止まっています|聞き取り中/);
+  await screen.findByText(/^(止まっています|聞き取り中)$/);
 }
 
 async function press(name: string) {
@@ -91,6 +91,97 @@ describe("文字起こしの画面", () => {
 
     await screen.findByText("聞き取り中");
     expect(screen.queryByText(/聞き取りを始められませんでした/)).toBeNull();
+  });
+
+  it("マイクの許可がなくて始められなかったら、設定へ案内する", async () => {
+    const client = new FakeEngineClient({
+      permissions: { microphone: false, notifications: true },
+    });
+    client.failNextStart(new EngineStartError("microphone-permission"));
+    await renderApp(client);
+
+    expect(screen.queryByRole("button", { name: "設定を開く" })).toBeNull();
+
+    await press("聞き取りを始める");
+
+    await screen.findByText("聞き取りにはマイクの許可が必要です。設定で許可してください。");
+    await press("設定を開く");
+    expect(client.settingsOpened).toBe(1);
+
+    await act(async () => {
+      client.setPermissions({ microphone: true, notifications: true });
+    });
+    expect(screen.queryByRole("button", { name: "設定を開く" })).toBeNull();
+  });
+
+  it("通知が許可されていないときは、出なくなるものを知らせる", async () => {
+    const client = new FakeEngineClient({
+      permissions: { microphone: true, notifications: false },
+    });
+    await renderApp(client);
+    await screen.findByText("まだ発話はありません");
+    expect(screen.queryByText(/通知が許可されていません/)).toBeNull();
+
+    await press("聞き取りを始める");
+
+    await screen.findByText(/通知が許可されていません/);
+    await press("設定を開く");
+    expect(client.settingsOpened).toBe(1);
+  });
+
+  it("マイクを開けなかったら理由を知らせる", async () => {
+    const client = new FakeEngineClient();
+    client.failNextStart(new EngineStartError("microphone-unavailable"));
+    await renderApp(client);
+
+    await press("聞き取りを始める");
+
+    await screen.findByText(
+      "マイクを開けませんでした。ほかのアプリが使っていないか確かめてください。",
+    );
+  });
+
+  it("文字起こしの実装がなければ理由を知らせる", async () => {
+    const client = new FakeEngineClient();
+    client.failNextStart(new EngineStartError("transcription-unavailable"));
+    await renderApp(client);
+
+    await press("聞き取りを始める");
+
+    await screen.findByText("文字起こしの機能がまだ入っていないため、聞き取りを始められません。");
+  });
+
+  it("開発用の実装で動いているときは、そのことを出す", async () => {
+    const client = new FakeEngineClient({
+      status: { engineName: "fake", apiVersion: 1, transcription: "development" },
+    });
+    await renderApp(client);
+
+    await screen.findByText("開発用: 文字起こしは本物ではありません");
+  });
+
+  it("本物の実装では開発用の表示を出さない", async () => {
+    await renderApp(new FakeEngineClient());
+
+    await screen.findByText("まだ発話はありません");
+    expect(screen.queryByText(/開発用/)).toBeNull();
+  });
+
+  it("マイクの都合で止まったら理由を知らせて、次の開始で消す", async () => {
+    const client = new FakeEngineClient({ listeningStatus: "listening" });
+    await renderApp(client);
+    await screen.findByText("聞き取り中");
+
+    await act(async () => {
+      client.interrupt();
+    });
+
+    await screen.findByText("マイクを使えなくなったため、聞き取りが止まりました。");
+
+    await press("聞き取りを始める");
+
+    await screen.findByText("聞き取り中");
+    expect(screen.queryByText(/聞き取りが止まりました/)).toBeNull();
   });
 
   it("エンジンの都合で止まったら、画面も止まった状態になる", async () => {

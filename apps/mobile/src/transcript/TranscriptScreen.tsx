@@ -1,5 +1,14 @@
-import { useListening, useUtterances } from "@ambient-memo/engine-client/react";
-import type { ListeningStatus, Utterance } from "@ambient-memo/engine-client";
+import {
+  useListening,
+  usePermissions,
+  useTranscriptionMode,
+  useUtterances,
+} from "@ambient-memo/engine-client/react";
+import {
+  EngineStartError,
+  type ListeningStatus,
+  type Utterance,
+} from "@ambient-memo/engine-client";
 import { spacing } from "@ambient-memo/design-tokens";
 import {
   Button,
@@ -37,6 +46,21 @@ function emptyDescription(status: ListeningStatus | undefined): string {
     : "聞き取りを始めると、ここに文字起こしが並びます。\n音声は保存しません。";
 }
 
+function listeningErrorMessage(status: ListeningStatus | undefined, error: unknown): string {
+  if (status === "listening") return "聞き取りを止められませんでした。もう一度試してください。";
+  if (error instanceof EngineStartError) {
+    switch (error.failure) {
+      case "microphone-permission":
+        return "聞き取りにはマイクの許可が必要です。設定で許可してください。";
+      case "microphone-unavailable":
+        return "マイクを開けませんでした。ほかのアプリが使っていないか確かめてください。";
+      case "transcription-unavailable":
+        return "文字起こしの機能がまだ入っていないため、聞き取りを始められません。";
+    }
+  }
+  return "聞き取りを始められませんでした。もう一度試してください。";
+}
+
 function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | undefined }) {
   const day = formatDay(item.startedAt);
   const isNewDay = older === undefined || formatDay(older.startedAt) !== day;
@@ -61,8 +85,15 @@ function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | und
 export function TranscriptScreen() {
   const listening = useListening();
   const { utterances, error: loadError } = useUtterances({ limit: UTTERANCE_LIMIT });
+  const { permissions, openSettings } = usePermissions();
+  const transcriptionMode = useTranscriptionMode();
   const { status, isChanging, start, stop } = listening;
   const isListening = status === "listening";
+  // 開始を試すと OS の確認が出るので、断られた後にだけ設定へ案内する
+  const needsMicrophoneGuide =
+    permissions?.microphone === false &&
+    listening.error instanceof EngineStartError &&
+    listening.error.failure === "microphone-permission";
 
   return (
     <Screen>
@@ -70,16 +101,33 @@ export function TranscriptScreen() {
         <Text variant="title" accessibilityRole="header">
           文字起こし
         </Text>
+        {transcriptionMode === "development" && (
+          <StatusBanner tone="neutral" message="開発用: 文字起こしは本物ではありません" />
+        )}
         <StatusBanner {...listeningBanner(status)} />
-        {listening.error !== undefined && (
+        {listening.interrupted && (
           <StatusBanner
             tone="danger"
-            message={
-              status === "listening"
-                ? "聞き取りを止められませんでした。もう一度試してください。"
-                : "聞き取りを始められませんでした。もう一度試してください。"
-            }
+            message="マイクを使えなくなったため、聞き取りが止まりました。"
           />
+        )}
+        {listening.error !== undefined && (
+          <StatusBanner tone="danger" message={listeningErrorMessage(status, listening.error)} />
+        )}
+        {needsMicrophoneGuide && (
+          <Button label="設定を開く" variant="secondary" onPress={openSettings} />
+        )}
+        {/* 開始のときに OS の確認が出るので、聞き取りを始めた後にだけ案内する */}
+        {permissions?.notifications === false && isListening && (
+          <>
+            <StatusBanner
+              tone="neutral"
+              message="通知が許可されていません。聞き取り中の表示と、再起動後のお知らせが出ません。"
+            />
+            {!needsMicrophoneGuide && (
+              <Button label="設定を開く" variant="secondary" onPress={openSettings} />
+            )}
+          </>
         )}
         {loadError !== undefined && (
           <StatusBanner tone="danger" message="文字起こしを読み込めませんでした。" />
