@@ -10,10 +10,12 @@ import dev.ambientmemo.engine.domain.ModelDownloadState
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertFalse
@@ -146,7 +148,8 @@ class ModelDownloadRunnerTest {
                 started.complete(Unit)
                 awaitCancellation()
             } finally {
-                cancelled.await()
+                // 取り消された後の await は待たずに例外になるので、後始末が長引く取得を NonCancellable で再現する
+                withContext(NonCancellable) { cancelled.await() }
                 onProgress(PROGRESS)
                 finished.complete(Unit)
             }
@@ -172,7 +175,7 @@ class ModelDownloadRunnerTest {
                 started.complete(Unit)
                 awaitCancellation()
             } finally {
-                release.await()
+                withContext(NonCancellable) { release.await() }
             }
         }
         runner.begin()
