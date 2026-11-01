@@ -23,7 +23,7 @@
     <string name="organize_title">メモを整理しています</string>
     <string name="organize_preparing">準備しています</string>
     <string name="organize_progress">%1$d / %2$d まとまり</string>
-    <string name="organize_stopping">今のまとまりが終わると止まります</string>
+    <string name="organize_stopping">区切りがつくと止まります</string>
     <string name="organize_stop">止める</string>
     <string name="organize_completed_title">メモの整理が終わりました</string>
     <string name="organize_completed_text">アプリでメモを確かめられます</string>

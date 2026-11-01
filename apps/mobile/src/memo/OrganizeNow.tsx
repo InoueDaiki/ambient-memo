@@ -51,7 +51,7 @@ function RunningSection({ status, stop }: { status: OrganizeStatus; stop: () => 
       )}
       <Text variant="caption" color="fgMuted">
         {isStopping
-          ? "今のまとまりが終わると止まります。"
+          ? "区切りがつくと止まります。モデルの読み込み中は、読み込みの後に止まります。"
           : "アプリを離れても続きます。聞き取りはそのまま動きます。"}
       </Text>
       <Button
