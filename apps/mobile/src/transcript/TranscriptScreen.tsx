@@ -21,8 +21,11 @@ import {
   Text,
   type StatusBannerTone,
 } from "@ambient-memo/ui-native";
+import { useNavigation } from "@react-navigation/native";
+import { useState } from "react";
 import { FlatList, View } from "react-native";
 
+import type { RootNavigation } from "../navigation/types.ts";
 import { formatDay, formatTime, speakerLabels } from "./format.ts";
 import {
   ModelDownloadButton,
@@ -30,6 +33,7 @@ import {
   OrganizerModelSection,
 } from "./ModelDownload.tsx";
 import { SelfEnrollmentCard } from "./SelfEnrollmentCard.tsx";
+import { SpeakerSheet } from "./SpeakerSheet.tsx";
 
 // 一度に読み込む発話の数。古い発話を遡る操作を作るときに見直す
 const UTTERANCE_LIMIT = 200;
@@ -69,7 +73,15 @@ function listeningErrorMessage(status: ListeningStatus | undefined, error: unkno
   return "聞き取りを始められませんでした。もう一度試してください。";
 }
 
-function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | undefined }) {
+function UtteranceRow({
+  item,
+  older,
+  onPress,
+}: {
+  item: Utterance;
+  older: Utterance | undefined;
+  onPress: () => void;
+}) {
   const day = formatDay(item.startedAt);
   const isNewDay = older === undefined || formatDay(older.startedAt) !== day;
   return (
@@ -85,12 +97,15 @@ function UtteranceRow({ item, older }: { item: Utterance; older: Utterance | und
         text={item.text}
         label={item.speakerName ?? speakerLabels[item.speaker]}
         meta={formatTime(item.startedAt)}
+        onPress={onPress}
       />
     </View>
   );
 }
 
 export function TranscriptScreen() {
+  const navigation = useNavigation<RootNavigation>();
+  const [correcting, setCorrecting] = useState<Utterance>();
   const listening = useListening();
   const { utterances, error: loadError } = useUtterances({ limit: UTTERANCE_LIMIT });
   const { permissions, openSettings } = usePermissions();
@@ -114,9 +129,18 @@ export function TranscriptScreen() {
   return (
     <Screen bottomInset={false}>
       <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.sm }}>
-        <Text variant="title" accessibilityRole="header">
-          文字起こし
-        </Text>
+        <View
+          style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}
+        >
+          <Text variant="title" accessibilityRole="header">
+            文字起こし
+          </Text>
+          <Button
+            label="話者"
+            variant="secondary"
+            onPress={() => navigation.navigate("Speakers")}
+          />
+        </View>
         <SelfEnrollmentCard isListening={isListening} />
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
         {needsSpeakerModel && (
@@ -169,7 +193,11 @@ export function TranscriptScreen() {
             data={utterances}
             keyExtractor={(item) => item.id}
             renderItem={({ item, index }) => (
-              <UtteranceRow item={item} older={utterances?.[index + 1]} />
+              <UtteranceRow
+                item={item}
+                older={utterances?.[index + 1]}
+                onPress={() => setCorrecting(item)}
+              />
             )}
           />
         )}
@@ -187,6 +215,9 @@ export function TranscriptScreen() {
           />
         )}
       </View>
+      {correcting !== undefined && (
+        <SpeakerSheet utterance={correcting} onClose={() => setCorrecting(undefined)} />
+      )}
     </Screen>
   );
 }

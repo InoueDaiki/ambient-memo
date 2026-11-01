@@ -1,4 +1,9 @@
-import { EngineStartError, FakeEngineClient, type Utterance } from "@ambient-memo/engine-client";
+import {
+  EngineStartError,
+  FakeEngineClient,
+  type SpeakerInfo,
+  type Utterance,
+} from "@ambient-memo/engine-client";
 import { describe, expect, it } from "@jest/globals";
 import { act, render, screen, userEvent } from "@testing-library/react-native";
 
@@ -474,5 +479,122 @@ describe("自分の声の登録", () => {
     expect(
       screen.getByRole("button", { name: "声を登録する" }).props.accessibilityState?.disabled,
     ).toBe(true);
+  });
+});
+
+describe("話者を手で直す", () => {
+  const speakers: SpeakerInfo[] = [
+    { id: "1", name: "自分", kind: "self", utteranceCount: 0 },
+    { id: "2", name: "話者1", kind: "provisional", utteranceCount: 0 },
+    { id: "3", name: "話者2", kind: "provisional", utteranceCount: 0 },
+  ];
+  const withRows = () =>
+    new FakeEngineClient({
+      speakers,
+      utterances: [
+        utterance({
+          id: "10",
+          text: "卵も切れていたよ",
+          speaker: "other",
+          speakerId: "2",
+          speakerName: "話者1",
+        }),
+      ],
+    });
+
+  it("一覧の行から自分に直すと、一覧の話者が変わる", async () => {
+    const client = withRows();
+    await renderApp(client);
+
+    await userEvent.press(await screen.findByText("卵も切れていたよ"));
+    await screen.findByText("この発話の話者を直す");
+    await press("自分");
+
+    await screen.findByText("自分");
+    expect(screen.queryByText("この発話の話者を直す")).toBeNull();
+    const [row] = await client.listUtterances({ limit: 1 });
+    expect(row?.speaker).toBe("self");
+  });
+
+  it("行から他の話者と不明に直せる", async () => {
+    const client = withRows();
+    await renderApp(client);
+
+    await userEvent.press(await screen.findByText("卵も切れていたよ"));
+    await press("話者2");
+    await screen.findByText("話者2");
+
+    await userEvent.press(screen.getByText("卵も切れていたよ"));
+    await press("不明にする");
+
+    await screen.findByText("不明");
+  });
+
+  it("仮の話者が上限なら、新しい話者を出さない", async () => {
+    const client = new FakeEngineClient({
+      speakers: [...speakers, { id: "4", name: "話者3", kind: "provisional", utteranceCount: 0 }],
+      utterances: [utterance({ id: "10", text: "本文の行", speaker: "unknown" })],
+    });
+    await renderApp(client);
+
+    await userEvent.press(await screen.findByText("本文の行"));
+    await screen.findByText("この発話の話者を直す");
+
+    expect(screen.queryByRole("button", { name: "他の話者(新しく作る)" })).toBeNull();
+  });
+
+  it("話者の画面で統合すると、発話が移り、話者が減る", async () => {
+    const client = withRows();
+    await renderApp(client);
+    await press("話者");
+    await screen.findByText("話者1(1 件)");
+
+    await press("話者1 を統合する");
+    await press("話者2 へ");
+    await screen.findByText(/取り消せません/);
+    await press("統合する");
+
+    await screen.findByText("話者2(1 件)");
+    expect(screen.queryByText(/^話者1\(/)).toBeNull();
+  });
+
+  it("自分は統合元に出さない", async () => {
+    await renderApp(withRows());
+    await press("話者");
+    await screen.findByText("話者1(1 件)");
+
+    expect(screen.queryByRole("button", { name: "自分 を統合する" })).toBeNull();
+  });
+
+  it("名前を付けられる", async () => {
+    const client = withRows();
+    await renderApp(client);
+    await press("話者");
+
+    await userEvent.press(await screen.findByRole("button", { name: "話者1 の名前を変える" }));
+    const field = await screen.findByLabelText("話者1 の名前");
+    await userEvent.clear(field);
+    await userEvent.type(field, "母");
+    await press("名前を保存する");
+
+    await screen.findByText("母(1 件)");
+    expect((await client.listSpeakers()).find((item) => item.id === "2")?.kind).toBe("named");
+  });
+
+  it("登録済みでも声を登録し直せて、聞き取り中は押せない", async () => {
+    await renderApp(new FakeEngineClient({ speakers, listeningStatus: "listening" }));
+    await press("話者");
+
+    const button = await screen.findByRole("button", { name: "声を登録し直す" });
+
+    expect(button.props.accessibilityState?.disabled).toBe(true);
+  });
+
+  it("判定の記録を出す", async () => {
+    await renderApp(withRows());
+    await press("話者");
+
+    await screen.findByText("判定の記録(直近 7 日)");
+    screen.getByText(/判定 10 回: 自分 6 \/ 他の人 3 \/ 不明 1\(10%\)/);
   });
 });

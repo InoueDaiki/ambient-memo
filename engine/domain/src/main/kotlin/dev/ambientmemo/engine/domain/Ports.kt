@@ -60,6 +60,14 @@ interface UtteranceRepository {
 
     /** 開始時刻の新しい順に最大 [limit] 件を返す。同時刻は後から保存したものを先にする。 */
     suspend fun listRecent(limit: Int): List<Utterance>
+
+    suspend fun find(id: Long): Utterance?
+
+    /** 発話の話者を手で直す。[speakerId] が null なら不明にする。類似度は消す。発話がなければ false を返す。 */
+    suspend fun setSpeaker(id: Long, speakerId: Long?): Boolean
+
+    /** 話者ごとの発話の数を返す。発話のない話者は含まない。 */
+    suspend fun countBySpeaker(): Map<Long, Int>
 }
 
 interface CaptureGapRepository {
@@ -70,6 +78,7 @@ interface CaptureGapRepository {
 }
 
 /** 話者と特徴量の記録。特徴量は端末の中だけで使い、この境界の外へ渡さない。 */
+@Suppress("TooManyFunctions") // 話者の表の読み書きを 1 つの境界にまとめる
 interface SpeakerRepository {
     /** 話者を id の順に返す。 */
     suspend fun listSpeakers(): List<Speaker>
@@ -80,20 +89,64 @@ interface SpeakerRepository {
      */
     suspend fun listEmbeddings(modelVersion: String, limit: Int): List<StoredSpeakerEmbedding>
 
-    /** 自分の特徴量を置き換える。自分の話者がなければ作る。過去の発話の話者は変えない。 */
+    /**
+     * 自分の特徴量を置き換える。自分の話者がなければ作る。過去の発話の話者は変えない。
+     * 育てた自分の声はすべての版で消す。登録し直すのは、それが合わなくなったときなので。
+     */
     suspend fun saveSelfEmbedding(embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long): Speaker
 
-    /** 仮の話者を「話者N」の名前で作り、最初の特徴量を記録する。 */
-    suspend fun createProvisionalSpeaker(embedding: SpeakerEmbedding, nowMillis: Long): Speaker
+    /**
+     * 仮の話者を作り、最初の特徴量を記録する。名前は使われていない最小の番号の「話者N」にする。
+     * [voicedMillis] は最初の特徴量の発話の長さ。
+     */
+    suspend fun createProvisionalSpeaker(
+        embedding: SpeakerEmbedding,
+        nowMillis: Long,
+        voicedMillis: Long = 0,
+    ): Speaker
+
+    /** 特徴量のない仮の話者を作る。手で「別の話者」に直した発話の声が、もうメモリにないときに使う。 */
+    suspend fun createProvisionalSpeakerWithoutVoice(nowMillis: Long): Speaker
 
     /** 既存の話者の特徴量を置き換える。 */
-    suspend fun updateEmbedding(speakerId: Long, embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long)
+    suspend fun updateEmbedding(
+        speakerId: Long,
+        embedding: SpeakerEmbedding,
+        sampleCount: Int,
+        nowMillis: Long,
+        voicedMillis: Long = 0,
+    )
+
+    /**
+     * [merges] をすべて適用するか、何も適用しないかのどちらかで記録する。発話の話者を付け替え、統合元の話者を消す。
+     * 統合元がもういなければその 1 件を飛ばすので、同じものをもう一度渡しても壊れない。
+     * [renumberProvisional] なら、残った仮の話者の名前を id の順に「話者1」から付け直す。
+     */
+    suspend fun mergeSpeakers(merges: List<SpeakerMerge>, nowMillis: Long, renumberProvisional: Boolean = false)
+
+    /** 育てた自分の声を返す。[modelVersion] で育てたものだけを返す。 */
+    suspend fun findSelfAdaptation(modelVersion: String): SelfAdaptation?
+
+    suspend fun saveSelfAdaptation(adaptation: SelfAdaptation, nowMillis: Long)
 
     /** 手で付けた名前を記録する。推定で上書きされなくなる。話者がいなければ false を返す。 */
     suspend fun setManualName(speakerId: Long, name: String): Boolean
 
     /** 推定した名前を記録する。自分と、手で付けた名前は変えずに false を返す。 */
     suspend fun setInferredName(speakerId: Long, name: String): Boolean
+}
+
+/**
+ * 話者の判定の集計。端末の中だけで、次の調整に使う。類似度の分布の数だけを持ち、発話や特徴量には戻せない。
+ */
+interface SpeakerDecisionLog {
+    suspend fun record(samples: List<SpeakerDecisionSample>, nowMillis: Long)
+
+    /** [fromMillis] を含む日から今までの集計を返す。判定、類似度の帯の順に並ぶ。 */
+    suspend fun summarize(fromMillis: Long): List<SpeakerDecisionBucket>
+
+    /** [beforeMillis] より前の日の集計を消す。 */
+    suspend fun prune(beforeMillis: Long)
 }
 
 /** プロンプトから文章を生成する。出力の形式は保証しない。解析と検証は `domain` で行う。 */

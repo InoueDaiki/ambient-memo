@@ -8,6 +8,7 @@ import { useColorScheme } from "react-native";
 import { MemoDetailScreen } from "../memo/MemoDetailScreen.tsx";
 import { MemoListScreen } from "../memo/MemoListScreen.tsx";
 import { TodoListScreen } from "../memo/TodoListScreen.tsx";
+import { SpeakersScreen } from "../transcript/SpeakersScreen.tsx";
 import { TranscriptScreen } from "../transcript/TranscriptScreen.tsx";
 import type { RootStackParamList } from "./types.ts";
 
@@ -54,6 +55,7 @@ export function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="MemoDetail" component={MemoDetailScreen} />
+        <Stack.Screen name="Speakers" component={SpeakersScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

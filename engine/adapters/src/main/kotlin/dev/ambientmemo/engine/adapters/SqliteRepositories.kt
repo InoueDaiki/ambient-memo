@@ -55,6 +55,23 @@ class SqliteUtteranceRepository(
             .listRecent(limit.toLong(), ::toUtterance)
             .executeAsList()
     }
+
+    override suspend fun find(id: Long): Utterance? = withContext(ioContext) {
+        database.utteranceQueries.findById(id, ::toUtterance).executeAsOneOrNull()
+    }
+
+    override suspend fun setSpeaker(id: Long, speakerId: Long?): Boolean = withContext(ioContext) {
+        database.transactionWithResult {
+            database.utteranceQueries.setSpeaker(speakerId, id)
+            database.speakerQueries.changes().executeAsOne() > 0
+        }
+    }
+
+    override suspend fun countBySpeaker(): Map<Long, Int> = withContext(ioContext) {
+        database.utteranceQueries.countBySpeaker { speakerId, count -> checkNotNull(speakerId) to count.toInt() }
+            .executeAsList()
+            .toMap()
+    }
 }
 
 /** SQLDelight の行の順に受ける。読み出す場所はすべてここを通す。 */

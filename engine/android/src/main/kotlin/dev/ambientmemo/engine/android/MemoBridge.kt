@@ -4,6 +4,9 @@ import dev.ambientmemo.engine.domain.Clock
 import dev.ambientmemo.engine.domain.Memo
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.Speaker
+import dev.ambientmemo.engine.domain.SpeakerDiagnostics
+import dev.ambientmemo.engine.domain.SpeakerNameSource
+import dev.ambientmemo.engine.domain.SpeakerTarget
 import dev.ambientmemo.engine.domain.Todo
 import dev.ambientmemo.engine.domain.TodoCompletion
 import dev.ambientmemo.engine.domain.TodoExtraction
@@ -58,10 +61,60 @@ fun Utterance.toWire(speakers: Map<Long, Speaker>): WireObject {
             speaker.isSelf -> "self"
             else -> "other"
         },
+        "speakerId" to speaker?.id?.toString(),
         "speakerName" to speaker?.displayName,
         "startedAt" to startedAtMillis.toDouble(),
     )
 }
+
+/** 話者と発話の数。 */
+class SpeakerSummary(
+    val speaker: Speaker,
+    val utteranceCount: Int,
+)
+
+fun SpeakerSummary.toWire(): WireObject = mapOf(
+    "id" to speaker.id.toString(),
+    "name" to speaker.displayName,
+    "kind" to when {
+        speaker.isSelf -> "self"
+        speaker.nameSource == SpeakerNameSource.PROVISIONAL -> "provisional"
+        else -> "named"
+    },
+    "utteranceCount" to utteranceCount,
+)
+
+/** JS の指定を直す先にする。読めなければ null。 */
+fun parseSpeakerTarget(target: String): SpeakerTarget? = when (target) {
+    "self" -> SpeakerTarget.Self
+    "unknown" -> SpeakerTarget.Unknown
+    "new" -> SpeakerTarget.NewOther
+    else -> target.toLongOrNull()?.let(SpeakerTarget::Existing)
+}
+
+fun SpeakerDiagnostics.toWire(): WireObject = mapOf(
+    "days" to days,
+    "selfRuns" to selfRuns.toDouble(),
+    "otherRuns" to otherRuns.toDouble(),
+    "unknownRuns" to unknownRuns.toDouble(),
+    "selfSeconds" to (selfMillis / MILLIS_PER_SECOND).toDouble(),
+    "otherSeconds" to (otherMillis / MILLIS_PER_SECOND).toDouble(),
+    "unknownSeconds" to (unknownMillis / MILLIS_PER_SECOND).toDouble(),
+    "histogram" to histogram.map {
+        mapOf(
+            "floor" to it.floor.toDouble(),
+            "self" to it.selfRuns.toDouble(),
+            "other" to it.otherRuns.toDouble(),
+            "unknown" to it.unknownRuns.toDouble(),
+        )
+    },
+    "provisionalSpeakers" to provisionalSpeakers,
+    "hasAdaptedVoice" to hasAdaptedVoice,
+    "selfThreshold" to config.selfThreshold.toDouble(),
+    "unknownFloor" to config.unknownFloor.toDouble(),
+)
+
+private const val MILLIS_PER_SECOND = 1_000L
 
 private fun Memo.toWire(): WireObject = mapOf(
     "id" to id.toString(),

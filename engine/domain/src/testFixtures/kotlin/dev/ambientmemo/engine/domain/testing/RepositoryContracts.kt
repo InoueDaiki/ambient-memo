@@ -10,7 +10,14 @@ import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NewMemo
 import dev.ambientmemo.engine.domain.NewTodo
 import dev.ambientmemo.engine.domain.NewUtterance
+import dev.ambientmemo.engine.domain.MergedEmbedding
+import dev.ambientmemo.engine.domain.SelfAdaptation
+import dev.ambientmemo.engine.domain.SpeakerDecision
+import dev.ambientmemo.engine.domain.SpeakerDecisionBucket
+import dev.ambientmemo.engine.domain.SpeakerDecisionLog
+import dev.ambientmemo.engine.domain.SpeakerDecisionSample
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
+import dev.ambientmemo.engine.domain.SpeakerMerge
 import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerRepository
 import dev.ambientmemo.engine.domain.TodoCompletion
@@ -48,6 +55,31 @@ abstract class UtteranceRepositoryContract {
         assertEquals(new.confidence, saved.confidence)
         assertEquals(new.createdAtMillis, saved.createdAtMillis)
         assertEquals(listOf(saved), repository.listOverlapping(0, 10_000))
+    }
+
+    @Test
+    fun `発話の話者を直すと類似度は消え、ない発話は false を返す`() = runTest {
+        val repository = repository()
+        val saved = repository.insert(NewUtterance(0, 100, "本文", null, 100, speakerId = 7, speakerConfidence = 0.625))
+
+        assertTrue(repository.setSpeaker(saved.id, 8))
+        assertEquals(8L, repository.find(saved.id)?.speakerId)
+        assertNull(repository.find(saved.id)?.speakerConfidence)
+
+        assertTrue(repository.setSpeaker(saved.id, null))
+        assertNull(repository.find(saved.id)?.speakerId)
+        assertFalse(repository.setSpeaker(saved.id + 1, 8))
+        assertNull(repository.find(saved.id + 1))
+    }
+
+    @Test
+    fun `話者ごとの発話の数を返す`() = runTest {
+        val repository = repository()
+        listOf(7L, 7L, 8L, null).forEach {
+            repository.insert(NewUtterance(0, 100, "本文", null, 100, speakerId = it, speakerConfidence = null))
+        }
+
+        assertEquals(mapOf(7L to 2, 8L to 1), repository.countBySpeaker())
     }
 
     @Test
@@ -144,6 +176,64 @@ abstract class UtteranceRepositoryContract {
 }
 
 /** [CaptureGapRepository] の Fake と本物の両方に流す契約テスト。 */
+/** [SpeakerDecisionLog] の Fake と本物の両方に流す契約テスト。 */
+abstract class SpeakerDecisionLogContract {
+    protected abstract fun log(): SpeakerDecisionLog
+
+    private val day = 86_400_000L
+
+    @Test
+    fun `判定と帯ごとに回数と長さを足す`() = runTest {
+        val log = log()
+
+        log.record(
+            listOf(
+                SpeakerDecisionSample(SpeakerDecision.SELF, 0.62f, 1_000),
+                SpeakerDecisionSample(SpeakerDecision.SELF, 0.64f, 2_000),
+                SpeakerDecisionSample(SpeakerDecision.OTHER, 0.1f, 500),
+            ),
+            10 * day,
+        )
+        log.record(listOf(SpeakerDecisionSample(SpeakerDecision.SELF, 0.61f, 3_000)), 11 * day)
+
+        assertEquals(
+            listOf(
+                SpeakerDecisionBucket(SpeakerDecision.OTHER, 2, 1, 500),
+                SpeakerDecisionBucket(SpeakerDecision.SELF, 12, 3, 6_000),
+            ),
+            log.summarize(10 * day + 5),
+        )
+    }
+
+    @Test
+    fun `範囲より前の日は数えず、消せる`() = runTest {
+        val log = log()
+        log.record(listOf(SpeakerDecisionSample(SpeakerDecision.UNKNOWN, 0.45f, 1_000)), 3 * day)
+        log.record(listOf(SpeakerDecisionSample(SpeakerDecision.UNKNOWN, 0.45f, 2_000)), 9 * day)
+
+        assertEquals(1L, log.summarize(5 * day).single().runs)
+
+        log.prune(5 * day)
+
+        assertEquals(1L, log.summarize(0).single().runs)
+    }
+
+    @Test
+    fun `範囲の外の類似度も帯に収める`() = runTest {
+        val log = log()
+
+        log.record(
+            listOf(
+                SpeakerDecisionSample(SpeakerDecision.OTHER, -0.3f, 1),
+                SpeakerDecisionSample(SpeakerDecision.SELF, 1f, 1),
+            ),
+            day,
+        )
+
+        assertEquals(listOf(0, 19), log.summarize(0).map { it.bucket })
+    }
+}
+
 /** [SpeakerRepository] の Fake と本物の両方に流す契約テスト。 */
 @Suppress("TooManyFunctions") // 契約の項目を 1 つずつテストにしている
 abstract class SpeakerRepositoryContract {
@@ -188,6 +278,100 @@ abstract class SpeakerRepositoryContract {
         assertEquals(before.id, after.id)
         assertEquals(1, repository.listSpeakers().size)
         assertArrayEquals(second.vector, repository.listEmbeddings(model, 10).single().vector)
+    }
+
+    @Test
+    fun `育てた声は版ごとに読めて、登録し直すと消える`() = runTest {
+        val repository = repository()
+        repository.saveSelfEmbedding(first, 3, 100)
+
+        repository.saveSelfAdaptation(SelfAdaptation(second.vector, 5_000, model), 200)
+
+        val saved = checkNotNull(repository.findSelfAdaptation(model))
+        assertArrayEquals(second.vector, saved.vector)
+        assertEquals(5_000L, saved.voicedMillis)
+        assertNull(repository.findSelfAdaptation("model-2"))
+
+        repository.saveSelfEmbedding(second, 3, 300)
+
+        assertNull(repository.findSelfAdaptation(model))
+    }
+
+    @Test
+    fun `仮の話者の名前は使われていない最小の番号にする`() = runTest {
+        val repository = repository()
+        val firstSpeaker = repository.createProvisionalSpeaker(first, 100)
+        val secondSpeaker = repository.createProvisionalSpeaker(first, 100)
+        repository.createProvisionalSpeaker(first, 100)
+
+        repository.mergeSpeakers(listOf(SpeakerMerge(secondSpeaker.id, firstSpeaker.id, null)), 200)
+
+        assertEquals("話者2", repository.createProvisionalSpeaker(first, 300).displayName)
+    }
+
+    @Test
+    fun `特徴量のない仮の話者を作れる`() = runTest {
+        val repository = repository()
+
+        val speaker = repository.createProvisionalSpeakerWithoutVoice(100)
+
+        assertEquals("話者1", speaker.displayName)
+        assertTrue(repository.listEmbeddings(model, 10).isEmpty())
+    }
+
+    @Test
+    fun `統合すると統合元と特徴量が消え、統合先の特徴量が変わる`() = runTest {
+        val repository = repository()
+        val into = repository.createProvisionalSpeaker(first, 100, 1_000)
+        val from = repository.createProvisionalSpeaker(second, 100, 2_000)
+        val merged = MergedEmbedding(SpeakerEmbedding(second.vector, model), 2, 3_000)
+
+        repository.mergeSpeakers(listOf(SpeakerMerge(from.id, into.id, merged)), 200)
+
+        assertEquals(listOf(into.id), repository.listSpeakers().map { it.id })
+        val stored = repository.listEmbeddings(model, 10).single()
+        assertEquals(into.id, stored.speakerId)
+        assertEquals(2, stored.sampleCount)
+        assertEquals(3_000L, stored.voicedMillis)
+        assertEquals(200L, stored.updatedAtMillis)
+    }
+
+    @Test
+    fun `自分は統合元にならず、いない統合元は飛ばす`() = runTest {
+        val repository = repository()
+        val self = repository.saveSelfEmbedding(first, 3, 100)
+        val other = repository.createProvisionalSpeaker(second, 100)
+
+        repository.mergeSpeakers(
+            listOf(SpeakerMerge(self.id, other.id, null), SpeakerMerge(self.id + 99, other.id, null)),
+            200,
+        )
+
+        assertEquals(2, repository.listSpeakers().size)
+    }
+
+    @Test
+    fun `振り直すと仮の話者だけを id の順に番号を付ける`() = runTest {
+        val repository = repository()
+        val speakers = List(4) { repository.createProvisionalSpeaker(first, 100) }
+        repository.setManualName(speakers[1].id, "話者1")
+
+        repository.mergeSpeakers(listOf(SpeakerMerge(speakers[2].id, speakers[0].id, null)), 200, true)
+
+        assertEquals(listOf("話者2", "話者1", "話者3"), repository.listSpeakers().map { it.displayName })
+    }
+
+    @Test
+    fun `特徴量に長さと名前の由来と更新時刻が付く`() = runTest {
+        val repository = repository()
+        val speaker = repository.createProvisionalSpeaker(first, 100, 2_500)
+
+        val stored = repository.listEmbeddings(model, 10).single()
+
+        assertEquals(speaker.id, stored.speakerId)
+        assertEquals(2_500L, stored.voicedMillis)
+        assertEquals(SpeakerNameSource.PROVISIONAL, stored.nameSource)
+        assertEquals(100L, stored.updatedAtMillis)
     }
 
     @Test

@@ -13,17 +13,39 @@ CREATE UNIQUE INDEX speaker_self ON speaker (is_self) WHERE is_self = 1;
 
 -- 話者の特徴量。vector はリトルエンディアンの 32 ビット浮動小数の列で、長さ 1 に正規化してある
 -- 端末の中だけで使う。モデルが変わると比べられないので、版ごとに持つ
+-- voiced_ms は重心に入れた発話の長さの合計で、重み付けに使う
 CREATE TABLE speaker_embedding (
   speaker_id INTEGER NOT NULL REFERENCES speaker (id),
   model_version TEXT NOT NULL,
   vector BLOB NOT NULL,
   sample_count INTEGER NOT NULL,
   updated_at_ms INTEGER NOT NULL,
+  voiced_ms INTEGER NOT NULL DEFAULT 0,
   PRIMARY KEY (speaker_id, model_version),
   CHECK (sample_count > 0)
 );
 
 CREATE INDEX speaker_embedding_recent ON speaker_embedding (model_version, updated_at_ms);
+
+-- 聞き取りの音声で育てた自分の声。登録の特徴量は上書きせず、別に持つ。登録し直すと消す
+CREATE TABLE self_voice_adaptation (
+  model_version TEXT NOT NULL PRIMARY KEY,
+  vector BLOB NOT NULL,
+  voiced_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  CHECK (voiced_ms > 0)
+);
+
+-- 話者の判定の日ごとの集計。端末の中で次の調整に使う。発話や特徴量には戻せない
+-- bucket は自分との類似度を 0.05 刻みにした番号。day_ms は UTC の日の始まり
+CREATE TABLE speaker_decision_stat (
+  day_ms INTEGER NOT NULL,
+  decision TEXT NOT NULL,
+  bucket INTEGER NOT NULL,
+  runs INTEGER NOT NULL,
+  voiced_ms INTEGER NOT NULL,
+  PRIMARY KEY (day_ms, decision, bucket)
+);
 
 insert:
 INSERT INTO speaker (display_name, name_source, is_self, created_at_ms)
@@ -42,10 +64,9 @@ SELECT *
 FROM speaker
 WHERE is_self = 1;
 
-countOthers:
-SELECT count(*)
-FROM speaker
-WHERE is_self = 0;
+listDisplayNames:
+SELECT display_name
+FROM speaker;
 
 setManualName:
 UPDATE speaker
@@ -57,17 +78,64 @@ UPDATE speaker
 SET display_name = :displayName, name_source = :nameSource
 WHERE id = :id AND is_self = 0 AND name_source IN :replaceable;
 
+setProvisionalName:
+UPDATE speaker
+SET display_name = :displayName
+WHERE id = :id AND name_source = :nameSource;
+
+deleteOther:
+DELETE FROM speaker
+WHERE id = :id AND is_self = 0;
+
 changes:
 SELECT changes();
 
 saveEmbedding:
-INSERT OR REPLACE INTO speaker_embedding (speaker_id, model_version, vector, sample_count, updated_at_ms)
-VALUES (?, ?, ?, ?, ?);
+INSERT OR REPLACE INTO speaker_embedding (speaker_id, model_version, vector, sample_count, updated_at_ms, voiced_ms)
+VALUES (?, ?, ?, ?, ?, ?);
+
+deleteEmbeddings:
+DELETE FROM speaker_embedding
+WHERE speaker_id = :speakerId;
 
 listEmbeddings:
-SELECT speaker_embedding.speaker_id, speaker.is_self, speaker_embedding.vector, speaker_embedding.sample_count
+SELECT speaker_embedding.speaker_id, speaker.is_self, speaker.name_source, speaker_embedding.vector,
+  speaker_embedding.sample_count, speaker_embedding.voiced_ms, speaker_embedding.updated_at_ms
 FROM speaker_embedding
 JOIN speaker ON speaker.id = speaker_embedding.speaker_id
 WHERE speaker_embedding.model_version = :modelVersion
 ORDER BY speaker.is_self DESC, speaker_embedding.updated_at_ms DESC, speaker_embedding.speaker_id DESC
 LIMIT :limit;
+
+findAdaptation:
+SELECT vector, voiced_ms
+FROM self_voice_adaptation
+WHERE model_version = :modelVersion;
+
+saveAdaptation:
+INSERT OR REPLACE INTO self_voice_adaptation (model_version, vector, voiced_ms, updated_at_ms)
+VALUES (?, ?, ?, ?);
+
+deleteAdaptations:
+DELETE FROM self_voice_adaptation;
+
+-- Android 7 の SQLite には UPSERT がないので、行を用意してから足す
+ensureDecisionStat:
+INSERT OR IGNORE INTO speaker_decision_stat (day_ms, decision, bucket, runs, voiced_ms)
+VALUES (:dayMs, :decision, :bucket, 0, 0);
+
+addDecisionStat:
+UPDATE speaker_decision_stat
+SET runs = runs + 1, voiced_ms = voiced_ms + :voicedMs
+WHERE day_ms = :dayMs AND decision = :decision AND bucket = :bucket;
+
+listDecisionStats:
+SELECT decision, bucket, SUM(runs) AS runs, SUM(voiced_ms) AS voiced_ms
+FROM speaker_decision_stat
+WHERE day_ms >= :fromDayMs
+GROUP BY decision, bucket
+ORDER BY decision, bucket;
+
+deleteDecisionStatsBefore:
+DELETE FROM speaker_decision_stat
+WHERE day_ms < :dayMs;

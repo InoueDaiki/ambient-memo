@@ -8,7 +8,10 @@ import type {
 } from "@ambient-memo/engine-client";
 
 // ネイティブの null は、名前がないことを表す
-export type NativeUtterance = Omit<Utterance, "speakerName"> & { speakerName: string | null };
+export type NativeUtterance = Omit<Utterance, "speakerId" | "speakerName"> & {
+  speakerId?: string | null;
+  speakerName: string | null;
+};
 
 export type NativeMemoDetail = Omit<MemoDetail, "utterances"> & { utterances: NativeUtterance[] };
 
@@ -23,8 +26,12 @@ export interface MemoNativeModule {
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): { remove(): void };
 }
 
-export function toUtterance({ speakerName, ...rest }: NativeUtterance): Utterance {
-  return speakerName === null ? rest : { ...rest, speakerName };
+export function toUtterance({ speakerId, speakerName, ...rest }: NativeUtterance): Utterance {
+  return {
+    ...rest,
+    ...(speakerId != null && { speakerId }),
+    ...(speakerName !== null && { speakerName }),
+  };
 }
 
 function toMemoDetail({ utterances, ...rest }: NativeMemoDetail): MemoDetail {
