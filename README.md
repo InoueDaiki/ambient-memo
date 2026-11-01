@@ -4,7 +4,7 @@
 
 クラウドに頼らないエッジ完結の構成を試すことも、このプロジェクトの目的の1つ。
 
-> 状態: 発話の検知、文字起こし、保存、一覧まで本物のモデルでつながった。モデルは画面の操作でアプリが取得する(約 743 MB。Debug は `mise run models:fetch`、`mise run models:push` でも入れられる)。決定事項は [docs/設計メモ.md](docs/設計メモ.md) を参照。
+> 状態: 発話の検知、文字起こし、話者識別、保存、メモの整理、ToDo の抽出、一覧まで本物のモデルでつながり、エミュレーターで確かめた。Pixel の実機と実際の声は未確認で、質問応答はまだない。モデルは画面の操作でアプリが取得する(文字起こしは約 743 MB、話者は約 29 MB、整理は約 3.66 GB。文字起こしは Debug なら `mise run models:fetch`、`mise run models:push` でも入れられる)。決定事項は [docs/設計メモ.md](docs/設計メモ.md) を参照。
 
 ## やりたいこと
 
@@ -44,7 +44,7 @@ flowchart LR
 | アプリ | React Native(Expo) | 決定 |
 | エンジン | 音声処理とビジネスロジックを Kotlin に置く。RN は画面だけを担当 | 決定 |
 | テスト | 結合テストを中心にしたテスティングトロフィーと、品質評価、実機指標 | 決定 |
-| CI / 配布 | GitHub Actions。タグで署名済み APK を GitHub Releases に置く | 決定 |
+| CI / 配布 | GitHub Actions。タグで署名済み APK を Actions の artifact に置く | 決定 |
 | モノレポ | pnpm workspace | 決定 |
 | ツール管理 | mise | 決定 |
 | デザイン | デザイントークンと UI 部品を別パッケージに分ける | 決定 |
@@ -70,10 +70,11 @@ packages/
   engine-client/          エンジンの TS 型、hooks、Fake 実装
 engine/                   Kotlin(Gradle のマルチモジュール)
   domain/                 ビジネスロジック。Android に依存しない
-  adapters/               sherpa-onnx、LLM、DB、マイクの実装
+  adapters*/              sherpa-onnx、LLM、DB、マイクの実装
   android/                Service、WorkManager、通知、receiver
 modules/engine-bridge/    Expo Module。RN と Kotlin をつなぐ
-tools/eval/               公開データでの精度評価
+tools/spike-asr/          ASR、VAD、話者識別の検証(公開データ)
+tools/spike-llm/          ローカル LLM の検証(架空の評価セット)
 docs/                     設計メモ、テスト戦略
 ```
 
@@ -107,11 +108,19 @@ Android SDK は Android Studio が入れたものを使う。`~/Library/Android/
 
 | きっかけ | アプリ ID | 版 | 置き場所 |
 |---|---|---|---|
-| `v1.2.3` のタグを push | `dev.ambientmemo.app` | `1.2.3` | GitHub Releases |
-| Release のワークフローを `workflow_dispatch` で実行 | `dev.ambientmemo.app.dev` | `0.0.0-dev.<実行番号>` | GitHub Releases のプレリリース(`dev-<実行番号>`) |
+| `v1.2.3` のタグを push | `dev.ambientmemo.app` | `1.2.3` | Actions の artifact |
+| Release のワークフローを `workflow_dispatch` で実行 | `dev.ambientmemo.app.dev` | `0.0.0-dev.<実行番号>` | Actions の artifact |
 | 手元のビルド | `dev.ambientmemo.app.dev` | `0.1.0` | なし |
 
 `versionCode` は Release のワークフローの実行番号を使う。ワークフローのファイル名を変えると番号が振り直されるので変えない。
+
+APK は Release のワークフローの実行ごとに、zip せず `ambient-memo-<版>-arm64.apk` として置く。保持は 90 日で、過ぎると消える。
+
+取得には GitHub へのログインが要る。スマホでは次の手順で受け取る。
+
+1. ブラウザで GitHub にログインする
+2. リポジトリの Actions から Release のワークフローを開き、成功した実行を選ぶ
+3. ページの Artifacts にある APK を押してダウンロードし、開いてインストールする(初回は、ブラウザに提供元不明のアプリの許可が要る)
 
 ### 署名鍵
 
@@ -157,3 +166,20 @@ gh secret set ANDROID_KEY_PASSWORD
 - 文字起こし、メモ、話者の特徴量を端末の外へ送らない
 - 通信はモデルの取得だけに使い、利用者の操作でだけ始める。モデルが確定したら、アプリの INTERNET 権限を外す
 - 自分用の端末で使い、ストアでは公開しない
+
+## このアプリを動かす人へ
+
+常時マイクは、自分以外の声も文字にする。動かす前に次の点を考える。以下は法的な助言ではない。録音の扱いは国や地域、場面によって違うので、必要なら専門家に確かめる。
+
+- **周囲の人に知らせる。** 同席する人や同居する人には、聞き取っていることを伝える。止めてほしいと言われたら止める。
+- **自分が参加していない会話に注意する。** 隣の席や家族の会話も拾う。音声を捨てても文字起こしは残り、第三者の発言の記録になる。参加していない会話の録音は、自分が当事者の会話の録音よりリスクが大きいと考える。当事者の録音でも、常に問題がないとは言えない。
+- **職場や学校の規程を確かめる。** 自分の端末でも、録音を禁じる規程に触れることがある。
+- **国や地域の法律を確かめる。** 会話の全当事者の同意を求める国や地域がある(米国の一部の州など)。旅行や出張の間は止めるほうが安全。
+- **話者の特徴量は機微な情報。** 声の特徴は、生体情報や個人情報として扱われることがある。端末の外には送らないが、周囲の人の特徴量を、本人が知らないまま端末に保存することになり得る。
+- **誤りがある。** 話者を取り違えることがあり(合成会話の検証では、他人を「自分」と誤る率が約 30%)、文字起こしにも誤りがある。メモや ToDo を、そのまま事実や発言の証拠として扱わない。
+
+## ライセンス
+
+All rights reserved. このリポジトリを公開しているのはソースコードを読めるようにするためで、使用、複製、改変、再配布などの再利用は許諾しない。
+
+第三者のモデル、データ、依存関係は、それぞれのライセンスに従う。これらはこのリポジトリに含めず、取得して使う(Gradle Wrapper の jar を除く)。

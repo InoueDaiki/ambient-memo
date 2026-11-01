@@ -292,9 +292,9 @@ abstract class SpeakerRepositoryContract {
         repository.setInferredName(speaker.id, "田中")
 
         assertTrue(repository.setManualName(speaker.id, "母"))
-        assertTrue(repository.setManualName(self.id, "大樹"))
+        assertTrue(repository.setManualName(self.id, "陽菜"))
 
-        assertEquals(listOf("大樹", "母"), repository.listSpeakers().map { it.displayName })
+        assertEquals(listOf("陽菜", "母"), repository.listSpeakers().map { it.displayName })
         assertTrue(repository.listSpeakers().first().isSelf)
     }
 

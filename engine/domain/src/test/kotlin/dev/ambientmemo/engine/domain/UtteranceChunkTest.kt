@@ -48,7 +48,7 @@ class UtteranceChunkTest {
 
     @Test
     fun `自分の名前を変えてもラベルは「自分」のまま`() {
-        val labels = SpeakerLabels(listOf(speaker(1, "大樹", isSelf = true, source = SpeakerNameSource.MANUAL)))
+        val labels = SpeakerLabels(listOf(speaker(1, "陽菜", isSelf = true, source = SpeakerNameSource.MANUAL)))
 
         assertEquals("[09:00] 自分: はい", utterance(1, 0, text = "はい", speakerId = 1).toTranscriptLine(tokyo, labels))
     }

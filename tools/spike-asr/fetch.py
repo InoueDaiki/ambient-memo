@@ -66,6 +66,7 @@ ESC50 = "https://github.com/karoldvl/ESC-50/archive/master.zip"
 JVM = ["sherpa-onnx-jvm-2.0.1.jar", "sherpa-onnx-native-lib-osx-aarch64-2.0.1.jar", "sherpa-onnx-2.0.1.aar"]
 ZENODO = "https://zenodo.org/api/records/1227121/files"
 
+# JVS を使う前に、著者のページの利用規約を読むこと。
 # JVS は著者のページ
 # https://sites.google.com/site/shinnosuketakamichi/research-topics/jvs_corpus
 # の公開リンク。ログインと規約への同意は不要(大きいファイルに出るウイルススキャン不可の確認だけ通す)
