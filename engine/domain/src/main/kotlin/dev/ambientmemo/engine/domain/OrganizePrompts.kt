@@ -5,6 +5,7 @@ package dev.ambientmemo.engine.domain
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
  * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
+ * タイトルのプロンプトだけは評価していない。
  */
 internal object OrganizePrompts {
     /** 日付の表の日数。今日を含む。 */
@@ -12,6 +13,7 @@ internal object OrganizePrompts {
 
     private const val WEEKDAYS = "月火水木金土日"
     private const val MAX_OUTPUT_TOKENS = 400
+    private const val MAX_TITLE_OUTPUT_TOKENS = 48
 
     private const val SYSTEM = "あなたは個人用メモアプリの整理係です。" +
         "入力は音声の自動文字起こしで、誤変換、言いよどみ、話者ラベルの誤りが含まれます。" +
@@ -35,6 +37,22 @@ internal object OrganizePrompts {
         |文字起こし:
         |
         """.trimMargin() + transcript.trim(),
+    )
+
+    /** 文字起こしより短くて誤りの少ない要約から作る。 */
+    fun title(summary: String) = LlmRequest(
+        SYSTEM,
+        """
+        |次のメモに、一覧で見分けるためのタイトルを付けてください。
+        |
+        |- 話題が分かる日本語の短い名詞句で、20文字以内
+        |- 日付や曜日だけのタイトルにしない
+        |- タイトルだけを1行で出力する。記号や説明は付けない
+        |
+        |メモ:
+        |
+        """.trimMargin() + summary.trim(),
+        MAX_TITLE_OUTPUT_TOKENS,
     )
 
     fun todo(date: CalendarDate, transcript: String) = request(

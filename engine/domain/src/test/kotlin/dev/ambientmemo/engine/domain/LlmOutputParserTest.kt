@@ -13,6 +13,18 @@ class LlmOutputParserTest {
     private val raw = RawTodo("牛乳を買う", "todo", "2026-11-02")
 
     @Test
+    fun `タイトルの飾りを外して最初の行を読む`() {
+        assertEquals("週末の買い物", parseTitle("タイトル: 「週末の買い物」\n説明です"))
+        assertEquals("歯医者の予約", parseTitle("- 歯医者の予約"))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["", "   ", "2026年11月1日(日曜日)", "11月1日", "2026-11-01"])
+    fun `空や日付だけのタイトルは読まない`(text: String) {
+        assertNull(parseTitle(text))
+    }
+
+    @Test
     fun `素直な JSON を読む`() {
         assertEquals(ParsedTodos(listOf(raw), isComplete = true), parseTodos("""{"items": [$item]}"""))
     }

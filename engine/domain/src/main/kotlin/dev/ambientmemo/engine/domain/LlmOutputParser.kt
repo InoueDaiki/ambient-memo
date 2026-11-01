@@ -24,7 +24,7 @@ internal data class ParsedTodos(
 
 private val THINK_BLOCK = Regex("""<think>.*?(</think>|\z)""", RegexOption.DOT_MATCHES_ALL)
 private val CODE_FENCE_LINE = Regex("""^\s*```.*$""", RegexOption.MULTILINE)
-private val BULLET = Regex("""^\s*[-*・]\s*""")
+internal val BULLET = Regex("""^\s*[-*・]\s*""")
 private val JSON_START = charArrayOf('{', '[')
 private const val ITEMS_KEY = "items"
 
@@ -34,7 +34,7 @@ private val lenientJson = Json {
     allowTrailingComma = true
 }
 
-private fun String.withoutWrapping(): String = replace(THINK_BLOCK, "").replace(CODE_FENCE_LINE, "").trim()
+internal fun String.withoutWrapping(): String = replace(THINK_BLOCK, "").replace(CODE_FENCE_LINE, "").trim()
 
 /** 箇条書きの要約を整える。前置きは捨て、行頭は「- 」に揃える。読めるものがなければ null。 */
 internal fun parseSummary(text: String): String? {

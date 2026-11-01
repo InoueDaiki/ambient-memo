@@ -21,6 +21,7 @@ import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.organizeBacklog
 import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.FakeLlm
+import dev.ambientmemo.engine.domain.testing.isTitleRequest
 import dev.ambientmemo.engine.domain.testing.isTodoRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -103,7 +104,11 @@ class OrganizeJobIntegrationTest {
     fun `発話からメモと ToDo と根拠を作り、発話を処理済みにする`() = withDatabase { db ->
         val first = db.say(evening, "歯医者の予約、あさっての十時に取れたって")
         val second = db.say(evening + minute, "よかったね")
-        val llm = FakeLlm.organizing(summary = "歯医者の予約です\n- 歯医者はあさって十時\n- 保険証を持っていく", todos = todoJson)
+        val llm = FakeLlm.organizing(
+            summary = "歯医者の予約です\n- 歯医者はあさって十時\n- 保険証を持っていく",
+            todos = todoJson,
+            title = "歯医者の予約",
+        )
 
         val result = db.job(llm).run()
 
@@ -111,7 +116,7 @@ class OrganizeJobIntegrationTest {
         assertEquals(1, result.memoCount)
         assertEquals(1, result.todoCount)
         val memo = db.memos.listMemos().single()
-        assertEquals("歯医者はあさって十時", memo.title)
+        assertEquals("歯医者の予約", memo.title)
         assertEquals("- 歯医者はあさって十時\n- 保険証を持っていく", memo.summary)
         assertEquals(TodoExtraction.COMPLETE, memo.todoExtraction)
         assertEquals("fake-1", memo.modelVersion)
@@ -128,6 +133,26 @@ class OrganizeJobIntegrationTest {
     }
 
     @Test
+    fun `タイトルは要約の1行目ではなく別に作る`() = withDatabase { db ->
+        db.say(0, "週末に買い物へ行こう")
+        val llm = FakeLlm.organizing(summary = "- 2026年11月1日(日曜日)\n- 週末に買い物へ行く", title = "週末の買い物")
+
+        db.job(llm).run()
+
+        assertEquals("週末の買い物", db.memos.listMemos().single().title)
+    }
+
+    @Test
+    fun `タイトルが日付だけなら、日付でない要約の行で代わりにする`() = withDatabase { db ->
+        db.say(0, "週末に買い物へ行こう")
+        val llm = FakeLlm.organizing(summary = "- 2026年11月1日(日曜日)\n- 週末に買い物へ行く", title = "11月1日")
+
+        db.job(llm).run()
+
+        assertEquals("週末に買い物へ行く", db.memos.listMemos().single().title)
+    }
+
+    @Test
     fun `プロンプトの今日は実行日ではなく話した日で、文字起こしは端末の時刻になる`() = withDatabase { db ->
         db.say(evening, "明日までに請求書を送る")
         db.clock.advanceBy(3 * 24 * hour)
@@ -135,8 +160,8 @@ class OrganizeJobIntegrationTest {
 
         db.job(llm).run()
 
-        assertEquals(2, llm.received.size)
-        llm.received.forEach { request ->
+        assertEquals(3, llm.received.size)
+        llm.received.filterNot { it.isTitleRequest }.forEach { request ->
             assertTrue("今日は 2026-11-02(月曜日) です" in request.user)
             assertTrue(request.user.endsWith("[18:00] 明日までに請求書を送る"))
         }
@@ -164,7 +189,7 @@ class OrganizeJobIntegrationTest {
         assertEquals(3, result.memoCount)
         val memos = db.memos.listMemos()
         assertEquals(conversations, memos.map { db.memos.listUtteranceIds(it.id) })
-        assertEquals(6, llm.received.size)
+        assertEquals(9, llm.received.size)
     }
 
     @Test
@@ -285,7 +310,7 @@ class OrganizeJobIntegrationTest {
         var isBroken = false
         var calls = 0
         val llm = FakeLlm { _, request ->
-            if (++calls == 3) isBroken = true
+            if (++calls == 4) isBroken = true
             if (isBroken) throw IOException("メモリ不足")
             if (request.isTodoRequest) todoJson else "- 要約"
         }
@@ -648,8 +673,8 @@ class OrganizeJobIntegrationTest {
             harness.job(llm).run()
 
             val expected = "[18:00] 話者1: 請求書、明日までに送ってくれる?\n[18:01] 自分: はい、送ります。\n[18:02] うん"
-            assertEquals(2, llm.received.size)
-            llm.received.forEach { assertTrue(it.user.endsWith(expected), it.user) }
+            assertEquals(3, llm.received.size)
+            llm.received.filterNot { it.isTitleRequest }.forEach { assertTrue(it.user.endsWith(expected), it.user) }
         }
     }
 
