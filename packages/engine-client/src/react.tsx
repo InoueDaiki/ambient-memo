@@ -16,6 +16,7 @@ import {
   type OrganizerModelStatus,
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
+  type DiagnosticsStatus,
   type SpeakerDiagnostics,
   type SpeakerInfo,
   type SpeakerTarget,
@@ -520,6 +521,60 @@ export function useSpeakerDiagnostics(): SpeakerDiagnostics | undefined {
   }, [client]);
 
   return diagnostics;
+}
+
+export interface UseDiagnosticsResult {
+  status: DiagnosticsStatus | undefined;
+  isPending: boolean;
+  hasFailed: boolean;
+  start: () => Promise<void>;
+  stop: () => Promise<void>;
+  clear: () => Promise<void>;
+  share: () => Promise<void>;
+}
+
+// 記録の状態は操作のたびに返るので、イベントは流さない
+export function useDiagnostics(): UseDiagnosticsResult {
+  const client = useEngineClient();
+  const [status, setStatus] = useState<DiagnosticsStatus>();
+  const [isPending, setIsPending] = useState(false);
+  const [hasFailed, setHasFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    client
+      .getDiagnosticsStatus()
+      .then((current) => {
+        if (active) setStatus(current);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client]);
+
+  const run = useCallback(async (action: () => Promise<DiagnosticsStatus | void>) => {
+    setIsPending(true);
+    setHasFailed(false);
+    try {
+      const next = await action();
+      if (next !== undefined) setStatus(next);
+    } catch {
+      setHasFailed(true);
+    } finally {
+      setIsPending(false);
+    }
+  }, []);
+
+  return {
+    status,
+    isPending,
+    hasFailed,
+    start: useCallback(() => run(() => client.startDiagnostics()), [client, run]),
+    stop: useCallback(() => run(() => client.stopDiagnostics()), [client, run]),
+    clear: useCallback(() => run(() => client.clearDiagnostics()), [client, run]),
+    share: useCallback(() => run(() => client.shareDiagnostics()), [client, run]),
+  };
 }
 
 const MemoClientContext = createContext<MemoEngineClient | undefined>(undefined);

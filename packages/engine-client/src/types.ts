@@ -64,7 +64,7 @@ export interface SpeakerScoreBand {
   unknown: number;
 }
 
-// 端末の中で話者の判定を確かめる値。音声も特徴量も含まず、端末の外へ出さない
+// 端末の中で話者の判定を確かめる値。音声も特徴量も含まない
 export interface SpeakerDiagnostics {
   days: number;
   selfRuns: number;
@@ -78,6 +78,17 @@ export interface SpeakerDiagnostics {
   hasAdaptedVoice: boolean;
   selfThreshold: number;
   unknownFloor: number;
+}
+
+// 実機の確認のための記録。数値だけを持ち、発話の本文や音声は含まない
+// - endsAt: 記録が止まる時刻。止めたときは止めた時刻。startedAt と一緒に、記録がないときはない
+// - isFull: 大きさの上限に達して、新しい記録を残していない
+export interface DiagnosticsStatus {
+  isRecording: boolean;
+  startedAt?: number;
+  endsAt?: number;
+  sizeBytes: number;
+  isFull: boolean;
 }
 
 export interface EnginePermissions {
@@ -219,6 +230,13 @@ export interface TranscriptEngineClient extends EngineClient {
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   // 直近の話者の判定の集計を返す
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
+  getDiagnosticsStatus(): Promise<DiagnosticsStatus>;
+  // 前の記録を消して始める。止めなくても 7 日で止まる
+  startDiagnostics(): Promise<DiagnosticsStatus>;
+  stopDiagnostics(): Promise<DiagnosticsStatus>;
+  clearDiagnostics(): Promise<DiagnosticsStatus>;
+  // OS の共有の画面を開く。送り先は利用者が選ぶので、操作でだけ呼ぶ。記録がなければ reject する
+  shareDiagnostics(): Promise<void>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
   // 自分の声を聞き取って登録する。登録済みなら置き換える。声は端末の中だけで扱い、音声は残さない。
   // 未許可のマイクの権限があれば OS の確認を出す。登録できないときは SelfEnrollmentError で reject する

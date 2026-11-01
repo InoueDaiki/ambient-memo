@@ -135,7 +135,14 @@ export function TranscriptScreen() {
           <Text variant="title" accessibilityRole="header">
             文字起こし
           </Text>
-          <Button label="話者" variant="ghost" onPress={() => navigation.navigate("Speakers")} />
+          <View style={{ flexDirection: "row", gap: spacing.xs }}>
+            <Button
+              label="記録"
+              variant="ghost"
+              onPress={() => navigation.navigate("Diagnostics")}
+            />
+            <Button label="話者" variant="ghost" onPress={() => navigation.navigate("Speakers")} />
+          </View>
         </View>
         <SelfEnrollmentCard isListening={isListening} />
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}

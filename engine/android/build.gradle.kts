@@ -25,6 +25,7 @@ dependencies {
     implementation(project(":adapters-sherpa"))
     implementation(project(":adapters-sherpa-android"))
     implementation(project(":adapters-llm-android"))
+    implementation(libs.androidx.core)
     implementation(libs.work.runtime)
     implementation(libs.kotlinx.coroutines.android)
 

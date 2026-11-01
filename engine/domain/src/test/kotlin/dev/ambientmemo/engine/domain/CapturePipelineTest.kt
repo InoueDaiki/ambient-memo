@@ -73,6 +73,36 @@ class CapturePipelineTest {
     )
 
     @Test
+    fun `処理した発話ごとに結果を記録し、本文は渡さない`() = runTest {
+        val (audio, speech) = bursts(4)
+        val events = mutableListOf<DiagnosticEvent>()
+        val transcriber = FakeTranscriber { index, _ ->
+            check(index != 3) { "失敗" }
+            Transcription(listOf("保存する", "雑音", " ")[index])
+        }
+
+        CapturePipeline(
+            audioSource = FakeAudioSource(audio),
+            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
+            transcriber = transcriber,
+            utterances = utterances,
+            captureGaps = gaps,
+            clock = clock,
+            config = config,
+            transcriptionFilter = { text, _ -> text != "雑音" },
+            diagnostics = events::add,
+        ).run()
+
+        val segments = events.filterIsInstance<SegmentProcessed>()
+        assertEquals(
+            listOf(SegmentOutcome.SAVED, SegmentOutcome.FILTERED, SegmentOutcome.BLANK, SegmentOutcome.FAILED),
+            segments.map { it.outcome },
+        )
+        assertEquals(listOf(4, 2, 1, 0), segments.map { it.textLength })
+        assertEquals(listOf(1, 0, 0, 0), segments.map { it.turns })
+    }
+
+    @Test
     fun `保存しないと判定した発話は欠落にせず、バッファを解放する`() = runTest {
         val (audio, speech) = bursts(2)
         val transcriber = FakeTranscriber()

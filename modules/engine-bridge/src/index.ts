@@ -1,6 +1,7 @@
 import {
   EngineStartError,
   SelfEnrollmentError,
+  type DiagnosticsStatus,
   type EngineEvent,
   type EngineListener,
   type EnginePermissions,
@@ -39,6 +40,11 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   resetSpeakers(): Promise<void>;
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
+  getDiagnosticsStatus(): Promise<DiagnosticsStatus>;
+  startDiagnostics(): Promise<DiagnosticsStatus>;
+  stopDiagnostics(): Promise<DiagnosticsStatus>;
+  clearDiagnostics(): Promise<DiagnosticsStatus>;
+  shareDiagnostics(): Promise<void>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
   enrollSelf(): Promise<void>;
   cancelSelfEnrollment(): Promise<void>;
@@ -98,6 +104,11 @@ export function createEngineClient(): TranscriptEngineClient {
     resetSpeakers: () => native.resetSpeakers(),
     renameSpeaker: (speakerId, name) => native.renameSpeaker(speakerId, name),
     getSpeakerDiagnostics: () => native.getSpeakerDiagnostics(),
+    getDiagnosticsStatus: () => native.getDiagnosticsStatus(),
+    startDiagnostics: () => native.startDiagnostics(),
+    stopDiagnostics: () => native.stopDiagnostics(),
+    clearDiagnostics: () => native.clearDiagnostics(),
+    shareDiagnostics: () => native.shareDiagnostics(),
     getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),
     enrollSelf: () =>
       native.enrollSelf().catch((error: unknown) => {

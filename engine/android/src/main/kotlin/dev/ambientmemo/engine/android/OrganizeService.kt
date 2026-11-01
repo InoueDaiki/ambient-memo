@@ -20,7 +20,9 @@ import dev.ambientmemo.engine.adapters.FileOrganizeAttempts
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
+import dev.ambientmemo.engine.domain.DiagnosticProcess
 import dev.ambientmemo.engine.domain.Llm
+import dev.ambientmemo.engine.domain.LlmBackendChosen
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.OrganizeTrigger
@@ -94,6 +96,7 @@ class OrganizeService : Service() {
             true
         },
     )
+    private val journal by lazy { DiagnosticsJournal(filesDir, DiagnosticProcess.ORGANIZE, SystemClock) }
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastStartId = 0
 
@@ -223,6 +226,8 @@ class OrganizeService : Service() {
     }
 
     private fun session(onProgress: (OrganizeProgress) -> Unit): OrganizeSession {
+        // 読み込みが終わらないときも、始めたことと、その時の端末の状態を残す
+        journal.record(deviceSample(this))
         val store = ModelStore(File(filesDir, MODELS_DIRECTORY))
         val model = ModelCatalog.ACTIVE_LLM
         return OrganizeSession(
@@ -230,12 +235,17 @@ class OrganizeService : Service() {
             openLlm = {
                 val cache = File(cacheDir, LLM_CACHE_DIRECTORY).apply { mkdirs() }
                 val path = store.pathOf(model.modelPackage, model.model)
-                LocalLlm(model.version, LiteRtLlmLoader(path, cache.path), dispatcher)
+                val loader = LiteRtLlmLoader(path, cache.path) { journal.record(LlmBackendChosen(it)) }
+                LocalLlm(model.version, loader, dispatcher)
             },
             jobFor = ::jobFor,
             onFailure = { Log.e(TAG, "モデルを読み込めません: ${it.javaClass.simpleName}") },
-            onResult = { Log.i(TAG, "整理: ${it.outcome} メモ ${it.memoCount} 読めない ${it.unreadableCount}") },
+            onResult = {
+                Log.i(TAG, "整理: ${it.outcome} メモ ${it.memoCount} 読めない ${it.unreadableCount}")
+                journal.record(deviceSample(this))
+            },
             onProgress = onProgress,
+            diagnostics = journal,
         )
     }
 
