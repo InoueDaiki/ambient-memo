@@ -1,4 +1,4 @@
-# Android の Debug ビルド。ネイティブ周りを変えた PR と、main への push で動かす
+# Android の Debug と Release のビルド。ネイティブ周りを変えた PR と、main への push で動かす
 name: Android Debug
 
 on:
@@ -11,6 +11,7 @@ on:
       - pnpm-lock.yaml
       - pnpm-workspace.yaml
       - mise.toml
+      - scripts/check-release-*.sh
       - .github/actions/**
       - .github/workflows/android-debug.yml
   push:
@@ -44,3 +45,32 @@ jobs:
           name: app-debug-arm64
           path: apps/mobile/android/app/build/outputs/apk/debug/app-debug.apk
           retention-days: 7
+
+  # R8 を通すのは Release だけなので、keep の漏れは Debug では分からない。マージの前に見つける。
+  # 署名の Secrets は PR に渡さない。公開しない APK なので、使い捨ての鍵で署名する
+  release-check:
+    name: Release の検査
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          android-packages: platforms;android-37.0 build-tools;37.0.0 ndk;27.1.12297006 cmake;3.22.1
+      - name: 使い捨ての鍵を作る
+        run: |
+          password=$(openssl rand -hex 16)
+          echo "::add-mask::$password"
+          keystore="$RUNNER_TEMP/throwaway.keystore"
+          mise exec -- keytool -genkeypair -keystore "$keystore" -storepass "$password" \
+            -alias throwaway -keyalg RSA -keysize 2048 -validity 1 -dname CN=throwaway
+          {
+            echo "ANDROID_KEYSTORE_PATH=$keystore"
+            echo "ANDROID_KEYSTORE_PASSWORD=$password"
+            echo "ANDROID_KEY_ALIAS=throwaway"
+            echo "ANDROID_KEY_PASSWORD=$password"
+          } >> "$GITHUB_ENV"
+      # scripts/check-release-manifest.sh と scripts/check-release-native-classes.sh も動く
+      - run: mise run build:android:release
