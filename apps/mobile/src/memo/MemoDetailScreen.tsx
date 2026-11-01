@@ -1,7 +1,15 @@
 import { spacing } from "@ambient-memo/design-tokens";
 import type { MemoDetail } from "@ambient-memo/engine-client";
 import { useCompleteTodo, useMemoDetail } from "@ambient-memo/engine-client/react";
-import { Button, EmptyState, ListItem, Screen, StatusBanner, Text } from "@ambient-memo/ui-native";
+import {
+  Button,
+  Disclosure,
+  EmptyState,
+  ListItem,
+  Screen,
+  StatusBanner,
+  Text,
+} from "@ambient-memo/ui-native";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import type { ReactNode } from "react";
 import { ScrollView, View } from "react-native";
@@ -14,16 +22,6 @@ import { TodoRow } from "./TodoRow.tsx";
 
 function Padded({ children }: { children: ReactNode }) {
   return <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>{children}</View>;
-}
-
-function SectionTitle({ children }: { children: string }) {
-  return (
-    <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.lg }}>
-      <Text variant="label" color="fgMuted" accessibilityRole="header">
-        {children}
-      </Text>
-    </View>
-  );
 }
 
 function MemoBody({ memo }: { memo: MemoDetail }) {
@@ -61,25 +59,33 @@ function MemoBody({ memo }: { memo: MemoDetail }) {
         )}
       </Padded>
 
-      {memo.todos.length > 0 && <SectionTitle>ToDo</SectionTitle>}
-      {memo.todos.map((todo) => (
-        <TodoRow
-          key={todo.id}
-          todo={todo}
-          isCompleting={pendingIds.has(todo.id)}
-          onComplete={complete}
-        />
-      ))}
+      {memo.todos.length > 0 && (
+        <Disclosure title={`ToDo(${memo.todos.length} 件)`}>
+          {memo.todos.map((todo) => (
+            <TodoRow
+              key={todo.id}
+              todo={todo}
+              isCompleting={pendingIds.has(todo.id)}
+              onComplete={complete}
+            />
+          ))}
+        </Disclosure>
+      )}
 
-      <SectionTitle>根拠の発話</SectionTitle>
-      {memo.utterances.map((utterance) => (
-        <ListItem
-          key={utterance.id}
-          text={utterance.text}
-          label={utterance.speakerName ?? speakerLabels[utterance.speaker]}
-          meta={formatTime(utterance.startedAt)}
-        />
-      ))}
+      {/* 要約がないと発話でしか内容が分からないので、開いておく */}
+      <Disclosure
+        title={`根拠の発話(${memo.utterances.length} 件)`}
+        defaultOpen={memo.summary === null}
+      >
+        {memo.utterances.map((utterance) => (
+          <ListItem
+            key={utterance.id}
+            text={utterance.text}
+            label={utterance.speakerName ?? speakerLabels[utterance.speaker]}
+            meta={formatTime(utterance.startedAt)}
+          />
+        ))}
+      </Disclosure>
     </ScrollView>
   );
 }

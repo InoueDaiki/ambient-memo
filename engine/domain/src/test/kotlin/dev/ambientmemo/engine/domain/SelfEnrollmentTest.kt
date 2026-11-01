@@ -48,6 +48,7 @@ class SelfEnrollmentTest {
         speech: List<LongRange>,
         embedder: SpeakerEmbedder,
         source: AudioSource = FakeAudioSource(audio),
+        onProgress: (EnrollmentProgress) -> Unit = {},
     ) = SelfEnrollment(
         audioSource = source,
         voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
@@ -56,6 +57,7 @@ class SelfEnrollmentTest {
         clock = FakeClock(9_000),
         captureConfig = captureConfig,
         config = config,
+        onProgress = onProgress,
     )
 
     @Test
@@ -103,6 +105,34 @@ class SelfEnrollmentTest {
 
         assertEquals(EnrollmentOutcome.NOT_ENOUGH_SPEECH, outcome)
         assertTrue(speakers.listSpeakers().isEmpty())
+    }
+
+    @Test
+    fun `使えた発話を 1 つずつ知らせる`() = runTest {
+        val (audio, speech) = bursts(2)
+        val progress = mutableListOf<EnrollmentProgress>()
+
+        enrollment(audio, speech, FakeSpeakerEmbedder(model), onProgress = progress::add).run()
+
+        assertEquals(listOf(EnrollmentProgress(1), EnrollmentProgress(2)), progress)
+    }
+
+    @Test
+    fun `短すぎる発話は読み直しを知らせ、ごく短い音は知らせない`() = runTest {
+        // 200ms と 300ms の発話のあとに、使える長さの発話を 2 つ
+        val audio = SyntheticAudio.tone(100) + SyntheticAudio.silence(200) +
+            SyntheticAudio.tone(300) + SyntheticAudio.silence(200) +
+            SyntheticAudio.tone(500) + SyntheticAudio.silence(200) +
+            SyntheticAudio.tone(500) + SyntheticAudio.silence(200)
+        val speech = listOf(0L..<100L, 300L..<600L, 800L..<1_300L, 1_500L..<2_000L)
+        val progress = mutableListOf<EnrollmentProgress>()
+
+        enrollment(audio, speech, FakeSpeakerEmbedder(model), onProgress = progress::add).run()
+
+        assertEquals(
+            listOf(EnrollmentProgress(0, isRejected = true), EnrollmentProgress(1), EnrollmentProgress(2)),
+            progress,
+        )
     }
 
     @Test

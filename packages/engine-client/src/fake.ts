@@ -235,7 +235,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
       return { ...rest, speaker: "unknown" };
     });
     this.#emit({ type: "utterances-changed" });
-    this.#emit({ type: "speakers-reset" });
+    this.#emit({ type: "self-enrollment-changed" });
     return Promise.resolve();
   }
 
@@ -520,6 +520,12 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   finishEnrollment(): void {
     this.#finishEnrollment?.();
     this.#clearEnrollment();
+    this.#emit({ type: "self-enrollment-changed" });
+  }
+
+  // 登録の途中の発話を知らせる
+  reportEnrollmentProgress(acceptedSamples: number, isRejected = false): void {
+    this.#emit({ type: "enrollment-progress", acceptedSamples, isRejected });
   }
 
   // 次の enrollSelf を失敗させる

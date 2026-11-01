@@ -175,8 +175,10 @@ export type EngineEvent =
   | { type: "listening-changed"; status: ListeningStatus; interrupted?: boolean }
   // 発話の追加のほか、話者の更新でも届く。受け取ったら listUtterances で取り直す
   | { type: "utterances-changed" }
-  // 自分の声も消えたので、受け取ったら getSelfEnrollmentStatus で取り直す
-  | { type: "speakers-reset" }
+  // 声の登録やリセットで届く。受け取ったら getSelfEnrollmentStatus で取り直す
+  | { type: "self-enrollment-changed" }
+  // 声の登録の途中で届く。isRejected は、話した発話が短いなどの理由で使えなかったとき
+  | { type: "enrollment-progress"; acceptedSamples: number; isRejected: boolean }
   // 受け取ったら getPermissions で取り直す
   | { type: "permissions-changed" }
   // 進み具合もこれで届く

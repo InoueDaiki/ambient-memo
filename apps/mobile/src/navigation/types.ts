@@ -5,6 +5,7 @@ export type RootStackParamList = {
   Tabs: undefined;
   MemoDetail: { memoId: string };
   Speakers: undefined;
+  SelfEnrollment: undefined;
 };
 
 export type RootNavigation = NativeStackNavigationProp<RootStackParamList>;
