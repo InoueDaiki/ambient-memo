@@ -4,6 +4,8 @@ import type {
   EngineEvent,
   MemoDetail,
   MemoEngineClient,
+  OrganizeStartResult,
+  OrganizeStatus,
   Utterance,
 } from "@ambient-memo/engine-client";
 
@@ -23,6 +25,9 @@ export interface MemoNativeModule {
   getMemo(id: string): Promise<NativeMemoDetail | null>;
   listTodos(limit: number): Promise<TodoList>;
   completeTodo(id: string): Promise<void>;
+  getOrganizeStatus(): Promise<OrganizeStatus>;
+  startOrganize(): Promise<OrganizeStartResult>;
+  stopOrganize(): Promise<void>;
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): { remove(): void };
 }
 
@@ -46,6 +51,9 @@ export function createMemoClient(native: MemoNativeModule): MemoEngineClient {
     getMemo: (id) => native.getMemo(id).then((detail) => detail && toMemoDetail(detail)),
     listTodos: ({ limit }) => native.listTodos(limit),
     completeTodo: (id) => native.completeTodo(id),
+    getOrganizeStatus: () => native.getOrganizeStatus(),
+    startOrganize: () => native.startOrganize(),
+    stopOrganize: () => native.stopOrganize(),
     subscribe: (listener) => {
       const subscription = native.addListener("engine", listener);
       return () => subscription.remove();

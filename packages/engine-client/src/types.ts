@@ -183,7 +183,9 @@ export type EngineEvent =
   // メモの追加のほか、根拠の発話の更新でも届く。受け取ったら listMemos と getMemo で取り直す
   | { type: "memos-changed" }
   // ToDo の追加や完了で届く。受け取ったら listTodos と getMemo で取り直す
-  | { type: "todos-changed" };
+  | { type: "todos-changed" }
+  // 整理の開始、進み具合、終わりで届く。受け取ったら getOrganizeStatus で取り直す
+  | { type: "organize-changed" };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -275,6 +277,47 @@ export interface MemoDetail extends Memo {
   todos: Todo[];
 }
 
+// - idle: 動いていない
+// - preparing: モデルを読み込んでいる
+// - organizing: まとまりを処理している
+// - stopping: 止める依頼を受け、処理中のまとまりが終わるのを待っている
+export type OrganizeState = "idle" | "preparing" | "organizing" | "stopping";
+
+// 手動の整理の最後の結果
+// - completed: 今処理できるまとまりをすべて処理した
+// - stopped: 利用者が止めた。残りは次の整理で続ける
+// - too-hot: 端末が熱くなったので止めた
+// - model-unavailable: 整理のモデルがなかった
+// - failed: 実行基盤が動かなかったか、整理のプロセスが落ちた。聞き取りには影響しない
+// - time-limit: OS の実行時間の上限に達した
+export type OrganizeResult =
+  | "completed"
+  | "stopped"
+  | "too-hot"
+  | "model-unavailable"
+  | "failed"
+  | "time-limit";
+
+export interface OrganizeStatus {
+  state: OrganizeState;
+  // 動いている実行の進み具合。対象が決まるまで totalChunks は 0
+  completedChunks: number;
+  totalChunks: number;
+  // 今整理できるまとまりの数
+  pendingChunks: number;
+  // 話が続いているかもしれない発話が、途切れるのを待っている
+  isWaitingForSilence: boolean;
+  // プロセスの再起動では消える。通知でも伝える
+  lastResult: OrganizeResult | null;
+}
+
+export type OrganizeStartResult =
+  | "started"
+  | "already-running"
+  | "model-unavailable"
+  | "nothing-to-organize"
+  | "failed";
+
 // メモと ToDo を扱う実装。engine-bridge にはまだなく、今は Fake だけが提供する
 export interface MemoEngineClient {
   getMemoMode(): Promise<MemoMode>;
@@ -287,6 +330,12 @@ export interface MemoEngineClient {
   // すでに完了していれば何もせず成功する。ない ToDo は reject する。
   // 状態が変わるときは todos-changed を届けてから解決する
   completeTodo(id: string): Promise<void>;
+  getOrganizeStatus(): Promise<OrganizeStatus>;
+  // 充電を待たずに整理する。利用者の操作でだけ呼ぶ。終わるのを待たずに解決し、結果は organize-changed で届く。
+  // 通知の許可がなければ OS の確認を出す
+  startOrganize(): Promise<OrganizeStartResult>;
+  // まとまりの区切りで止める。動いていなければ何もしない
+  stopOrganize(): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

@@ -31,17 +31,28 @@ class OrganizeJob(
     /**
      * 処理できるまとまりを古い順に処理する。[shouldContinue] はまとまりの間で確かめる。
      * 充電が終わったらここで止める。すぐに止めたいときはコルーチンをキャンセルする。
+     * [onProgress] は対象のまとまりが決まったときと、まとまりを1つ終えるたびに呼ぶ。
      *
      * LLM の例外は [OrganizeOutcome.LLM_FAILED] で返す。DB の例外とキャンセルはそのまま投げる。
      * 特定のまとまりで止まり続けないように、読めないまとまりは要約のないメモとして記録して先へ進む。
      */
-    suspend fun run(shouldContinue: () -> Boolean = { true }): OrganizeResult {
+    suspend fun run(
+        shouldContinue: () -> Boolean = { true },
+        onProgress: (OrganizeProgress) -> Unit = {},
+    ): OrganizeResult {
         val labels = SpeakerLabels(speakers.listSpeakers())
         val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, labels)
             .withoutOngoing(clock.nowMillis(), config)
         val pass = Pass(labels)
-        val stoppedBy = chunks.firstNotNullOfOrNull { chunk ->
-            if (shouldContinue()) process(chunk, pass) else OrganizeOutcome.STOPPED
+        onProgress(OrganizeProgress(0, chunks.size))
+        val stoppedBy = chunks.withIndex().firstNotNullOfOrNull { (index, chunk) ->
+            if (shouldContinue()) {
+                process(chunk, pass).also { stopped ->
+                    if (stopped == null) onProgress(OrganizeProgress(index + 1, chunks.size))
+                }
+            } else {
+                OrganizeOutcome.STOPPED
+            }
         }
         // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
         val finished = if (pass.suspects.isEmpty()) OrganizeOutcome.COMPLETED else OrganizeOutcome.LLM_FAILED
@@ -224,6 +235,19 @@ class OrganizeJob(
         dueDate = due.date,
         status = if (due.isConfident) TodoStatus.OPEN else TodoStatus.CANDIDATE,
     )
+}
+
+/** 今整理できる量を、LLM を使わずに数える。[OrganizeJob.run] と同じ分け方にする。本文が空のまとまりは数えない。 */
+suspend fun organizeBacklog(
+    memos: MemoRepository,
+    speakers: List<Speaker>,
+    clock: Clock,
+    timeZone: TimeZone,
+    config: OrganizeConfig = OrganizeConfig(),
+): OrganizeBacklog {
+    val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, SpeakerLabels(speakers))
+    val ready = chunks.withoutOngoing(clock.nowMillis(), config)
+    return OrganizeBacklog(ready.count { !it.isBlank }, hasOngoing = ready.size < chunks.size)
 }
 
 /** プロセスの中でだけ数える。実行をまたいで数えなくてよい場面の既定値。 */

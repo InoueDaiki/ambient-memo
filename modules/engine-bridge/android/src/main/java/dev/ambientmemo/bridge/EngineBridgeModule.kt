@@ -116,6 +116,9 @@ class EngineBridgeModule : Module() {
       moduleScope.launch {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
+      moduleScope.launch {
+        engine.organizeChanges.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "organize-changed")) }
+      }
       engine.addMemoListener(memoListener)
       // 以前の版で増えた話者を、聞き取りを始める前でも一覧でまとまって見えるようにする
       moduleScope.launch { engine.consolidateSpeakers() }
@@ -254,6 +257,19 @@ class EngineBridgeModule : Module() {
       }
     }
 
+    AsyncFunction("getOrganizeStatus") Coroutine { ->
+      engine.memoBridge.organizeStatus()
+    }
+
+    // 利用者の操作でだけ呼ぶ。充電を待たずに LLM を動かす
+    AsyncFunction("startOrganize") Coroutine { ->
+      engine.memoBridge.startOrganize(::requestNotificationPermission)
+    }
+
+    AsyncFunction("stopOrganize") {
+      engine.memoBridge.stopOrganize()
+    }
+
     AsyncFunction("getSelfEnrollmentStatus") Coroutine { ->
       when (engine.selfEnrollmentStatus()) {
         SelfEnrollmentStatus.ENROLLED -> "enrolled"
@@ -364,11 +380,22 @@ class EngineBridgeModule : Module() {
 
   /** 開始の操作のときに OS の確認を出す。結果は [Engine.startCapture] と getPermissions が見る。 */
   private suspend fun requestPermissions() {
-    val manager = appContext.permissions ?: return
     val requested = buildList {
       add(Manifest.permission.RECORD_AUDIO)
       if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
     }
+    askForPermissions(requested)
+  }
+
+  /** 整理の進行と「止める」は通知に出す。許可がなくても整理は動き、画面からは止められる。 */
+  private suspend fun requestNotificationPermission() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+    askForPermissions(listOf(Manifest.permission.POST_NOTIFICATIONS))
+    publishPermissions()
+  }
+
+  private suspend fun askForPermissions(requested: List<String>) {
+    val manager = appContext.permissions ?: return
     suspendCancellableCoroutine { continuation ->
       val listener = PermissionsResponseListener { if (continuation.isActive) continuation.resume(Unit) }
       manager.askForPermissions(listener, *requested.toTypedArray())

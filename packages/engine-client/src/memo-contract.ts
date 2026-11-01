@@ -3,7 +3,14 @@
 // Kotlin 側はテストの名前をここと比べるので、ケースを足したら両方に足す
 import { describe, expect, it } from "vitest";
 
-import type { EngineEvent, MemoDetail, MemoEngineClient, Todo, Utterance } from "./types.ts";
+import type {
+  EngineEvent,
+  MemoDetail,
+  MemoEngineClient,
+  OrganizerModelStatus,
+  Todo,
+  Utterance,
+} from "./types.ts";
 
 export const memo = (id: string, overrides: Partial<MemoDetail> = {}): MemoDetail => ({
   id,
@@ -28,9 +35,16 @@ export const todo = (id: string, overrides: Partial<Todo> = {}): Todo => ({
   ...overrides,
 });
 
+// 整理の契約の前提。Fake は未処理の量を直接持つ。Kotlin 側は本物の SQLite に発話を入れる
+export interface OrganizeSetup {
+  pendingChunks?: number;
+  isWaitingForSilence?: boolean;
+  organizerModel?: OrganizerModelStatus;
+}
+
 export function runMemoClientContract(
   name: string,
-  createClient: (memos: MemoDetail[]) => MemoEngineClient,
+  createClient: (memos: MemoDetail[], organize?: OrganizeSetup) => MemoEngineClient,
 ): void {
   describe(`${name} のメモと ToDo`, () => {
     it("メモは開始時刻の新しい順に limit 件まで返す", async () => {
@@ -131,6 +145,67 @@ export function runMemoClientContract(
 
     it("ない ToDo の完了は reject する", async () => {
       await expect(createClient([]).completeTodo("none")).rejects.toThrow();
+    });
+
+    it("未処理がなければ整理を始めない", async () => {
+      const client = createClient([]);
+
+      expect(await client.startOrganize()).toBe("nothing-to-organize");
+      const status = await client.getOrganizeStatus();
+      expect(status.state).toBe("idle");
+      expect(status.pendingChunks).toBe(0);
+    });
+
+    it("話が途切れていない発話は待っていると伝える", async () => {
+      const client = createClient([], { isWaitingForSilence: true });
+
+      const status = await client.getOrganizeStatus();
+
+      expect(status.pendingChunks).toBe(0);
+      expect(status.isWaitingForSilence).toBe(true);
+      expect(await client.startOrganize()).toBe("nothing-to-organize");
+    });
+
+    it("未処理があれば整理を始めて、進行の状態を返す", async () => {
+      const client = createClient([], { pendingChunks: 2 });
+
+      expect((await client.getOrganizeStatus()).pendingChunks).toBe(2);
+      expect(await client.startOrganize()).toBe("started");
+
+      expect((await client.getOrganizeStatus()).state).toBe("preparing");
+    });
+
+    it("動いている間に始めても二重には始めない", async () => {
+      const client = createClient([], { pendingChunks: 1 });
+      await client.startOrganize();
+
+      expect(await client.startOrganize()).toBe("already-running");
+    });
+
+    it("止めると区切りで止まる途中の状態になる", async () => {
+      const client = createClient([], { pendingChunks: 1 });
+      await client.startOrganize();
+
+      await client.stopOrganize();
+
+      expect((await client.getOrganizeStatus()).state).toBe("stopping");
+    });
+
+    it("動いていないときに止めても何も起きない", async () => {
+      const client = createClient([]);
+
+      await client.stopOrganize();
+
+      expect((await client.getOrganizeStatus()).state).toBe("idle");
+    });
+
+    it("整理のモデルがなければ始めない", async () => {
+      const client = createClient([], {
+        pendingChunks: 1,
+        organizerModel: { state: "idle", downloadedBytes: 0, totalBytes: 1 },
+      });
+
+      expect(await client.startOrganize()).toBe("model-unavailable");
     });
   });
 }

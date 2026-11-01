@@ -7,6 +7,7 @@ import { FlatList, View } from "react-native";
 import type { RootNavigation } from "../navigation/types.ts";
 import { formatMemoPeriod, UNTITLED_MEMO } from "./format.ts";
 import { MemoModeBanner } from "./MemoModeBanner.tsx";
+import { OrganizeNow } from "./OrganizeNow.tsx";
 
 // 一度に読み込むメモの数。古いメモを遡る操作を作るときに見直す
 export const MEMO_LIMIT = 200;
@@ -22,6 +23,7 @@ export function MemoListScreen() {
           メモ
         </Text>
         <MemoModeBanner />
+        <OrganizeNow />
         {error !== undefined && (
           <StatusBanner tone="danger" message="メモを読み込めませんでした。" />
         )}

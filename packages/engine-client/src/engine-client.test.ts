@@ -255,7 +255,44 @@ describe("FakeEngineClient の発話", () => {
   });
 });
 
-runMemoClientContract("FakeEngineClient", (memos) => new FakeEngineClient({ memos }));
+runMemoClientContract(
+  "FakeEngineClient",
+  (memos, { pendingChunks = 0, isWaitingForSilence = false, organizerModel } = {}) =>
+    new FakeEngineClient({
+      memos,
+      organizeBacklog: { pendingChunks, isWaitingForSilence },
+      ...(organizerModel && { organizerModel }),
+    }),
+);
+
+describe("FakeEngineClient の整理", () => {
+  it("始まりと進み具合と終わりでイベントが届き、結果が残る", async () => {
+    const client = new FakeEngineClient({ organizeBacklog: { pendingChunks: 2 } });
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    await client.startOrganize();
+    client.progressOrganize(1, 2);
+    expect((await client.getOrganizeStatus()).completedChunks).toBe(1);
+    client.finishOrganize("too-hot", 1);
+
+    expect(events).toHaveLength(3);
+    const status = await client.getOrganizeStatus();
+    expect(status.state).toBe("idle");
+    expect(status.lastResult).toBe("too-hot");
+    expect(status.pendingChunks).toBe(1);
+  });
+
+  it("もう一度始めると前の結果は消える", async () => {
+    const client = new FakeEngineClient({ organizeBacklog: { pendingChunks: 1 } });
+    await client.startOrganize();
+    client.finishOrganize("stopped", 1);
+
+    await client.startOrganize();
+
+    expect((await client.getOrganizeStatus()).lastResult).toBeNull();
+  });
+});
 
 describe("FakeEngineClient のメモと ToDo", () => {
   it("メモが増えるとイベントが届く", () => {

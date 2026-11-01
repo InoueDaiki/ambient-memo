@@ -3,13 +3,20 @@ package dev.ambientmemo.engine.android
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
+import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.OrganizeResult
 import dev.ambientmemo.engine.llm.LocalLlm
 
 /** 1回の整理の結果。 */
 enum class OrganizeRunResult {
-    /** 終わったか、区切りよく止めた。残りは次の定期実行で続ける。 */
-    FINISHED,
+    /** 今処理できるまとまりをすべて処理した。 */
+    COMPLETED,
+
+    /** 区切りよく止めた。残りは次の実行で続ける。 */
+    STOPPED,
+
+    /** モデルがないので読み込まなかった。 */
+    MODEL_MISSING,
 
     /** 実行基盤が動かなかった。しばらくしてやり直す。 */
     FAILED,
@@ -26,10 +33,12 @@ internal class OrganizeSession(
     private val jobFor: (Llm) -> OrganizeJob,
     private val onFailure: (Exception) -> Unit = {},
     private val onResult: (OrganizeResult) -> Unit = {},
+    private val onProgress: (OrganizeProgress) -> Unit = {},
 ) {
-    suspend fun run(shouldContinue: () -> Boolean): OrganizeRunResult {
-        if (!isModelReady() || !shouldContinue()) return OrganizeRunResult.FINISHED
-        return openLlm().use { llm ->
+    suspend fun run(shouldContinue: () -> Boolean): OrganizeRunResult = when {
+        !isModelReady() -> OrganizeRunResult.MODEL_MISSING
+        !shouldContinue() -> OrganizeRunResult.STOPPED
+        else -> openLlm().use { llm ->
             if (load(llm)) organize(llm, shouldContinue) else OrganizeRunResult.FAILED
         }
     }
@@ -45,10 +54,11 @@ internal class OrganizeSession(
     }
 
     private suspend fun organize(llm: Llm, shouldContinue: () -> Boolean): OrganizeRunResult {
-        val result = jobFor(llm).run(shouldContinue)
+        val result = jobFor(llm).run(shouldContinue, onProgress)
         onResult(result)
         return when (result.outcome) {
-            OrganizeOutcome.COMPLETED, OrganizeOutcome.STOPPED -> OrganizeRunResult.FINISHED
+            OrganizeOutcome.COMPLETED -> OrganizeRunResult.COMPLETED
+            OrganizeOutcome.STOPPED -> OrganizeRunResult.STOPPED
             OrganizeOutcome.LLM_FAILED -> OrganizeRunResult.FAILED
         }
     }

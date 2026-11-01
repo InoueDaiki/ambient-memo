@@ -23,10 +23,14 @@
             android:exported="false"
             android:foregroundServiceType="dataSync" />
 
-        <!-- LLM を別のプロセスで動かす。実行基盤のクラッシュやメモリ不足で、聞き取りのプロセスを巻き込まない -->
+        <!--
+            LLM を別のプロセスで動かす。実行基盤のクラッシュやメモリ不足で、聞き取りのプロセスを巻き込まない。
+            定期実行では bind だけで動き、Foreground Service にはしない。手動の実行のときだけ dataSync 型で前面に出す
+        -->
         <service
             android:name=".OrganizeService"
             android:exported="false"
+            android:foregroundServiceType="dataSync"
             android:process=":organize" />
 
         <!-- BOOT_COMPLETED はシステムが送るので、他のアプリに公開しなくても届く -->

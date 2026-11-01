@@ -67,7 +67,7 @@ class OrganizeSessionTest {
 
         val result = session(native).run { true }
 
-        assertEquals(OrganizeRunResult.FINISHED, result)
+        assertEquals(OrganizeRunResult.COMPLETED, result)
         assertEquals(1, memos.listMemos().size)
         assertEquals(1, native.closed)
     }
@@ -87,7 +87,7 @@ class OrganizeSessionTest {
     fun `モデルがなければ読み込まずに終わる`() = runTest {
         val result = session(CountingNative(), isModelReady = false).run { true }
 
-        assertEquals(OrganizeRunResult.FINISHED, result)
+        assertEquals(OrganizeRunResult.MODEL_MISSING, result)
         assertEquals(0, loads)
     }
 
@@ -95,7 +95,7 @@ class OrganizeSessionTest {
     fun `始める時点で止めるなら読み込まない`() = runTest {
         val result = session(CountingNative()).run { false }
 
-        assertEquals(OrganizeRunResult.FINISHED, result)
+        assertEquals(OrganizeRunResult.STOPPED, result)
         assertEquals(0, loads)
     }
 
@@ -115,7 +115,7 @@ class OrganizeSessionTest {
 
         val stopped = session(native).run { ++checks < 3 } // 読み込み前、1 つ目の前、2 つ目の前
 
-        assertEquals(OrganizeRunResult.FINISHED, stopped)
+        assertEquals(OrganizeRunResult.STOPPED, stopped)
         assertEquals(1, memos.listMemos().size)
         assertEquals(1, native.closed)
 

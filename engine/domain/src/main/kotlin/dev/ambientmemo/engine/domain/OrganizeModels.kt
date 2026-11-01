@@ -136,6 +136,18 @@ enum class OrganizeOutcome {
     LLM_FAILED,
 }
 
+/** 1回の実行の進み具合。 */
+data class OrganizeProgress(
+    val completedChunks: Int,
+    val totalChunks: Int,
+)
+
+/** 今の未処理の量。[hasOngoing] は、話が続いているかもしれないので待っているまとまりがあること。 */
+data class OrganizeBacklog(
+    val readyChunks: Int,
+    val hasOngoing: Boolean,
+)
+
 /** [unreadableCount] は、LLM で読めずに要約のないメモとして記録したまとまりの数。[memoCount] に含む。 */
 
 data class OrganizeResult(

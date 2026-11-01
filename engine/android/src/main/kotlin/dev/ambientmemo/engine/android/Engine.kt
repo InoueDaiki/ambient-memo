@@ -36,11 +36,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -99,7 +101,12 @@ class Engine private constructor(context: Context) {
     }
 
     /** JS が見るメモと ToDo。 */
-    val memoBridge by lazy { MemoBridge(memoRepository, ::speakers, SystemClock) }
+    val memoBridge by lazy { MemoBridge(memoRepository, ::speakers, SystemClock, organizeMonitor) }
+
+    /** 手動の整理の入口と、`:organize` の見守り。LLM はこのプロセスに持たない。 */
+    private val organizeMonitor by lazy {
+        OrganizeMonitor(this.context, { modelDownloads.plan(ModelGroup.ORGANIZER).isComplete }, ::notifyMemoChanged)
+    }
 
     private val enrollmentRunner = EnrollmentRunner(scope, ::enrollmentPrecondition, ::runEnrollment)
     private val changes = MutableSharedFlow<Unit>(
@@ -136,6 +143,9 @@ class Engine private constructor(context: Context) {
 
     val captureState: StateFlow<CaptureState> = runner.state
 
+    /** 整理の状態が変わるたびに流れる。中身は [memoBridge] の organizeStatus で読む。 */
+    val organizeChanges: Flow<Unit> get() = organizeMonitor.statuses.map { }
+
     /** 発話が保存されるたびに流れる。 */
     val utterancesChanged: SharedFlow<Unit> = changes.asSharedFlow()
 
@@ -144,6 +154,8 @@ class Engine private constructor(context: Context) {
 
     init {
         OrganizeSchedule.ensureScheduled(this.context)
+        // 動いている整理に、アプリを開いた時点で繋ぐ
+        organizeMonitor
     }
 
     /**
