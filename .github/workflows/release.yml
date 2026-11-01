@@ -1,7 +1,8 @@
-# 署名済みの arm64 Release APK をビルドし、GitHub Releases に置く。
+# 署名済みの arm64 Release APK をビルドし、Actions の artifact に置く。
 # - バージョンタグ(v1.2.3): 普段使いの版。タグの版を versionName にする
-# - workflow_dispatch: 任意のブランチの開発版(.dev)。dev-<実行番号> のプレリリースにする
+# - workflow_dispatch: 任意のブランチの開発版(.dev)。版は 0.0.0-dev.<実行番号>
 # versionCode は実行番号。このファイルの名前を変えると番号が振り直されるので変えない
+# 配布物を作るので、Actions のキャッシュは読み書きしない(fork の PR から読める場所に残さない)
 name: Release
 
 on:
@@ -20,17 +21,17 @@ jobs:
   release:
     name: Release APK
     runs-on: ubuntu-latest
-    timeout-minutes: 30
-    permissions:
-      contents: write
+    timeout-minutes: 60
     env:
-      ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
-      ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-      ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
-      ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       ANDROID_VERSION_CODE: ${{ github.run_number }}
     steps:
+      # Secrets は使うステップの env だけに渡す。依存関係の導入などには見せない
       - name: 署名の Secrets を確かめる
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           missing=()
           for name in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
@@ -48,23 +49,18 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           android-packages: platforms;android-37.0 build-tools;37.0.0 ndk;27.1.12297006 cmake;3.22.1
+          cache: "false"
 
       - name: 版と鍵を用意する
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           if [ "$GITHUB_REF_TYPE" = tag ] && [ "$GITHUB_EVENT_NAME" = push ]; then
             version="${GITHUB_REF_NAME#v}"
-            {
-              echo "APP_VARIANT=production"
-              echo "RELEASE_TAG=$GITHUB_REF_NAME"
-              echo "RELEASE_FLAGS=--latest"
-            } >> "$GITHUB_ENV"
+            echo "APP_VARIANT=production" >> "$GITHUB_ENV"
           else
             version="0.0.0-dev.$GITHUB_RUN_NUMBER"
-            {
-              echo "APP_VARIANT=dev"
-              echo "RELEASE_TAG=dev-$GITHUB_RUN_NUMBER"
-              echo "RELEASE_FLAGS=--prerelease"
-            } >> "$GITHUB_ENV"
+            echo "APP_VARIANT=dev" >> "$GITHUB_ENV"
           fi
           keystore="$RUNNER_TEMP/release.keystore"
           base64 --decode <<< "$ANDROID_KEYSTORE_BASE64" > "$keystore"
@@ -75,20 +71,22 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - run: mise run build:android:release
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: 署名を確かめる
         run: |
           cp apps/mobile/android/app/build/outputs/apk/release/app-release.apk "$APK_PATH"
           "$ANDROID_HOME/build-tools/37.0.0/apksigner" verify --print-certs "$APK_PATH"
 
-      - name: GitHub Releases に置く
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          # 再実行のときはリリースが既にあるので、APK だけを置き換える
-          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
-            gh release upload "$RELEASE_TAG" "$APK_PATH" --clobber --repo "$GITHUB_REPOSITORY"
-          else
-            gh release create "$RELEASE_TAG" "$APK_PATH" --repo "$GITHUB_REPOSITORY" \
-              --target "$GITHUB_SHA" --title "$RELEASE_TAG" --generate-notes $RELEASE_FLAGS
-          fi
+      # archive: false では zip せず APK のまま置く。artifact の名前はファイル名になる
+      # 保持の 90 日は public のリポジトリの上限。overwrite は同じ実行の再実行のため
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          path: ${{ env.APK_PATH }}
+          archive: false
+          overwrite: true
+          if-no-files-found: error
+          retention-days: 90

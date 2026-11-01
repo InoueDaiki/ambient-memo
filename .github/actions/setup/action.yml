@@ -5,6 +5,9 @@ inputs:
   android-packages:
     description: sdkmanager で入れるもの(空白区切り)
     default: platforms;android-37.0 build-tools;37.0.0
+  cache:
+    description: Actions のキャッシュを読み書きするか。署名して配る Release では false にして、fork の PR から読める場所に残さない
+    default: "true"
 
 runs:
   using: composite
@@ -13,6 +16,7 @@ runs:
       with:
         # mise 自体の版も固定する
         version: 2026.10.4
+        cache: ${{ inputs.cache }}
 
     - name: pnpm のストアの場所
       id: pnpm
@@ -20,6 +24,7 @@ runs:
       run: echo "store=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
 
     - name: pnpm のキャッシュ
+      if: inputs.cache == 'true'
       uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: ${{ steps.pnpm.outputs.store }}
@@ -37,3 +42,5 @@ runs:
 
     # キャッシュの保存は既定のブランチだけで行われる
     - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+      with:
+        cache-disabled: ${{ inputs.cache != 'true' }}
