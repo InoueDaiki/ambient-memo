@@ -8,7 +8,10 @@ import type {
   SelfEnrollmentFailure,
   SelfEnrollmentStatus,
   ModelDownloadStatus,
+  OrganizeResult,
   OrganizerModelStatus,
+  OrganizeStartResult,
+  OrganizeStatus,
   Memo,
   MemoDetail,
   MemoEngineClient,
@@ -28,6 +31,8 @@ export interface FakeEngineClientOptions {
   organizerModel?: OrganizerModelStatus;
   memoMode?: MemoMode;
   memos?: MemoDetail[];
+  // 今整理できるまとまりの数と、話が途切れるのを待っている発話の有無
+  organizeBacklog?: { pendingChunks: number; isWaitingForSilence?: boolean };
 }
 
 // 未完了を先に、期限の早い順。期限がなければ後ろ、同じなら新しい順
@@ -66,6 +71,8 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   #organizerModelStarts = 0;
   readonly #memoMode: MemoMode;
   #memos: MemoDetail[];
+  #organize: OrganizeStatus;
+  #organizeStarts = 0;
   #memoReadError: Error | undefined;
   #completeError: Error | undefined;
 
@@ -79,6 +86,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     organizerModel = { state: "installed", downloadedBytes: 0, totalBytes: 0 },
     memoMode = "ready",
     memos = [],
+    organizeBacklog = { pendingChunks: 0 },
   }: FakeEngineClientOptions = {}) {
     this.#organizerModel = organizerModel;
     this.#status = status;
@@ -93,6 +101,14 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
         : { state: "idle", downloadedBytes: 0, totalBytes: 742_022_351 });
     this.#memoMode = memoMode;
     this.#memos = [...memos];
+    this.#organize = {
+      state: "idle",
+      completedChunks: 0,
+      totalChunks: 0,
+      pendingChunks: organizeBacklog.pendingChunks,
+      isWaitingForSilence: organizeBacklog.isWaitingForSilence ?? false,
+      lastResult: null,
+    };
   }
 
   getStatus(): Promise<EngineStatus> {
@@ -274,6 +290,45 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     this.#emit({ type: "utterances-changed" });
   }
 
+  getOrganizeStatus(): Promise<OrganizeStatus> {
+    return Promise.resolve({ ...this.#organize });
+  }
+
+  startOrganize(): Promise<OrganizeStartResult> {
+    if (this.#organize.state !== "idle") return Promise.resolve("already-running");
+    if (this.#organizerModel.state !== "installed") return Promise.resolve("model-unavailable");
+    if (this.#organize.pendingChunks === 0) return Promise.resolve("nothing-to-organize");
+    this.#organizeStarts += 1;
+    this.#setOrganize({ state: "preparing", completedChunks: 0, totalChunks: 0, lastResult: null });
+    return Promise.resolve("started");
+  }
+
+  stopOrganize(): Promise<void> {
+    if (this.#organize.state !== "idle") this.#setOrganize({ state: "stopping" });
+    return Promise.resolve();
+  }
+
+  get organizeStarts(): number {
+    return this.#organizeStarts;
+  }
+
+  // 整理の進み具合を進める
+  progressOrganize(completedChunks: number, totalChunks: number): void {
+    const state = this.#organize.state === "stopping" ? "stopping" : "organizing";
+    this.#setOrganize({ state, completedChunks, totalChunks });
+  }
+
+  // 整理を結果 result で終える
+  finishOrganize(result: OrganizeResult, pendingChunks = 0): void {
+    this.#setOrganize({
+      state: "idle",
+      completedChunks: 0,
+      totalChunks: 0,
+      pendingChunks,
+      lastResult: result,
+    });
+  }
+
   addMemo(memo: MemoDetail): void {
     this.#memos.push(memo);
     this.#emit({ type: "memos-changed" });
@@ -365,6 +420,11 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
       return Promise.reject(error);
     }
     return Promise.resolve(read());
+  }
+
+  #setOrganize(changes: Partial<OrganizeStatus>): void {
+    this.#organize = { ...this.#organize, ...changes };
+    this.#emit({ type: "organize-changed" });
   }
 
   #emit(event: EngineEvent): void {

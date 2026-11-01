@@ -442,3 +442,107 @@ describe("表示の形", () => {
     ).toBe("10月31日(土) 23:50 – 11月1日(日) 0:10");
   });
 });
+
+describe("今すぐ整理する", () => {
+  const ready = (pendingChunks: number) =>
+    new FakeEngineClient({ organizeBacklog: { pendingChunks } });
+
+  it("未処理の量を出し、押すと始まって、進み具合が出る", async () => {
+    const client = ready(3);
+    await openTab(client, "メモ");
+    await screen.findByText(/未処理のまとまり: 3/);
+
+    await userEvent.press(screen.getByRole("button", { name: "今すぐ整理する" }));
+    await screen.findByText("整理の準備をしています");
+    expect(client.organizeStarts).toBe(1);
+
+    await act(async () => client.progressOrganize(1, 3));
+    await screen.findByText("整理しています(1 / 3 まとまり)");
+    await screen.findByRole("progressbar", { name: "整理の進み具合" });
+  });
+
+  it("開くだけでは始まらない", async () => {
+    const client = ready(3);
+    await openTab(client, "メモ");
+
+    await screen.findByRole("button", { name: "今すぐ整理する" });
+
+    expect(client.organizeStarts).toBe(0);
+  });
+
+  it("止めると、今のまとまりが終わるまで待つことを出し、止まると結果を出す", async () => {
+    const client = ready(2);
+    await openTab(client, "メモ");
+    await userEvent.press(await screen.findByRole("button", { name: "今すぐ整理する" }));
+
+    await userEvent.press(await screen.findByRole("button", { name: "止める" }));
+
+    await screen.findByText("今のまとまりが終わると止まります。");
+    await act(async () => client.finishOrganize("stopped", 1));
+    await screen.findByText("整理を止めました。残りは次の整理で続きから処理します。");
+  });
+
+  it("発熱で止まったら理由を出す", async () => {
+    const client = ready(2);
+    await openTab(client, "メモ");
+    await userEvent.press(await screen.findByRole("button", { name: "今すぐ整理する" }));
+    await screen.findByText("整理の準備をしています");
+
+    await act(async () => client.finishOrganize("too-hot", 2));
+
+    await screen.findByText(
+      "端末が熱くなったので整理を止めました。冷めてからもう一度試してください。",
+    );
+  });
+
+  it("整理のプロセスが落ちたら、聞き取りには影響がないと伝える", async () => {
+    const client = ready(1);
+    await openTab(client, "メモ");
+    await userEvent.press(await screen.findByRole("button", { name: "今すぐ整理する" }));
+    await screen.findByText("整理の準備をしています");
+
+    await act(async () => client.finishOrganize("failed", 1));
+
+    await screen.findByText(/聞き取りには影響ありません/);
+  });
+
+  it("Gemma がないときは取得の案内を出し、整理のボタンは出さない", async () => {
+    const client = new FakeEngineClient({
+      organizeBacklog: { pendingChunks: 1 },
+      organizerModel: { state: "idle", downloadedBytes: 0, totalBytes: 3_660_000_000 },
+    });
+    await openTab(client, "メモ");
+
+    await screen.findByRole("button", { name: "整理のモデルを取得する" });
+
+    expect(screen.queryByRole("button", { name: "今すぐ整理する" })).toBeNull();
+  });
+
+  it("未処理の発話がないときはそう出し、押せない", async () => {
+    await openTab(ready(0), "メモ");
+
+    await screen.findByText("未処理の発話はありません。");
+    expect(
+      screen.getByRole("button", { name: "今すぐ整理する" }).props.accessibilityState.disabled,
+    ).toBe(true);
+  });
+
+  it("話の途中の発話しかないときは待っていることを出す", async () => {
+    const client = new FakeEngineClient({
+      organizeBacklog: { pendingChunks: 0, isWaitingForSilence: true },
+    });
+    await openTab(client, "メモ");
+
+    await screen.findByText("話が途切れて 5 分たつと、直近の発話を整理できます。");
+  });
+
+  it("動いている間に開いても、進み具合と止める操作を出す", async () => {
+    const client = ready(2);
+    await client.startOrganize();
+    client.progressOrganize(1, 2);
+    await openTab(client, "メモ");
+
+    await screen.findByText("整理しています(1 / 2 まとまり)");
+    await screen.findByRole("button", { name: "止める" });
+  });
+});

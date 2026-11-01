@@ -10,6 +10,8 @@ import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.TodoKind
 import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.Utterance
+import dev.ambientmemo.engine.domain.organizeBacklog
+import java.util.TimeZone
 
 class TodoNotFoundException : Exception()
 
@@ -26,6 +28,8 @@ class MemoBridge internal constructor(
     private val memos: MemoRepository,
     private val speakers: suspend () -> Map<Long, Speaker>,
     private val clock: Clock,
+    private val organize: OrganizeControl,
+    private val timeZone: TimeZone = TimeZone.getDefault(),
 ) {
     suspend fun listMemos(limit: Int): List<WireObject> = memos.listRecentMemos(limit).map { it.toWire() }
 
@@ -45,6 +49,53 @@ class MemoBridge internal constructor(
         val todoId = id.toLongOrNull() ?: throw TodoNotFoundException()
         if (memos.completeTodo(todoId, clock.nowMillis()) == TodoCompletion.NOT_FOUND) throw TodoNotFoundException()
     }
+
+    suspend fun organizeStatus(): WireObject {
+        val backlog = backlog()
+        val status = organize.status
+        return mapOf(
+            "state" to when (status.phase) {
+                OrganizePhase.IDLE -> "idle"
+                OrganizePhase.PREPARING -> "preparing"
+                OrganizePhase.ORGANIZING -> "organizing"
+                OrganizePhase.STOPPING -> "stopping"
+            },
+            "completedChunks" to status.completedChunks,
+            "totalChunks" to status.totalChunks,
+            "pendingChunks" to backlog.readyChunks,
+            "isWaitingForSilence" to backlog.hasOngoing,
+            "lastResult" to when (status.ending) {
+                null -> null
+                OrganizeEnding.COMPLETED -> "completed"
+                OrganizeEnding.STOPPED -> "stopped"
+                OrganizeEnding.TOO_HOT -> "too-hot"
+                OrganizeEnding.MODEL_MISSING -> "model-unavailable"
+                OrganizeEnding.FAILED -> "failed"
+                OrganizeEnding.TIME_LIMIT -> "time-limit"
+            },
+        )
+    }
+
+    /**
+     * 利用者の操作でだけ呼ぶ。始めるものがないときはモデルを読み込まない。
+     * [beforeStart] は、始めると決まってから OS の確認を出すために呼ぶ。
+     */
+    suspend fun startOrganize(beforeStart: suspend () -> Unit = {}): String = when {
+        organize.status.isRunning && organize.status.isManual -> "already-running"
+        !organize.isModelReady() -> "model-unavailable"
+        !organize.status.isRunning && backlog().readyChunks == 0 -> "nothing-to-organize"
+        else -> {
+            beforeStart()
+            if (organize.start()) "started" else "failed"
+        }
+    }
+
+    /** 区切りで止まる。動いていなければ何もしない。 */
+    fun stopOrganize() {
+        if (organize.status.isRunning) organize.stop()
+    }
+
+    private suspend fun backlog() = organizeBacklog(memos, speakers().values.toList(), clock, timeZone)
 }
 
 /** 特徴量は JS へ渡さない。JS が知るのは表示に使う名前だけ。 */

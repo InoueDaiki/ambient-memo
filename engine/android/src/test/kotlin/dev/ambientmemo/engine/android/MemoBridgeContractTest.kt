@@ -26,8 +26,10 @@ import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import java.io.File
 import java.util.Properties
+import java.util.TimeZone
 
 private const val SELF_SPEAKER_ID = 7L
+private const val TEN_MINUTES = 10 * 60 * 1_000L
 
 /**
  * `packages/engine-client/src/memo-contract.ts` の契約を、本物の [MemoBridge] と SQLite に流す。
@@ -44,7 +46,28 @@ class MemoBridgeContractTest {
         events += it
     }
     private val self = Speaker(SELF_SPEAKER_ID, "自分", SpeakerNameSource.SELF, isSelf = true, createdAtMillis = 0)
-    private val bridge = MemoBridge(memos, { mapOf(self.id to self) }, FakeClock(50_000))
+
+    private class FakeOrganize : OrganizeControl {
+        var modelReady = true
+        var starts = 0
+        override var status = OrganizeStatus()
+
+        override fun isModelReady() = modelReady
+
+        override fun start(): Boolean {
+            starts++
+            status = OrganizeStatus(OrganizePhase.PREPARING, isManual = true)
+            return true
+        }
+
+        override fun stop() {
+            status = status.copy(phase = OrganizePhase.STOPPING)
+        }
+    }
+
+    private val organize = FakeOrganize()
+    private val clock = FakeClock(50_000)
+    private val bridge = MemoBridge(memos, { mapOf(self.id to self) }, clock, organize, TimeZone.getTimeZone("UTC"))
 
     @AfterEach
     fun close() = driver.close()
@@ -188,6 +211,80 @@ class MemoBridgeContractTest {
         listOf("none", "12345").forEach { id ->
             assertThrows(TodoNotFoundException::class.java) { runBlocking { bridge.completeTodo(id) } }
         }
+    }
+
+    private suspend fun leaveUnorganized(atMillis: Long) {
+        utterances.insert(NewUtterance(atMillis, atMillis, "発話", null, atMillis))
+    }
+
+    @Test
+    fun `未処理がなければ整理を始めない`() = runTest {
+        assertEquals("nothing-to-organize", bridge.startOrganize())
+        assertEquals("idle", bridge.organizeStatus()["state"])
+        assertEquals(0, bridge.organizeStatus()["pendingChunks"])
+    }
+
+    @Test
+    fun `話が途切れていない発話は待っていると伝える`() = runTest {
+        leaveUnorganized(clock.nowMillis() - 1)
+
+        val status = bridge.organizeStatus()
+
+        assertEquals(0, status["pendingChunks"])
+        assertEquals(true, status["isWaitingForSilence"])
+        assertEquals("nothing-to-organize", bridge.startOrganize())
+    }
+
+    @Test
+    fun `未処理があれば整理を始めて、進行の状態を返す`() = runTest {
+        leaveUnorganized(0)
+        clock.advanceBy(TEN_MINUTES)
+        leaveUnorganized(clock.nowMillis())
+        clock.advanceBy(TEN_MINUTES)
+
+        assertEquals(2, bridge.organizeStatus()["pendingChunks"])
+        assertEquals("started", bridge.startOrganize())
+
+        assertEquals("preparing", bridge.organizeStatus()["state"])
+    }
+
+    @Test
+    fun `動いている間に始めても二重には始めない`() = runTest {
+        leaveUnorganized(0)
+        clock.advanceBy(TEN_MINUTES)
+        bridge.startOrganize()
+
+        assertEquals("already-running", bridge.startOrganize())
+
+        assertEquals(1, organize.starts)
+    }
+
+    @Test
+    fun `止めると区切りで止まる途中の状態になる`() = runTest {
+        leaveUnorganized(0)
+        clock.advanceBy(TEN_MINUTES)
+        bridge.startOrganize()
+
+        bridge.stopOrganize()
+
+        assertEquals("stopping", bridge.organizeStatus()["state"])
+    }
+
+    @Test
+    fun `動いていないときに止めても何も起きない`() = runTest {
+        bridge.stopOrganize()
+
+        assertEquals("idle", bridge.organizeStatus()["state"])
+    }
+
+    @Test
+    fun `整理のモデルがなければ始めない`() = runTest {
+        leaveUnorganized(0)
+        clock.advanceBy(TEN_MINUTES)
+        organize.modelReady = false
+
+        assertEquals("model-unavailable", bridge.startOrganize())
+        assertEquals(0, organize.starts)
     }
 
     @Test

@@ -10,6 +10,8 @@ import {
   type MemoDetail,
   type MemoEngineClient,
   type MemoMode,
+  type OrganizeStartResult,
+  type OrganizeStatus,
   type ModelDownloadStatus,
   type OrganizerModelStatus,
   type SelfEnrollmentFailure,
@@ -433,6 +435,8 @@ function useMemoQuery<T>(
 const MEMO_EVENTS = ["memos-changed"] as const;
 const TODO_EVENTS = ["todos-changed"] as const;
 const MEMO_DETAIL_EVENTS = ["memos-changed", "todos-changed"] as const;
+// 未処理の量は発話が増えても、メモになっても変わる
+const ORGANIZE_EVENTS = ["organize-changed", "memos-changed", "utterances-changed"] as const;
 
 // 最初の取得が終わるまでと、取得に失敗したときは undefined
 export function useMemoMode(): MemoMode | undefined {
@@ -492,6 +496,37 @@ export function useTodos({ limit }: { limit: number }): UseTodosResult {
   const load = useCallback(() => client.listTodos({ limit }), [client, limit]);
   const { value, error } = useMemoQuery(load, TODO_EVENTS);
   return { todos: value, error };
+}
+
+export interface UseOrganizeResult {
+  // 最初の取得が終わるまでと、取得に失敗したときは undefined
+  status: OrganizeStatus | undefined;
+  // 最後の開始の依頼の結果。始まらなかった理由を出すのに使う。次の操作で消える
+  startResult: OrganizeStartResult | undefined;
+  start: () => void;
+  stop: () => void;
+}
+
+// 充電を待たない整理の操作と状態
+export function useOrganize(): UseOrganizeResult {
+  const client = useMemoClient();
+  const load = useCallback(() => client.getOrganizeStatus(), [client]);
+  const { value } = useMemoQuery(load, ORGANIZE_EVENTS);
+  const [startResult, setStartResult] = useState<OrganizeStartResult>();
+
+  const start = useCallback(() => {
+    setStartResult(undefined);
+    client
+      .startOrganize()
+      .then(setStartResult)
+      .catch(() => setStartResult("failed"));
+  }, [client]);
+
+  const stop = useCallback(() => {
+    client.stopOrganize().catch(() => undefined);
+  }, [client]);
+
+  return { status: value, startResult, start, stop };
 }
 
 export interface UseCompleteTodoResult {

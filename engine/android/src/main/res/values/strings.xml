@@ -19,4 +19,17 @@
     <string name="download_finished_text">聞き取りを始められます</string>
     <string name="download_failed_title">モデルを取得できませんでした</string>
     <string name="download_failed_text">アプリを開いて、もう一度試してください</string>
+    <string name="channel_organize">メモの整理</string>
+    <string name="organize_title">メモを整理しています</string>
+    <string name="organize_preparing">準備しています</string>
+    <string name="organize_progress">%1$d / %2$d まとまり</string>
+    <string name="organize_stopping">今のまとまりが終わると止まります</string>
+    <string name="organize_stop">止める</string>
+    <string name="organize_completed_title">メモの整理が終わりました</string>
+    <string name="organize_completed_text">アプリでメモを確かめられます</string>
+    <string name="organize_stopped_title">メモの整理を止めました</string>
+    <string name="organize_too_hot_text">端末が熱くなりました。冷めてからもう一度試してください</string>
+    <string name="organize_failed_title">メモの整理が止まりました</string>
+    <string name="organize_failed_text">聞き取りには影響ありません。アプリを開いて、もう一度試してください</string>
+    <string name="organize_time_limit_text">長く動いたので止めました。アプリを開くと続きから整理できます</string>
 </resources>

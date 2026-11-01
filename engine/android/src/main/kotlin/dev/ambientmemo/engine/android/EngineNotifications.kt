@@ -17,6 +17,7 @@ private const val REQUEST_STOP = 1
 
 internal const val CAPTURE_NOTIFICATION_ID = 1
 internal const val CHANNEL_MODEL_DOWNLOAD = "model-download"
+internal const val CHANNEL_ORGANIZE = "organize"
 
 /** エンジンの通知。POST_NOTIFICATIONS がないと表示されないが、呼んでも失敗はしない。 */
 internal class EngineNotifications(private val context: Context) {
@@ -94,6 +95,11 @@ internal class EngineNotifications(private val context: Context) {
                 NotificationChannel(
                     CHANNEL_MODEL_DOWNLOAD,
                     context.getString(R.string.channel_model_download),
+                    NotificationManager.IMPORTANCE_LOW,
+                ),
+                NotificationChannel(
+                    CHANNEL_ORGANIZE,
+                    context.getString(R.string.channel_organize),
                     NotificationManager.IMPORTANCE_LOW,
                 ),
             ),

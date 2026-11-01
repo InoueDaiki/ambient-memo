@@ -9,13 +9,16 @@ import dev.ambientmemo.engine.domain.LlmInputTooLongException
 import dev.ambientmemo.engine.domain.LlmRequest
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.OrganizeAttempts
+import dev.ambientmemo.engine.domain.OrganizeBacklog
 import dev.ambientmemo.engine.domain.OrganizeConfig
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
+import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.TodoKind
 import dev.ambientmemo.engine.domain.TodoStatus
+import dev.ambientmemo.engine.domain.organizeBacklog
 import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.FakeLlm
 import dev.ambientmemo.engine.domain.testing.isTodoRequest
@@ -662,6 +665,37 @@ class OrganizeJobIntegrationTest {
 
             val memo = harness.memos.listMemos().single()
             assertEquals(TodoStatus.CANDIDATE, harness.memos.listTodos(memo.id).single().status)
+        }
+    }
+
+    @Test
+    fun `今整理できる量は実行と同じ分け方で数え、話の途中の発話は待っているものとして数える`() = runTest {
+        openTestDriver(dir.resolve("backlog.db")).use { driver ->
+            val harness = Harness(driver)
+            harness.sayConversations(2)
+            harness.say(afterLastTalk - minute, "今の話")
+
+            val backlog = organizeBacklog(harness.memos, emptyList(), harness.clock, tokyo, config)
+
+            assertEquals(OrganizeBacklog(readyChunks = 2, hasOngoing = true), backlog)
+            assertEquals(2, harness.job(FakeLlm.organizing()).run().memoCount)
+            assertEquals(
+                OrganizeBacklog(readyChunks = 0, hasOngoing = true),
+                organizeBacklog(harness.memos, emptyList(), harness.clock, tokyo, config),
+            )
+        }
+    }
+
+    @Test
+    fun `進み具合は対象が決まったときとまとまりを終えるたびに届く`() = runTest {
+        openTestDriver(dir.resolve("progress.db")).use { driver ->
+            val harness = Harness(driver)
+            harness.sayConversations(2)
+            val progress = mutableListOf<OrganizeProgress>()
+
+            harness.job(FakeLlm.organizing()).run(onProgress = { progress += it })
+
+            assertEquals(listOf(OrganizeProgress(0, 2), OrganizeProgress(1, 2), OrganizeProgress(2, 2)), progress)
         }
     }
 }

@@ -54,11 +54,12 @@ internal object OrganizeSchedule {
  * [OrganizeService] に整理を頼み、終わるのを待つ。LLM はこのプロセスで動かさない。
  *
  * 条件が外れて止められたら、区切りのよいところで止めるよう頼む。残りは未処理のまま残るので、次の実行が続きから処理する。
+ * 手動の実行が動いていれば、すぐに終わった返事が来る。同時には動かさない。
  */
 class OrganizeWorker(context: Context, parameters: WorkerParameters) : CoroutineWorker(context, parameters) {
     override suspend fun doWork(): Result = when (OrganizeConnection(applicationContext).run()) {
-        OrganizeRunResult.FINISHED -> Result.success()
         OrganizeRunResult.FAILED -> if (runAttemptCount + 1 < MAX_RUN_ATTEMPTS) Result.retry() else Result.success()
+        OrganizeRunResult.COMPLETED, OrganizeRunResult.STOPPED, OrganizeRunResult.MODEL_MISSING -> Result.success()
     }
 }
 
