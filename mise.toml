@@ -74,4 +74,5 @@ depends = ["mobile:prebuild"]
 run = [
   "apps/mobile/android/gradlew -p apps/mobile/android :app:assembleRelease -PreactNativeArchitectures=arm64-v8a",
   "scripts/check-release-manifest.sh",
+  "scripts/check-release-native-classes.sh",
 ]
