@@ -172,7 +172,9 @@ export function SpeakersScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
-        <Button label="戻る" variant="ghost" onPress={() => navigation.goBack()} />
+        <View style={{ alignSelf: "flex-start" }}>
+          <Button label="戻る" variant="ghost" onPress={() => navigation.goBack()} />
+        </View>
         <Text variant="title" accessibilityRole="header">
           話者
         </Text>
