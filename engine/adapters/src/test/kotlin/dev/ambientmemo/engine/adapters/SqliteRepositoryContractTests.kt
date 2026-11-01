@@ -8,6 +8,7 @@ import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.testing.CaptureGapRepositoryContract
 import dev.ambientmemo.engine.domain.testing.MemoRepositoryContract
 import dev.ambientmemo.engine.domain.testing.OrganizeAttemptsContract
+import dev.ambientmemo.engine.domain.testing.SpeakerDecisionLogContract
 import dev.ambientmemo.engine.domain.testing.SpeakerRepositoryContract
 import dev.ambientmemo.engine.domain.testing.UtteranceRepositoryContract
 import kotlinx.coroutines.test.runTest
@@ -58,6 +59,21 @@ class SqliteSpeakerRepositoryContractTest : SpeakerRepositoryContract() {
     private lateinit var driver: JdbcSqliteDriver
 
     override fun repository(): SqliteSpeakerRepository {
+        driver = openTestDriver(dir.resolve("test.db"))
+        return SqliteSpeakerRepository(AmbientMemoDatabase(driver))
+    }
+
+    @AfterEach
+    fun closeDriver() = driver.close()
+}
+
+class SqliteSpeakerDecisionLogContractTest : SpeakerDecisionLogContract() {
+    @TempDir
+    lateinit var dir: Path
+
+    private lateinit var driver: JdbcSqliteDriver
+
+    override fun log(): SqliteSpeakerRepository {
         driver = openTestDriver(dir.resolve("test.db"))
         return SqliteSpeakerRepository(AmbientMemoDatabase(driver))
     }

@@ -9,6 +9,14 @@ data class SpeakerTurn(
     val endedAtMillis: Long,
     val text: String,
     val speaker: SpeakerAssignment?,
+    /** 手で直したときに判定へ反映する声。保存しない。 */
+    val voice: TurnVoice? = null,
+)
+
+/** 行の声の特徴量。[RecentVoices] がメモリに持つだけで、DB には書かない。 */
+class TurnVoice(
+    val vector: FloatArray,
+    val voicedMillis: Long,
 )
 
 internal data class SpeakerWindow(
@@ -32,7 +40,9 @@ internal class VoiceRun(
     val voice: Voice,
     val vector: FloatArray?,
     val score: Float,
-)
+) {
+    val millis: Long get() = endMillis - startMillis
+}
 
 /** 本文の割り当てが済んだまとまり。 */
 internal class VoicePart(
@@ -99,6 +109,23 @@ private fun voiceRun(
         else -> Voice.OTHER
     }
     return VoiceRun(startMillis, endMillis, voice, meanOf(windows.map { it.vector }), score)
+}
+
+/**
+ * 知っている他人の声と比べて、自分の判定を確かめる。[rivalScore] は最も近い他人との類似度。
+ *
+ * しきい値を緩めると、別の人の声も帯の近くに入る。一方で、自分の声が端末の条件で下がった発話は、
+ * 他人の重心にも近くならない。そこで、確信の持てない範囲だけ、自分と他人のどちらに近いかで決める。
+ */
+internal fun settledVoice(run: VoiceRun, rivalScore: Float?, config: SpeakerConfig): Voice {
+    if (rivalScore == null || run.score >= config.strongSelfThreshold) return run.voice
+    val lead = run.score - rivalScore
+    return when {
+        run.voice == Voice.UNKNOWN && lead >= config.rivalMargin -> Voice.SELF
+        run.voice == Voice.UNKNOWN && lead <= -config.rivalMargin -> Voice.OTHER
+        run.voice == Voice.SELF && lead <= -config.selfOverrideMargin -> Voice.OTHER
+        else -> run.voice
+    }
 }
 
 /**
@@ -176,5 +203,6 @@ private fun SpeakerTurn.mergedWith(next: SpeakerTurn): SpeakerTurn {
         endedAtMillis = next.endedAtMillis,
         text = text + next.text,
         speaker = speaker?.copy(confidence = confidence),
+        voice = listOfNotNull(voice, next.voice).maxByOrNull { it.voicedMillis },
     )
 }

@@ -77,8 +77,29 @@ class SchemaMigrationTest {
     }
 
     @TestFactory
+    fun `移行した話者の特徴量は長さを持ち、まとめ直しと統計に使える`(): List<DynamicTest> =
+        (3L..<schema.version).map { version ->
+            dynamicTest("版 $version から") {
+                val path = dir.resolve("speaker-$version.db")
+                Files.copy(snapshot(version), path)
+                JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+                    seedStatements(seed(version)!!).forEach { driver.execute(null, it, 0) }
+                    schema.migrate(driver, version, schema.version).value
+                    val speakers = SqliteSpeakerRepository(AmbientMemoDatabase(driver), Dispatchers.Unconfined)
+                    runTest {
+                        val stored = speakers.listEmbeddings("fake-1", 10)
+                        val lengths = stored.map { it.sampleCount to it.voicedMillis }.toSet()
+                        assertEquals(setOf(3 to 6_000L, 1 to 2_000L), lengths)
+                        assertEquals(null, speakers.findSelfAdaptation("fake-1"))
+                        assertTrue(speakers.summarize(0).isEmpty())
+                    }
+                }
+            }
+        }
+
+    @TestFactory
     fun `移行した ToDo は未完了のまま読めて、完了できる`(): List<DynamicTest> =
-        (2 until schema.version).map { version ->
+        (2L..3L).map { version ->
             dynamicTest("版 $version から") {
                 val path = dir.resolve("todo-$version.db")
                 Files.copy(snapshot(version), path)

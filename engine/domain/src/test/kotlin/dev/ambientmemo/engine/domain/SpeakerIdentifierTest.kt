@@ -21,7 +21,11 @@ class SpeakerIdentifierTest {
     // 窓を 1 つにして、まとまりの照合だけを見る。窓の動きは SpeakerTurnPipelineTest で確かめる
     private val config = SpeakerConfig(
         selfThreshold = 0.6f,
+        selfExitThreshold = 0.55f,
+        unknownFloor = 0.45f,
         provisionalThreshold = 0.7f,
+        minNewSpeakerRunMillis = 0,
+        maxProvisionalSpeakers = 64,
         windowMillis = 60_000,
         trailingSilenceMillis = 0,
         minReliableMillis = 2_000,
@@ -110,7 +114,7 @@ class SpeakerIdentifierTest {
         val angle = 1.2f
         val first = floatArrayOf(0f, 1f, 0f)
         val next = floatArrayOf(0f, cos(angle / 3), sin(angle / 3))
-        val other = speakers.createProvisionalSpeaker(SpeakerEmbedding(first, model), 0)
+        val other = speakers.createProvisionalSpeaker(SpeakerEmbedding(first, model), 0, 3_000)
         val (identifier, _) = identifier(next)
 
         identifier.identify(segment())

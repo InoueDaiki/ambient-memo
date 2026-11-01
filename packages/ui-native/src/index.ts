@@ -17,4 +17,6 @@ export { Tag } from "./Tag.tsx";
 export type { TagProps } from "./Tag.tsx";
 export { Text } from "./Text.tsx";
 export type { TextProps } from "./Text.tsx";
+export { TextField } from "./TextField.tsx";
+export type { TextFieldProps } from "./TextField.tsx";
 export { useColors } from "./theme.ts";

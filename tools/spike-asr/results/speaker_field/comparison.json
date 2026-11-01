@@ -1,0 +1,2840 @@
+{
+ "dev": {
+  "main の規則": {
+   "studio": {
+    "recall_ci": [
+     82.0,
+     91.0
+    ],
+    "fa_ci": [
+     0.7,
+     3.8
+    ],
+    "growth": [
+     2.1,
+     2.7,
+     3.4,
+     3.8
+    ],
+    "recall": 86.7,
+    "fa": 2.0,
+    "s2o": 7.4,
+    "unk": 7.6,
+    "speakers_mean": 3.8,
+    "speakers_max": 8,
+    "self_clusters": 0.9
+   },
+   "table": {
+    "recall_ci": [
+     72.6,
+     87.5
+    ],
+    "fa_ci": [
+     0.6,
+     2.2
+    ],
+    "growth": [
+     3.2,
+     4.6,
+     6.7,
+     9.5
+    ],
+    "recall": 80.3,
+    "fa": 1.4,
+    "s2o": 11.4,
+    "unk": 6.2,
+    "speakers_mean": 9.5,
+    "speakers_max": 17,
+    "self_clusters": 2.8
+   },
+   "pocket": {
+    "recall_ci": [
+     42.2,
+     72.4
+    ],
+    "fa_ci": [
+     0.3,
+     0.9
+    ],
+    "growth": [
+     1.7,
+     2.4,
+     4.9,
+     6.1
+    ],
+    "recall": 57.6,
+    "fa": 0.6,
+    "s2o": 13.5,
+    "unk": 18.1,
+    "speakers_mean": 6.1,
+    "speakers_max": 14,
+    "self_clusters": 2.4
+   },
+   "cafe": {
+    "recall_ci": [
+     24.6,
+     56.3
+    ],
+    "fa_ci": [
+     0.1,
+     0.5
+    ],
+    "growth": [
+     3.6,
+     6.9,
+     10.0,
+     12.1
+    ],
+    "recall": 39.6,
+    "fa": 0.3,
+    "s2o": 36.8,
+    "unk": 12.9,
+    "speakers_mean": 12.1,
+    "speakers_max": 18,
+    "self_clusters": 4.7
+   },
+   "mixed": {
+    "recall_ci": [
+     55.6,
+     77.0
+    ],
+    "fa_ci": [
+     0.5,
+     1.6
+    ],
+    "growth": [
+     3.2,
+     4.8,
+     8.8,
+     11.5
+    ],
+    "recall": 66.2,
+    "fa": 1.0,
+    "s2o": 15.9,
+    "unk": 11.3,
+    "speakers_mean": 11.5,
+    "speakers_max": 20,
+    "self_clusters": 4.1
+   }
+  },
+  "main + 仮の話者の上限だけ": {
+   "studio": {
+    "recall_ci": [
+     82.0,
+     91.0
+    ],
+    "fa_ci": [
+     0.7,
+     3.8
+    ],
+    "growth": [
+     2.0,
+     2.2,
+     2.7,
+     2.7
+    ],
+    "recall": 86.7,
+    "fa": 2.0,
+    "s2o": 7.6,
+    "unk": 7.5,
+    "speakers_mean": 2.7,
+    "speakers_max": 3,
+    "self_clusters": 0.7
+   },
+   "table": {
+    "recall_ci": [
+     72.6,
+     87.5
+    ],
+    "fa_ci": [
+     0.6,
+     2.2
+    ],
+    "growth": [
+     2.3,
+     2.7,
+     3.0,
+     3.0
+    ],
+    "recall": 80.3,
+    "fa": 1.4,
+    "s2o": 11.6,
+    "unk": 6.0,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 0.9
+   },
+   "pocket": {
+    "recall_ci": [
+     42.2,
+     72.4
+    ],
+    "fa_ci": [
+     0.3,
+     0.9
+    ],
+    "growth": [
+     1.6,
+     2.3,
+     2.5,
+     2.7
+    ],
+    "recall": 57.6,
+    "fa": 0.6,
+    "s2o": 14.1,
+    "unk": 17.4,
+    "speakers_mean": 2.7,
+    "speakers_max": 3,
+    "self_clusters": 0.8
+   },
+   "cafe": {
+    "recall_ci": [
+     24.6,
+     56.3
+    ],
+    "fa_ci": [
+     0.1,
+     0.5
+    ],
+    "growth": [
+     2.9,
+     3.0,
+     3.0,
+     3.0
+    ],
+    "recall": 39.6,
+    "fa": 0.3,
+    "s2o": 37.2,
+    "unk": 12.2,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 0.7
+   },
+   "mixed": {
+    "recall_ci": [
+     55.6,
+     77.0
+    ],
+    "fa_ci": [
+     0.5,
+     1.6
+    ],
+    "growth": [
+     2.3,
+     3.0,
+     3.0,
+     3.0
+    ],
+    "recall": 66.2,
+    "fa": 1.0,
+    "s2o": 16.4,
+    "unk": 10.6,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 1.0
+   }
+  },
+  "緩める(比較なし、更新なし)": {
+   "studio": {
+    "recall_ci": [
+     93.5,
+     97.4
+    ],
+    "fa_ci": [
+     2.8,
+     18.0
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 95.6,
+    "fa": 9.3,
+    "s2o": 3.1,
+    "unk": 5.2,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     91.7,
+     96.5
+    ],
+    "fa_ci": [
+     2.5,
+     12.5
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     2.0,
+     2.4
+    ],
+    "recall": 94.3,
+    "fa": 6.8,
+    "s2o": 4.2,
+    "unk": 3.6,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   },
+   "pocket": {
+    "recall_ci": [
+     84.6,
+     93.1
+    ],
+    "fa_ci": [
+     2.1,
+     5.7
+    ],
+    "growth": [
+     1.0,
+     1.1,
+     1.8,
+     1.8
+    ],
+    "recall": 88.9,
+    "fa": 3.9,
+    "s2o": 5.3,
+    "unk": 7.0,
+    "speakers_mean": 1.8,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "cafe": {
+    "recall_ci": [
+     64.2,
+     84.6
+    ],
+    "fa_ci": [
+     1.0,
+     5.8
+    ],
+    "growth": [
+     1.4,
+     2.1,
+     2.2,
+     2.4
+    ],
+    "recall": 74.7,
+    "fa": 3.1,
+    "s2o": 18.6,
+    "unk": 4.9,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.7
+   },
+   "mixed": {
+    "recall_ci": [
+     86.0,
+     93.8
+    ],
+    "fa_ci": [
+     2.0,
+     9.4
+    ],
+    "growth": [
+     1.2,
+     1.2,
+     1.9,
+     2.2
+    ],
+    "recall": 90.1,
+    "fa": 5.1,
+    "s2o": 6.0,
+    "unk": 4.7,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   }
+  },
+  "緩める + 他人との比較": {
+   "studio": {
+    "recall_ci": [
+     93.7,
+     96.1
+    ],
+    "fa_ci": [
+     2.1,
+     6.0
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 94.9,
+    "fa": 3.9,
+    "s2o": 4.8,
+    "unk": 0.3,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     91.8,
+     95.5
+    ],
+    "fa_ci": [
+     2.3,
+     4.8
+    ],
+    "growth": [
+     1.1,
+     1.6,
+     2.0,
+     2.3
+    ],
+    "recall": 93.9,
+    "fa": 3.4,
+    "s2o": 5.6,
+    "unk": 0.4,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     79.2,
+     91.3
+    ],
+    "fa_ci": [
+     1.3,
+     2.8
+    ],
+    "growth": [
+     1.0,
+     1.1,
+     1.8,
+     1.8
+    ],
+    "recall": 85.5,
+    "fa": 2.0,
+    "s2o": 11.9,
+    "unk": 2.0,
+    "speakers_mean": 1.8,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "cafe": {
+    "recall_ci": [
+     62.1,
+     83.8
+    ],
+    "fa_ci": [
+     0.8,
+     3.0
+    ],
+    "growth": [
+     1.3,
+     2.1,
+     2.2,
+     2.4
+    ],
+    "recall": 73.5,
+    "fa": 1.8,
+    "s2o": 23.7,
+    "unk": 1.7,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.7
+   },
+   "mixed": {
+    "recall_ci": [
+     84.4,
+     93.9
+    ],
+    "fa_ci": [
+     1.7,
+     3.7
+    ],
+    "growth": [
+     1.1,
+     1.1,
+     1.8,
+     2.0
+    ],
+    "recall": 90.1,
+    "fa": 2.7,
+    "s2o": 9.0,
+    "unk": 0.8,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   }
+  },
+  "推奨(緩める + 比較 + 自分の更新)": {
+   "studio": {
+    "recall_ci": [
+     95.5,
+     97.1
+    ],
+    "fa_ci": [
+     3.2,
+     10.4
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 96.4,
+    "fa": 6.4,
+    "s2o": 3.4,
+    "unk": 0.3,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     95.2,
+     97.2
+    ],
+    "fa_ci": [
+     3.4,
+     7.3
+    ],
+    "growth": [
+     1.1,
+     1.6,
+     1.9,
+     2.3
+    ],
+    "recall": 96.3,
+    "fa": 5.3,
+    "s2o": 3.3,
+    "unk": 0.3,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     90.3,
+     94.8
+    ],
+    "fa_ci": [
+     2.0,
+     4.5
+    ],
+    "growth": [
+     1.0,
+     1.2,
+     1.7,
+     1.7
+    ],
+    "recall": 92.6,
+    "fa": 3.1,
+    "s2o": 5.7,
+    "unk": 1.5,
+    "speakers_mean": 1.7,
+    "speakers_max": 3,
+    "self_clusters": 0.3
+   },
+   "cafe": {
+    "recall_ci": [
+     66.5,
+     89.9
+    ],
+    "fa_ci": [
+     1.4,
+     4.2
+    ],
+    "growth": [
+     1.3,
+     2.0,
+     2.1,
+     2.3
+    ],
+    "recall": 79.4,
+    "fa": 2.8,
+    "s2o": 19.0,
+    "unk": 1.2,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "mixed": {
+    "recall_ci": [
+     93.0,
+     96.2
+    ],
+    "fa_ci": [
+     2.8,
+     6.3
+    ],
+    "growth": [
+     1.1,
+     1.2,
+     1.8,
+     2.1
+    ],
+    "recall": 94.9,
+    "fa": 4.6,
+    "s2o": 4.7,
+    "unk": 0.6,
+    "speakers_mean": 2.1,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   }
+  },
+  "推奨で他人との比較をなくす": {
+   "studio": {
+    "recall_ci": [
+     95.8,
+     98.4
+    ],
+    "fa_ci": [
+     4.1,
+     25.4
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 97.2,
+    "fa": 13.5,
+    "s2o": 2.0,
+    "unk": 7.3,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     95.1,
+     98.1
+    ],
+    "fa_ci": [
+     4.0,
+     19.7
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     1.9,
+     2.3
+    ],
+    "recall": 96.7,
+    "fa": 11.2,
+    "s2o": 2.5,
+    "unk": 5.2,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     91.1,
+     95.9
+    ],
+    "fa_ci": [
+     3.6,
+     12.8
+    ],
+    "growth": [
+     1.0,
+     1.2,
+     1.7,
+     1.7
+    ],
+    "recall": 93.5,
+    "fa": 8.0,
+    "s2o": 3.0,
+    "unk": 7.3,
+    "speakers_mean": 1.7,
+    "speakers_max": 3,
+    "self_clusters": 0.3
+   },
+   "cafe": {
+    "recall_ci": [
+     69.0,
+     89.5
+    ],
+    "fa_ci": [
+     1.6,
+     8.1
+    ],
+    "growth": [
+     1.4,
+     2.0,
+     2.1,
+     2.3
+    ],
+    "recall": 80.1,
+    "fa": 4.6,
+    "s2o": 14.9,
+    "unk": 5.1,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   },
+   "mixed": {
+    "recall_ci": [
+     91.6,
+     96.4
+    ],
+    "fa_ci": [
+     3.2,
+     14.9
+    ],
+    "growth": [
+     1.2,
+     1.3,
+     1.9,
+     2.2
+    ],
+    "recall": 94.3,
+    "fa": 8.5,
+    "s2o": 3.9,
+    "unk": 6.1,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   }
+  },
+  "推奨で更新の幅の上限なし": {
+   "studio": {
+    "recall_ci": [
+     97.1,
+     98.5
+    ],
+    "fa_ci": [
+     4.5,
+     35.1
+    ],
+    "growth": [
+     0.9,
+     0.9,
+     0.9,
+     0.9
+    ],
+    "recall": 97.8,
+    "fa": 16.1,
+    "s2o": 2.1,
+    "unk": 0.2,
+    "speakers_mean": 0.9,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     96.8,
+     98.0
+    ],
+    "fa_ci": [
+     4.7,
+     10.9
+    ],
+    "growth": [
+     1.1,
+     1.6,
+     1.9,
+     2.2
+    ],
+    "recall": 97.4,
+    "fa": 7.5,
+    "s2o": 2.4,
+    "unk": 0.3,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.0
+   },
+   "pocket": {
+    "recall_ci": [
+     93.1,
+     96.9
+    ],
+    "fa_ci": [
+     3.6,
+     24.0
+    ],
+    "growth": [
+     0.8,
+     1.0,
+     1.5,
+     1.5
+    ],
+    "recall": 95.4,
+    "fa": 10.7,
+    "s2o": 3.9,
+    "unk": 1.4,
+    "speakers_mean": 1.5,
+    "speakers_max": 3,
+    "self_clusters": 0.0
+   },
+   "cafe": {
+    "recall_ci": [
+     69.7,
+     93.7
+    ],
+    "fa_ci": [
+     2.4,
+     7.0
+    ],
+    "growth": [
+     1.3,
+     1.9,
+     2.0,
+     2.2
+    ],
+    "recall": 83.2,
+    "fa": 4.7,
+    "s2o": 15.7,
+    "unk": 1.0,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.3
+   },
+   "mixed": {
+    "recall_ci": [
+     95.2,
+     97.5
+    ],
+    "fa_ci": [
+     3.9,
+     10.8
+    ],
+    "growth": [
+     1.1,
+     1.2,
+     1.7,
+     1.9
+    ],
+    "recall": 96.5,
+    "fa": 7.0,
+    "s2o": 3.2,
+    "unk": 0.6,
+    "speakers_mean": 1.9,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "推奨で仮の話者の重みを長さにしない": {
+   "studio": {
+    "recall_ci": [
+     95.4,
+     97.1
+    ],
+    "fa_ci": [
+     3.1,
+     9.1
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 96.3,
+    "fa": 5.8,
+    "s2o": 3.5,
+    "unk": 0.3,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     94.8,
+     96.8
+    ],
+    "fa_ci": [
+     3.2,
+     6.3
+    ],
+    "growth": [
+     1.1,
+     1.6,
+     1.9,
+     2.3
+    ],
+    "recall": 96.0,
+    "fa": 4.7,
+    "s2o": 3.7,
+    "unk": 0.3,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     89.5,
+     94.1
+    ],
+    "fa_ci": [
+     1.9,
+     4.4
+    ],
+    "growth": [
+     1.0,
+     1.1,
+     1.7,
+     1.7
+    ],
+    "recall": 91.9,
+    "fa": 3.0,
+    "s2o": 6.3,
+    "unk": 1.6,
+    "speakers_mean": 1.7,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   },
+   "cafe": {
+    "recall_ci": [
+     62.6,
+     87.5
+    ],
+    "fa_ci": [
+     1.1,
+     3.3
+    ],
+    "growth": [
+     1.3,
+     2.0,
+     2.1,
+     2.2
+    ],
+    "recall": 76.2,
+    "fa": 2.1,
+    "s2o": 22.0,
+    "unk": 1.3,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "mixed": {
+    "recall_ci": [
+     92.4,
+     95.7
+    ],
+    "fa_ci": [
+     2.6,
+     5.1
+    ],
+    "growth": [
+     1.1,
+     1.2,
+     1.8,
+     2.1
+    ],
+    "recall": 94.3,
+    "fa": 3.9,
+    "s2o": 5.3,
+    "unk": 0.6,
+    "speakers_mean": 2.1,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   }
+  },
+  "推奨で聞き取りと同じ場所で登録": {
+   "studio": {
+    "recall_ci": [
+     85.4,
+     94.9
+    ],
+    "fa_ci": [
+     1.2,
+     3.2
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 91.2,
+    "fa": 2.1,
+    "s2o": 8.3,
+    "unk": 0.4,
+    "speakers_mean": 1.0,
+    "speakers_max": 1,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     96.6,
+     97.9
+    ],
+    "fa_ci": [
+     4.7,
+     9.7
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     1.9,
+     2.2
+    ],
+    "recall": 97.3,
+    "fa": 7.2,
+    "s2o": 2.5,
+    "unk": 0.2,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.0
+   },
+   "pocket": {
+    "recall_ci": [
+     93.4,
+     95.7
+    ],
+    "fa_ci": [
+     2.7,
+     5.6
+    ],
+    "growth": [
+     0.9,
+     1.1,
+     1.6,
+     1.6
+    ],
+    "recall": 94.6,
+    "fa": 4.1,
+    "s2o": 4.2,
+    "unk": 1.4,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "cafe": {
+    "recall_ci": [
+     79.1,
+     93.2
+    ],
+    "fa_ci": [
+     2.4,
+     6.0
+    ],
+    "growth": [
+     1.5,
+     2.1,
+     2.3,
+     2.5
+    ],
+    "recall": 86.8,
+    "fa": 4.2,
+    "s2o": 11.7,
+    "unk": 1.3,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   },
+   "mixed": {
+    "recall_ci": [
+     94.5,
+     97.2
+    ],
+    "fa_ci": [
+     3.8,
+     8.8
+    ],
+    "growth": [
+     1.2,
+     1.3,
+     1.8,
+     2.0
+    ],
+    "recall": 96.0,
+    "fa": 6.3,
+    "s2o": 3.5,
+    "unk": 0.6,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  }
+ },
+ "eval": {
+  "main の規則": {
+   "studio": {
+    "recall_ci": [
+     83.4,
+     91.8
+    ],
+    "fa_ci": [
+     1.0,
+     2.3
+    ],
+    "growth": [
+     2.0,
+     2.4,
+     2.8,
+     3.0
+    ],
+    "recall": 88.1,
+    "fa": 1.6,
+    "s2o": 6.0,
+    "unk": 11.6,
+    "speakers_mean": 3.0,
+    "speakers_max": 5,
+    "self_clusters": 0.4
+   },
+   "table": {
+    "recall_ci": [
+     71.4,
+     85.4
+    ],
+    "fa_ci": [
+     0.7,
+     1.6
+    ],
+    "growth": [
+     2.8,
+     3.8,
+     5.4,
+     7.2
+    ],
+    "recall": 79.3,
+    "fa": 1.1,
+    "s2o": 10.8,
+    "unk": 8.6,
+    "speakers_mean": 7.2,
+    "speakers_max": 18,
+    "self_clusters": 1.95
+   },
+   "pocket": {
+    "recall_ci": [
+     38.4,
+     63.5
+    ],
+    "fa_ci": [
+     0.3,
+     1.1
+    ],
+    "growth": [
+     2.0,
+     2.8,
+     3.6,
+     4.2
+    ],
+    "recall": 51.2,
+    "fa": 0.6,
+    "s2o": 15.6,
+    "unk": 20.8,
+    "speakers_mean": 4.2,
+    "speakers_max": 14,
+    "self_clusters": 1.6
+   },
+   "cafe": {
+    "recall_ci": [
+     24.1,
+     40.1
+    ],
+    "fa_ci": [
+     0.1,
+     0.3
+    ],
+    "growth": [
+     3.8,
+     6.6,
+     8.5,
+     9.8
+    ],
+    "recall": 32.1,
+    "fa": 0.2,
+    "s2o": 41.7,
+    "unk": 13.6,
+    "speakers_mean": 9.8,
+    "speakers_max": 19,
+    "self_clusters": 3.25
+   },
+   "mixed": {
+    "recall_ci": [
+     52.9,
+     69.6
+    ],
+    "fa_ci": [
+     0.4,
+     1.0
+    ],
+    "growth": [
+     2.8,
+     4.3,
+     7.3,
+     9.1
+    ],
+    "recall": 61.8,
+    "fa": 0.7,
+    "s2o": 18.1,
+    "unk": 12.3,
+    "speakers_mean": 9.1,
+    "speakers_max": 15,
+    "self_clusters": 2.85
+   }
+  },
+  "main + 仮の話者の上限だけ": {
+   "studio": {
+    "recall_ci": [
+     83.4,
+     91.8
+    ],
+    "fa_ci": [
+     1.0,
+     2.3
+    ],
+    "growth": [
+     1.8,
+     2.2,
+     2.4,
+     2.4
+    ],
+    "recall": 88.1,
+    "fa": 1.6,
+    "s2o": 6.0,
+    "unk": 11.5,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.35
+   },
+   "table": {
+    "recall_ci": [
+     71.4,
+     85.4
+    ],
+    "fa_ci": [
+     0.7,
+     1.6
+    ],
+    "growth": [
+     2.2,
+     2.6,
+     2.7,
+     3.0
+    ],
+    "recall": 79.3,
+    "fa": 1.1,
+    "s2o": 10.9,
+    "unk": 8.5,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 0.75
+   },
+   "pocket": {
+    "recall_ci": [
+     38.4,
+     63.5
+    ],
+    "fa_ci": [
+     0.3,
+     1.1
+    ],
+    "growth": [
+     1.9,
+     2.3,
+     2.4,
+     2.5
+    ],
+    "recall": 51.2,
+    "fa": 0.6,
+    "s2o": 15.9,
+    "unk": 20.4,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.65
+   },
+   "cafe": {
+    "recall_ci": [
+     24.1,
+     40.1
+    ],
+    "fa_ci": [
+     0.1,
+     0.3
+    ],
+    "growth": [
+     2.8,
+     3.0,
+     3.0,
+     3.0
+    ],
+    "recall": 32.1,
+    "fa": 0.2,
+    "s2o": 42.1,
+    "unk": 12.9,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 0.85
+   },
+   "mixed": {
+    "recall_ci": [
+     52.9,
+     69.6
+    ],
+    "fa_ci": [
+     0.4,
+     1.0
+    ],
+    "growth": [
+     2.2,
+     2.6,
+     3.0,
+     3.0
+    ],
+    "recall": 61.8,
+    "fa": 0.7,
+    "s2o": 18.4,
+    "unk": 11.8,
+    "speakers_mean": 3.0,
+    "speakers_max": 3,
+    "self_clusters": 0.7
+   }
+  },
+  "緩める(比較なし、更新なし)": {
+   "studio": {
+    "recall_ci": [
+     95.3,
+     97.8
+    ],
+    "fa_ci": [
+     5.0,
+     15.9
+    ],
+    "growth": [
+     1.2,
+     1.2,
+     1.2,
+     1.2
+    ],
+    "recall": 96.7,
+    "fa": 10.1,
+    "s2o": 2.3,
+    "unk": 11.7,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     93.2,
+     96.8
+    ],
+    "fa_ci": [
+     3.6,
+     9.6
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 95.4,
+    "fa": 6.4,
+    "s2o": 3.0,
+    "unk": 7.4,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     81.0,
+     91.3
+    ],
+    "fa_ci": [
+     1.8,
+     5.8
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 86.6,
+    "fa": 3.7,
+    "s2o": 5.9,
+    "unk": 9.3,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   },
+   "cafe": {
+    "recall_ci": [
+     61.3,
+     77.9
+    ],
+    "fa_ci": [
+     1.2,
+     3.0
+    ],
+    "growth": [
+     1.5,
+     2.0,
+     2.0,
+     2.2
+    ],
+    "recall": 70.3,
+    "fa": 2.0,
+    "s2o": 20.4,
+    "unk": 6.0,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   },
+   "mixed": {
+    "recall_ci": [
+     81.9,
+     92.0
+    ],
+    "fa_ci": [
+     2.5,
+     6.6
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     2.0,
+     2.3
+    ],
+    "recall": 87.6,
+    "fa": 4.4,
+    "s2o": 7.2,
+    "unk": 6.8,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.3
+   }
+  },
+  "緩める + 他人との比較": {
+   "studio": {
+    "recall_ci": [
+     92.6,
+     95.9
+    ],
+    "fa_ci": [
+     2.9,
+     6.5
+    ],
+    "growth": [
+     1.2,
+     1.2,
+     1.2,
+     1.2
+    ],
+    "recall": 94.3,
+    "fa": 4.6,
+    "s2o": 5.4,
+    "unk": 1.0,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     80.4,
+     93.6
+    ],
+    "fa_ci": [
+     2.0,
+     4.0
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 88.0,
+    "fa": 3.0,
+    "s2o": 11.6,
+    "unk": 0.5,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     51.4,
+     79.6
+    ],
+    "fa_ci": [
+     0.9,
+     2.4
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 66.2,
+    "fa": 1.5,
+    "s2o": 32.4,
+    "unk": 1.3,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   },
+   "cafe": {
+    "recall_ci": [
+     43.4,
+     67.9
+    ],
+    "fa_ci": [
+     0.5,
+     1.2
+    ],
+    "growth": [
+     1.5,
+     2.0,
+     2.1,
+     2.4
+    ],
+    "recall": 55.9,
+    "fa": 0.8,
+    "s2o": 41.9,
+    "unk": 1.3,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   },
+   "mixed": {
+    "recall_ci": [
+     70.9,
+     88.0
+    ],
+    "fa_ci": [
+     1.5,
+     3.1
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     1.9,
+     2.2
+    ],
+    "recall": 79.9,
+    "fa": 2.2,
+    "s2o": 18.7,
+    "unk": 1.1,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   }
+  },
+  "推奨(緩める + 比較 + 自分の更新)": {
+   "studio": {
+    "recall_ci": [
+     95.1,
+     97.4
+    ],
+    "fa_ci": [
+     4.7,
+     20.8
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 96.4,
+    "fa": 12.0,
+    "s2o": 3.4,
+    "unk": 2.6,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     82.1,
+     94.9
+    ],
+    "fa_ci": [
+     2.7,
+     5.3
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 89.5,
+    "fa": 3.9,
+    "s2o": 10.3,
+    "unk": 0.4,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     54.9,
+     84.2
+    ],
+    "fa_ci": [
+     1.4,
+     4.0
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 70.1,
+    "fa": 2.5,
+    "s2o": 28.9,
+    "unk": 1.2,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   },
+   "cafe": {
+    "recall_ci": [
+     47.7,
+     73.6
+    ],
+    "fa_ci": [
+     0.8,
+     1.8
+    ],
+    "growth": [
+     1.6,
+     2.1,
+     2.2,
+     2.4
+    ],
+    "recall": 60.8,
+    "fa": 1.2,
+    "s2o": 37.7,
+    "unk": 1.0,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   },
+   "mixed": {
+    "recall_ci": [
+     75.6,
+     92.2
+    ],
+    "fa_ci": [
+     2.1,
+     4.1
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.8,
+     2.2
+    ],
+    "recall": 85.0,
+    "fa": 3.1,
+    "s2o": 14.0,
+    "unk": 1.0,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "推奨で他人との比較をなくす": {
+   "studio": {
+    "recall_ci": [
+     97.0,
+     98.6
+    ],
+    "fa_ci": [
+     10.1,
+     30.2
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 97.9,
+    "fa": 19.5,
+    "s2o": 1.3,
+    "unk": 11.8,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     94.8,
+     98.0
+    ],
+    "fa_ci": [
+     5.5,
+     15.6
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 96.8,
+    "fa": 10.2,
+    "s2o": 2.2,
+    "unk": 9.3,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     83.2,
+     94.0
+    ],
+    "fa_ci": [
+     2.8,
+     11.1
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 89.1,
+    "fa": 6.5,
+    "s2o": 4.9,
+    "unk": 9.7,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   },
+   "cafe": {
+    "recall_ci": [
+     64.3,
+     82.1
+    ],
+    "fa_ci": [
+     1.4,
+     3.7
+    ],
+    "growth": [
+     1.6,
+     2.0,
+     2.0,
+     2.3
+    ],
+    "recall": 74.0,
+    "fa": 2.5,
+    "s2o": 18.0,
+    "unk": 5.6,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.35
+   },
+   "mixed": {
+    "recall_ci": [
+     86.1,
+     95.4
+    ],
+    "fa_ci": [
+     3.9,
+     10.1
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.8,
+     2.2
+    ],
+    "recall": 91.2,
+    "fa": 6.7,
+    "s2o": 5.2,
+    "unk": 8.1,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   }
+  },
+  "推奨で更新の幅の上限なし": {
+   "studio": {
+    "recall_ci": [
+     96.7,
+     98.6
+    ],
+    "fa_ci": [
+     9.5,
+     38.9
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 97.7,
+    "fa": 22.3,
+    "s2o": 2.2,
+    "unk": 0.7,
+    "speakers_mean": 0.9,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     87.1,
+     97.1
+    ],
+    "fa_ci": [
+     4.4,
+     8.9
+    ],
+    "growth": [
+     1.3,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 92.9,
+    "fa": 6.5,
+    "s2o": 6.9,
+    "unk": 0.4,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     60.0,
+     90.6
+    ],
+    "fa_ci": [
+     5.9,
+     33.3
+    ],
+    "growth": [
+     1.1,
+     1.4,
+     1.6,
+     1.6
+    ],
+    "recall": 76.3,
+    "fa": 17.9,
+    "s2o": 23.1,
+    "unk": 1.1,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "cafe": {
+    "recall_ci": [
+     50.4,
+     78.2
+    ],
+    "fa_ci": [
+     1.0,
+     2.4
+    ],
+    "growth": [
+     1.5,
+     2.1,
+     2.2,
+     2.5
+    ],
+    "recall": 64.3,
+    "fa": 1.6,
+    "s2o": 34.6,
+    "unk": 0.8,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   },
+   "mixed": {
+    "recall_ci": [
+     81.1,
+     95.2
+    ],
+    "fa_ci": [
+     3.2,
+     6.5
+    ],
+    "growth": [
+     1.3,
+     1.6,
+     1.9,
+     2.2
+    ],
+    "recall": 89.1,
+    "fa": 4.7,
+    "s2o": 10.2,
+    "unk": 0.8,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   }
+  },
+  "推奨で仮の話者の重みを長さにしない": {
+   "studio": {
+    "recall_ci": [
+     94.7,
+     97.3
+    ],
+    "fa_ci": [
+     4.7,
+     20.8
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 96.2,
+    "fa": 12.0,
+    "s2o": 3.6,
+    "unk": 2.6,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     81.3,
+     94.5
+    ],
+    "fa_ci": [
+     2.6,
+     5.1
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 89.0,
+    "fa": 3.8,
+    "s2o": 10.8,
+    "unk": 0.4,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     53.6,
+     83.4
+    ],
+    "fa_ci": [
+     1.3,
+     4.0
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 69.2,
+    "fa": 2.5,
+    "s2o": 30.0,
+    "unk": 1.1,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "cafe": {
+    "recall_ci": [
+     41.6,
+     70.1
+    ],
+    "fa_ci": [
+     0.7,
+     1.5
+    ],
+    "growth": [
+     1.5,
+     2.2,
+     2.2,
+     2.4
+    ],
+    "recall": 56.6,
+    "fa": 1.1,
+    "s2o": 42.4,
+    "unk": 0.8,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "mixed": {
+    "recall_ci": [
+     73.9,
+     91.5
+    ],
+    "fa_ci": [
+     2.1,
+     3.9
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.8,
+     2.2
+    ],
+    "recall": 83.6,
+    "fa": 2.9,
+    "s2o": 15.6,
+    "unk": 0.9,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "推奨で聞き取りと同じ場所で登録": {
+   "studio": {
+    "recall_ci": [
+     68.7,
+     89.3
+    ],
+    "fa_ci": [
+     1.1,
+     2.4
+    ],
+    "growth": [
+     1.2,
+     1.2,
+     1.2,
+     1.2
+    ],
+    "recall": 80.2,
+    "fa": 1.7,
+    "s2o": 19.0,
+    "unk": 0.6,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     94.0,
+     97.1
+    ],
+    "fa_ci": [
+     5.7,
+     14.6
+    ],
+    "growth": [
+     1.4,
+     1.5,
+     1.6,
+     2.0
+    ],
+    "recall": 95.8,
+    "fa": 9.6,
+    "s2o": 4.0,
+    "unk": 0.6,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     62.4,
+     88.6
+    ],
+    "fa_ci": [
+     2.5,
+     8.7
+    ],
+    "growth": [
+     1.3,
+     1.6,
+     1.7,
+     1.7
+    ],
+    "recall": 76.0,
+    "fa": 5.0,
+    "s2o": 23.0,
+    "unk": 1.6,
+    "speakers_mean": 1.7,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   },
+   "cafe": {
+    "recall_ci": [
+     68.2,
+     86.4
+    ],
+    "fa_ci": [
+     1.7,
+     3.1
+    ],
+    "growth": [
+     1.6,
+     2.1,
+     2.2,
+     2.5
+    ],
+    "recall": 78.1,
+    "fa": 2.3,
+    "s2o": 20.3,
+    "unk": 1.1,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.35
+   },
+   "mixed": {
+    "recall_ci": [
+     85.5,
+     95.6
+    ],
+    "fa_ci": [
+     4.1,
+     10.6
+    ],
+    "growth": [
+     1.4,
+     1.6,
+     2.0,
+     2.4
+    ],
+    "recall": 91.3,
+    "fa": 6.8,
+    "s2o": 8.2,
+    "unk": 1.0,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   }
+  }
+ },
+ "sensitivity": {
+  "0.60 / 0.55 / 0.50": {
+   "studio": {
+    "recall_ci": [
+     90.2,
+     95.7
+    ],
+    "fa_ci": [
+     1.6,
+     3.8
+    ],
+    "growth": [
+     1.2,
+     1.2,
+     1.2,
+     1.2
+    ],
+    "recall": 93.5,
+    "fa": 2.6,
+    "s2o": 6.1,
+    "unk": 0.5,
+    "speakers_mean": 1.2,
+    "speakers_max": 2,
+    "self_clusters": 0.05
+   },
+   "table": {
+    "recall_ci": [
+     76.4,
+     90.8
+    ],
+    "fa_ci": [
+     1.1,
+     2.2
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 84.7,
+    "fa": 1.6,
+    "s2o": 13.6,
+    "unk": 1.0,
+    "speakers_mean": 1.9,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     42.8,
+     70.4
+    ],
+    "fa_ci": [
+     0.4,
+     1.7
+    ],
+    "growth": [
+     1.4,
+     1.6,
+     1.8,
+     1.8
+    ],
+    "recall": 56.9,
+    "fa": 1.0,
+    "s2o": 39.3,
+    "unk": 2.3,
+    "speakers_mean": 1.8,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "cafe": {
+    "recall_ci": [
+     28.3,
+     48.7
+    ],
+    "fa_ci": [
+     0.1,
+     0.5
+    ],
+    "growth": [
+     1.4,
+     1.8,
+     1.9,
+     2.1
+    ],
+    "recall": 38.6,
+    "fa": 0.3,
+    "s2o": 57.3,
+    "unk": 2.1,
+    "speakers_mean": 2.1,
+    "speakers_max": 3,
+    "self_clusters": 0.5
+   },
+   "mixed": {
+    "recall_ci": [
+     63.7,
+     82.5
+    ],
+    "fa_ci": [
+     0.7,
+     1.5
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     2.0,
+     2.4
+    ],
+    "recall": 73.6,
+    "fa": 1.1,
+    "s2o": 23.1,
+    "unk": 1.8,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   }
+  },
+  "0.55 / 0.50 / 0.45": {
+   "studio": {
+    "recall_ci": [
+     93.9,
+     97.0
+    ],
+    "fa_ci": [
+     2.6,
+     6.3
+    ],
+    "growth": [
+     1.1,
+     1.1,
+     1.1,
+     1.1
+    ],
+    "recall": 95.7,
+    "fa": 4.3,
+    "s2o": 4.1,
+    "unk": 0.4,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     83.6,
+     95.0
+    ],
+    "fa_ci": [
+     1.8,
+     3.6
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 90.6,
+    "fa": 2.7,
+    "s2o": 8.7,
+    "unk": 0.5,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "pocket": {
+    "recall_ci": [
+     52.8,
+     80.6
+    ],
+    "fa_ci": [
+     0.8,
+     2.6
+    ],
+    "growth": [
+     1.3,
+     1.6,
+     1.8,
+     1.8
+    ],
+    "recall": 67.2,
+    "fa": 1.6,
+    "s2o": 30.8,
+    "unk": 1.4,
+    "speakers_mean": 1.8,
+    "speakers_max": 3,
+    "self_clusters": 0.4
+   },
+   "cafe": {
+    "recall_ci": [
+     41.4,
+     64.9
+    ],
+    "fa_ci": [
+     0.4,
+     1.0
+    ],
+    "growth": [
+     1.4,
+     2.0,
+     2.0,
+     2.2
+    ],
+    "recall": 53.4,
+    "fa": 0.7,
+    "s2o": 43.9,
+    "unk": 1.5,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.55
+   },
+   "mixed": {
+    "recall_ci": [
+     72.2,
+     89.1
+    ],
+    "fa_ci": [
+     1.3,
+     2.5
+    ],
+    "growth": [
+     1.2,
+     1.6,
+     1.9,
+     2.3
+    ],
+    "recall": 81.4,
+    "fa": 1.9,
+    "s2o": 16.7,
+    "unk": 1.3,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.3
+   }
+  },
+  "0.50 / 0.45 / 0.40": {
+   "studio": {
+    "recall_ci": [
+     95.1,
+     97.4
+    ],
+    "fa_ci": [
+     4.7,
+     20.8
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 96.4,
+    "fa": 12.0,
+    "s2o": 3.4,
+    "unk": 2.6,
+    "speakers_mean": 1.1,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     82.1,
+     94.9
+    ],
+    "fa_ci": [
+     2.7,
+     5.3
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 89.5,
+    "fa": 3.9,
+    "s2o": 10.3,
+    "unk": 0.4,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     54.9,
+     84.2
+    ],
+    "fa_ci": [
+     1.4,
+     4.0
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.6,
+     1.6
+    ],
+    "recall": 70.1,
+    "fa": 2.5,
+    "s2o": 28.9,
+    "unk": 1.2,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   },
+   "cafe": {
+    "recall_ci": [
+     47.7,
+     73.6
+    ],
+    "fa_ci": [
+     0.8,
+     1.8
+    ],
+    "growth": [
+     1.6,
+     2.1,
+     2.2,
+     2.4
+    ],
+    "recall": 60.8,
+    "fa": 1.2,
+    "s2o": 37.7,
+    "unk": 1.0,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.45
+   },
+   "mixed": {
+    "recall_ci": [
+     75.6,
+     92.2
+    ],
+    "fa_ci": [
+     2.1,
+     4.1
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.8,
+     2.2
+    ],
+    "recall": 85.0,
+    "fa": 3.1,
+    "s2o": 14.0,
+    "unk": 1.0,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "0.45 / 0.40 / 0.35": {
+   "studio": {
+    "recall_ci": [
+     93.5,
+     97.8
+    ],
+    "fa_ci": [
+     11.8,
+     40.2
+    ],
+    "growth": [
+     1.0,
+     1.0,
+     1.0,
+     1.0
+    ],
+    "recall": 95.9,
+    "fa": 24.9,
+    "s2o": 3.9,
+    "unk": 2.6,
+    "speakers_mean": 0.9,
+    "speakers_max": 2,
+    "self_clusters": 0.05
+   },
+   "table": {
+    "recall_ci": [
+     77.6,
+     93.0
+    ],
+    "fa_ci": [
+     4.2,
+     9.1
+    ],
+    "growth": [
+     1.3,
+     1.4,
+     1.6,
+     2.0
+    ],
+    "recall": 86.2,
+    "fa": 6.5,
+    "s2o": 13.6,
+    "unk": 0.6,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     57.2,
+     86.8
+    ],
+    "fa_ci": [
+     2.6,
+     13.2
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.6,
+     1.6
+    ],
+    "recall": 72.7,
+    "fa": 7.2,
+    "s2o": 26.9,
+    "unk": 2.0,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "cafe": {
+    "recall_ci": [
+     45.4,
+     75.8
+    ],
+    "fa_ci": [
+     1.1,
+     2.4
+    ],
+    "growth": [
+     1.6,
+     2.2,
+     2.2,
+     2.4
+    ],
+    "recall": 60.8,
+    "fa": 1.7,
+    "s2o": 38.3,
+    "unk": 0.8,
+    "speakers_mean": 2.4,
+    "speakers_max": 3,
+    "self_clusters": 0.35
+   },
+   "mixed": {
+    "recall_ci": [
+     71.5,
+     90.7
+    ],
+    "fa_ci": [
+     3.2,
+     6.9
+    ],
+    "growth": [
+     1.3,
+     1.6,
+     2.0,
+     2.3
+    ],
+    "recall": 81.8,
+    "fa": 4.9,
+    "s2o": 17.8,
+    "unk": 0.9,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "0.40 / 0.35 / 0.30": {
+   "studio": {
+    "recall_ci": [
+     89.7,
+     97.6
+    ],
+    "fa_ci": [
+     21.5,
+     59.7
+    ],
+    "growth": [
+     0.8,
+     0.8,
+     0.8,
+     0.8
+    ],
+    "recall": 94.1,
+    "fa": 39.9,
+    "s2o": 5.8,
+    "unk": 2.0,
+    "speakers_mean": 0.8,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     80.2,
+     93.6
+    ],
+    "fa_ci": [
+     7.6,
+     31.2
+    ],
+    "growth": [
+     1.2,
+     1.4,
+     1.4,
+     2.0
+    ],
+    "recall": 87.2,
+    "fa": 18.3,
+    "s2o": 12.7,
+    "unk": 1.1,
+    "speakers_mean": 2.0,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     67.8,
+     90.1
+    ],
+    "fa_ci": [
+     7.6,
+     30.5
+    ],
+    "growth": [
+     1.0,
+     1.4,
+     1.6,
+     1.6
+    ],
+    "recall": 80.1,
+    "fa": 18.2,
+    "s2o": 19.4,
+    "unk": 2.7,
+    "speakers_mean": 1.6,
+    "speakers_max": 3,
+    "self_clusters": 0.15
+   },
+   "cafe": {
+    "recall_ci": [
+     52.0,
+     82.5
+    ],
+    "fa_ci": [
+     2.3,
+     6.7
+    ],
+    "growth": [
+     1.4,
+     2.0,
+     2.0,
+     2.3
+    ],
+    "recall": 67.6,
+    "fa": 4.3,
+    "s2o": 31.7,
+    "unk": 1.1,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.25
+   },
+   "mixed": {
+    "recall_ci": [
+     74.0,
+     92.2
+    ],
+    "fa_ci": [
+     5.5,
+     19.2
+    ],
+    "growth": [
+     1.2,
+     1.5,
+     1.9,
+     2.3
+    ],
+    "recall": 83.4,
+    "fa": 11.6,
+    "s2o": 16.4,
+    "unk": 1.5,
+    "speakers_mean": 2.3,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  },
+  "0.35 / 0.30 / 0.25": {
+   "studio": {
+    "recall_ci": [
+     92.0,
+     97.7
+    ],
+    "fa_ci": [
+     35.2,
+     71.1
+    ],
+    "growth": [
+     0.4,
+     0.4,
+     0.5,
+     0.5
+    ],
+    "recall": 95.2,
+    "fa": 53.5,
+    "s2o": 4.7,
+    "unk": 3.5,
+    "speakers_mean": 0.5,
+    "speakers_max": 2,
+    "self_clusters": 0.0
+   },
+   "table": {
+    "recall_ci": [
+     76.1,
+     94.8
+    ],
+    "fa_ci": [
+     20.2,
+     54.3
+    ],
+    "growth": [
+     1.0,
+     1.2,
+     1.4,
+     1.8
+    ],
+    "recall": 86.6,
+    "fa": 36.0,
+    "s2o": 13.3,
+    "unk": 0.9,
+    "speakers_mean": 1.9,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "pocket": {
+    "recall_ci": [
+     78.1,
+     93.6
+    ],
+    "fa_ci": [
+     18.9,
+     51.6
+    ],
+    "growth": [
+     0.7,
+     1.2,
+     1.4,
+     1.4
+    ],
+    "recall": 87.2,
+    "fa": 34.8,
+    "s2o": 12.6,
+    "unk": 3.2,
+    "speakers_mean": 1.4,
+    "speakers_max": 3,
+    "self_clusters": 0.1
+   },
+   "cafe": {
+    "recall_ci": [
+     48.6,
+     76.5
+    ],
+    "fa_ci": [
+     3.0,
+     6.6
+    ],
+    "growth": [
+     1.4,
+     2.2,
+     2.4,
+     2.5
+    ],
+    "recall": 63.3,
+    "fa": 4.7,
+    "s2o": 36.3,
+    "unk": 1.1,
+    "speakers_mean": 2.5,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   },
+   "mixed": {
+    "recall_ci": [
+     76.6,
+     94.4
+    ],
+    "fa_ci": [
+     16.2,
+     43.7
+    ],
+    "growth": [
+     1.0,
+     1.4,
+     1.7,
+     2.2
+    ],
+    "recall": 86.9,
+    "fa": 28.4,
+    "s2o": 12.9,
+    "unk": 1.7,
+    "speakers_mean": 2.2,
+    "speakers_max": 3,
+    "self_clusters": 0.2
+   }
+  }
+ },
+ "migration": {
+  "recall_ci": [
+   62.7,
+   86.1
+  ],
+  "fa_ci": [
+   1.4,
+   3.0
+  ],
+  "growth": [
+   2.2,
+   2.6
+  ],
+  "recall": 75.3,
+  "fa": 2.1,
+  "s2o": 23.8,
+  "unk": 0.6,
+  "speakers_mean": 2.6,
+  "speakers_max": 3,
+  "self_clusters": 0.55,
+  "before": 4.3,
+  "before_max": 9,
+  "after": 2.1
+ }
+}

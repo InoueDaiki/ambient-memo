@@ -6,6 +6,8 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
 import kotlin.coroutines.CoroutineContext
@@ -35,6 +37,8 @@ class CapturePipeline(
     private val processingContext: CoroutineContext = EmptyCoroutineContext,
     private val transcriptionFilter: TranscriptionFilter = TranscriptionFilter { _, _ -> true },
     private val speakerIdentifier: SpeakerIdentifier? = null,
+    private val recentVoices: RecentVoices? = null,
+    private val speakerLock: Mutex = Mutex(),
 ) {
     /**
      * 音声の終わりまで処理する。
@@ -120,16 +124,26 @@ class CapturePipeline(
             val transcription = transcriber.transcribe(segment)
             val durationMillis = segment.endedAtMillis - segment.startedAtMillis
             if (transcription.text.isNotBlank() && transcriptionFilter.shouldSave(transcription.text, durationMillis)) {
-                val createdAtMillis = clock.nowMillis()
-                utterances.insertAll(
-                    identifySpeakers(segment, transcription).map { it.toUtterance(transcription, createdAtMillis) },
-                )
+                save(segment, transcription)
             }
         } catch (e: Exception) {
             val isStopping = !currentCoroutineContext().isActive
             val reason = if (isStopping) CaptureGapReason.PIPELINE_STOPPED else CaptureGapReason.PROCESSING_FAILED
             backlog.addGap(CaptureGap(segment.startedAtMillis, segment.endedAtMillis, reason))
             if (isStopping) throw e
+        }
+    }
+
+    /**
+     * 判定から保存までを [speakerLock] の内側で行う。手の操作で話者が統合されても、消えた話者の行を残さない。
+     * 文字起こしは含めないので、待つのは判定の間だけ。
+     */
+    private suspend fun save(segment: SpeechSegment, transcription: TimedTranscription) = speakerLock.withLock {
+        val createdAtMillis = clock.nowMillis()
+        val turns = identifySpeakers(segment, transcription)
+        val saved = utterances.insertAll(turns.map { it.toUtterance(transcription, createdAtMillis) })
+        saved.zip(turns).forEach { (utterance, turn) ->
+            turn.voice?.let { recentVoices?.remember(utterance.id, it) }
         }
     }
 

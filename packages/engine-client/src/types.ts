@@ -26,10 +26,58 @@ export interface Utterance {
   id: string;
   text: string;
   speaker: Speaker;
+  // 話者の id。unknown の発話にはない
+  speakerId?: string;
   // 表示する話者の名前(「話者1」など)。unknown の発話にはない
   speakerName?: string;
   // 発話の開始時刻(Unix 時間のミリ秒)
   startedAt: number;
+}
+
+// - self: 登録した自分
+// - provisional: 特徴量のまとまりに付けた仮の話者。増えすぎるとエンジンがまとめ直す
+// - named: 名前の付いた話者。エンジンは勝手に統合しない
+export type SpeakerKind = "self" | "provisional" | "named";
+
+export interface SpeakerInfo {
+  id: string;
+  name: string;
+  kind: SpeakerKind;
+  utteranceCount: number;
+}
+
+// 発話を手で直す先
+// - self: 自分
+// - unknown: 不明
+// - new: 新しい仮の話者。仮の話者の上限に達していれば reject する
+// - それ以外: 話者の id
+export type SpeakerTarget = "self" | "unknown" | "new" | (string & {});
+
+// 仮の話者の上限。画面が「新しい話者」を出すかどうかに使う。値はエンジンの既定値と揃える
+export const MAX_PROVISIONAL_SPEAKERS = 3;
+
+// 類似度の帯ごとの判定の数。floor は帯の下端
+export interface SpeakerScoreBand {
+  floor: number;
+  self: number;
+  other: number;
+  unknown: number;
+}
+
+// 端末の中で話者の判定を確かめる値。音声も特徴量も含まず、端末の外へ出さない
+export interface SpeakerDiagnostics {
+  days: number;
+  selfRuns: number;
+  otherRuns: number;
+  unknownRuns: number;
+  selfSeconds: number;
+  otherSeconds: number;
+  unknownSeconds: number;
+  histogram: SpeakerScoreBand[];
+  provisionalSpeakers: number;
+  hasAdaptedVoice: boolean;
+  selfThreshold: number;
+  unknownFloor: number;
 }
 
 export interface EnginePermissions {
@@ -152,8 +200,18 @@ export interface TranscriptEngineClient extends EngineClient {
   stopListening(): Promise<void>;
   // 新しい順に最大 limit 件を返す
   listUtterances(options: { limit: number }): Promise<Utterance[]>;
+  // id の順に返す
+  listSpeakers(): Promise<SpeakerInfo[]>;
+  // 発話の話者を直す。以後の判定にも反映する。終わると utterances-changed が届く。ない発話や話者は reject する
+  setUtteranceSpeaker(utteranceId: string, target: SpeakerTarget): Promise<void>;
+  // fromId の発話を intoId へ移し、fromId を消す。自分は統合元にできない。取り消せない
+  mergeSpeakers(fromId: string, intoId: string): Promise<void>;
+  // 手で名前を付ける。空の名前は reject する。自分の名前も変えられるが、整理では「自分」のまま
+  renameSpeaker(speakerId: string, name: string): Promise<void>;
+  // 直近の話者の判定の集計を返す
+  getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
-  // 自分の声を聞き取って登録する。声は端末の中だけで扱い、音声は残さない。
+  // 自分の声を聞き取って登録する。登録済みなら置き換える。声は端末の中だけで扱い、音声は残さない。
   // 未許可のマイクの権限があれば OS の確認を出す。登録できないときは SelfEnrollmentError で reject する
   enrollSelf(): Promise<void>;
   // 登録の途中なら止める。enrollSelf は cancelled で reject する

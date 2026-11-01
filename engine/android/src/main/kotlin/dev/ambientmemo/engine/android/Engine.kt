@@ -15,9 +15,15 @@ import dev.ambientmemo.engine.domain.CapturePipeline
 import dev.ambientmemo.engine.domain.EnrollmentOutcome
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
+import dev.ambientmemo.engine.domain.RecentVoices
 import dev.ambientmemo.engine.domain.SelfEnrollment
 import dev.ambientmemo.engine.domain.Speaker
+import dev.ambientmemo.engine.domain.SpeakerConsolidation
+import dev.ambientmemo.engine.domain.SpeakerCorrections
+import dev.ambientmemo.engine.domain.SpeakerDiagnostics
+import dev.ambientmemo.engine.domain.SpeakerDiagnosticsReader
 import dev.ambientmemo.engine.domain.SpeakerIdentifier
+import dev.ambientmemo.engine.domain.SpeakerTarget
 import dev.ambientmemo.engine.domain.SystemClock
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.sherpa.ModelCatalog
@@ -36,6 +42,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
@@ -44,6 +52,7 @@ import java.util.concurrent.CopyOnWriteArraySet
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
 private const val MODELS_DIRECTORY = "models"
+private const val STAT_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1_000
 
 /** 文字起こしの状態。モデルが内部ストレージになければ [UNAVAILABLE]。 */
 enum class TranscriptionMode { READY, UNAVAILABLE }
@@ -73,6 +82,13 @@ class Engine private constructor(context: Context) {
         ObservableUtteranceRepository(SqliteUtteranceRepository(database)) { changes.tryEmit(Unit) }
     }
     private val speakerRepository by lazy { SqliteSpeakerRepository(database) }
+
+    /** 判定から保存までと、手の操作やまとめ直しが、話者を同時に書き換えないようにする。 */
+    private val speakerLock = Mutex()
+    private val recentVoices = RecentVoices()
+    private val speakerCorrections by lazy {
+        SpeakerCorrections(speakerRepository, utteranceRepository, recentVoices, speakerModel.version, SystemClock)
+    }
     private val memoListeners = CopyOnWriteArraySet<(MemoChange) -> Unit>()
 
     /** メモと ToDo の読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
@@ -137,6 +153,7 @@ class Engine private constructor(context: Context) {
      */
     private suspend fun capture(audioSource: AudioSource) {
         val canIdentifySpeakers = withContext(Dispatchers.IO) { modelStore.verify(speakerModel) }
+        consolidateSpeakers()
         androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
             androidTranscriber(modelStore, models).use { transcriber ->
                 androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
@@ -151,15 +168,62 @@ class Engine private constructor(context: Context) {
                         processingContext = Dispatchers.Default,
                         transcriptionFilter = NoiseTextFilter(),
                         speakerIdentifier = if (canIdentifySpeakers) {
-                            SpeakerIdentifier(embedder, speakerRepository, SystemClock)
+                            SpeakerIdentifier(embedder, speakerRepository, SystemClock, decisionLog = speakerRepository)
                         } else {
                             null
                         },
+                        recentVoices = recentVoices,
+                        speakerLock = speakerLock,
                     ).run()
                 }
             }
         }
     }
+
+    /**
+     * 増えすぎた仮の話者をまとめ直す。上限以下なら何もしないので、何度呼んでもよい。
+     * 失敗しても聞き取りは止めない。次の機会にやり直す。
+     */
+    @Suppress("TooGenericExceptionCaught") // まとめ直しの失敗で文字起こしを止めない
+    suspend fun consolidateSpeakers() {
+        try {
+            val merged = speakerLock.withLock {
+                speakerRepository.prune(SystemClock.nowMillis() - STAT_RETENTION_MILLIS)
+                SpeakerConsolidation(speakerRepository, speakerModel.version, SystemClock).run()
+            }
+            if (merged > 0) notifySpeakersChanged()
+        } catch (e: Exception) {
+            Log.e(TAG, "話者をまとめ直せませんでした: ${e.javaClass.simpleName}")
+        }
+    }
+
+    private fun notifySpeakersChanged() {
+        changes.tryEmit(Unit)
+        notifyMemoChanged(MemoChange.MEMOS)
+    }
+
+    /** 話者を発話の数と一緒に返す。 */
+    suspend fun speakerSummaries(): List<SpeakerSummary> {
+        val counts = utteranceRepository.countBySpeaker()
+        return speakerRepository.listSpeakers().map { SpeakerSummary(it, counts[it.id] ?: 0) }
+    }
+
+    /** 発話の話者を手で直す。発話や話者がなければ false を返す。 */
+    suspend fun reassignUtterance(utteranceId: Long, target: SpeakerTarget): Boolean =
+        speakerLock.withLock { speakerCorrections.reassign(utteranceId, target) }
+            .also { if (it) notifySpeakersChanged() }
+
+    suspend fun mergeSpeakers(fromId: Long, intoId: Long): Boolean =
+        speakerLock.withLock { speakerCorrections.merge(fromId, intoId) }
+            .also { if (it) notifySpeakersChanged() }
+
+    suspend fun renameSpeaker(speakerId: Long, name: String): Boolean =
+        speakerLock.withLock { speakerCorrections.rename(speakerId, name) }
+            .also { if (it) notifySpeakersChanged() }
+
+    /** 端末の中で話者の判定を確かめる値。音声も特徴量も含まない。 */
+    suspend fun speakerDiagnostics(): SpeakerDiagnostics =
+        SpeakerDiagnosticsReader(speakerRepository, speakerRepository, speakerModel.version, SystemClock).read()
 
     suspend fun selfEnrollmentStatus(): SelfEnrollmentStatus = when {
         !modelStore.isInstalled(speakerModel) -> SelfEnrollmentStatus.UNAVAILABLE

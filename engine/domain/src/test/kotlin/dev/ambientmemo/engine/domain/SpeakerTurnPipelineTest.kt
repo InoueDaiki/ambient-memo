@@ -37,6 +37,16 @@ class SpeakerTurnPipelineTest {
         minSpeechMillis = 0,
     )
 
+    // 窓の動きを見るテストなので、しきい値は既定値の調整に左右されない値に固定する
+    private val windowConfig = SpeakerConfig(
+        selfThreshold = 0.6f,
+        selfExitThreshold = 0.55f,
+        unknownFloor = 0.45f,
+        provisionalThreshold = 0.6f,
+        minNewSpeakerRunMillis = 1_000,
+        maxProvisionalSpeakers = 64,
+    )
+
     // 1 つの区間 + 区切りの無音で 6.8 秒。窓の発話の部分は 6 秒で、開始は 0, 750, ..., 4_500 の 7 つ
     private val windowCount = 7
 
@@ -69,7 +79,7 @@ class SpeakerTurnPipelineTest {
             captureGaps = gaps,
             clock = clock,
             config = captureConfig,
-            speakerIdentifier = SpeakerIdentifier(embedder, speakers, clock),
+            speakerIdentifier = SpeakerIdentifier(embedder, speakers, clock, windowConfig),
         )
         pipeline.run()
         return Pipeline(saved(), embedder, transcriber)
@@ -344,7 +354,7 @@ class SpeakerTurnPipelineTest {
             captureGaps = gaps,
             clock = clock,
             config = captureConfig,
-            speakerIdentifier = SpeakerIdentifier(embedder, speakers, clock),
+            speakerIdentifier = SpeakerIdentifier(embedder, speakers, clock, windowConfig),
         )
 
         val job = launch { pipeline.run() }
