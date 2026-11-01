@@ -31,8 +31,8 @@ function RenameForm({
   return (
     <View style={{ gap: spacing.sm }}>
       <TextField label={`${speaker.name} の名前`} value={name} onChangeText={setName} />
-      <Button label="名前を保存する" variant="secondary" onPress={() => onSubmit(name)} />
-      <Button label="やめる" variant="secondary" onPress={onCancel} />
+      <Button label="名前を保存する" variant="primary" onPress={() => onSubmit(name)} />
+      <Button label="やめる" variant="ghost" onPress={onCancel} />
     </View>
   );
 }
@@ -55,8 +55,8 @@ function MergeForm({
         <Text variant="caption">
           {speaker.name} の発話を {into.name} に移します。取り消せません。
         </Text>
-        <Button label="統合する" variant="secondary" onPress={() => onSubmit(into)} />
-        <Button label="やめる" variant="secondary" onPress={onCancel} />
+        <Button label="統合する" variant="danger" onPress={() => onSubmit(into)} />
+        <Button label="やめる" variant="ghost" onPress={onCancel} />
       </View>
     );
   }
@@ -73,7 +73,7 @@ function MergeForm({
             onPress={() => setInto(item)}
           />
         ))}
-      <Button label="やめる" variant="secondary" onPress={onCancel} />
+      <Button label="やめる" variant="ghost" onPress={onCancel} />
     </View>
   );
 }
@@ -133,7 +133,7 @@ export function SpeakersScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
-        <Button label="戻る" variant="secondary" onPress={() => navigation.goBack()} />
+        <Button label="戻る" variant="ghost" onPress={() => navigation.goBack()} />
         <Text variant="title" accessibilityRole="header">
           話者
         </Text>

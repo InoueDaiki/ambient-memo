@@ -2,17 +2,20 @@
 // 色は役割の名前で持つ(「緑」ではなく「聞き取り中」)。画面ではこの名前だけを使う。
 //
 // 見た目の考え方: 紙とインクのメモ帳。地はわずかに暖かい紙の色、文字は真っ黒にしないインク。
-// 色を持つのは「聞き取り中」と「誤り」だけにして、文字起こしの本文を邪魔しない。
+// 色を持つのは「主な操作」「聞き取り中」「誤りと止める操作」だけにして、文字起こしの本文を邪魔しない。
+// 主な操作の緑はアプリのアイコンと同じ系統にする。
 
 export interface ColorPalette {
   /** 画面の地(紙) */
   canvas: string;
-  /** 地の上に置く面(知らせの帯、主でないボタン) */
+  /** 地の上に置く面(知らせの帯) */
   surface: string;
-  /** surface や主でないボタンを押している間 */
+  /** surface や枠線のボタンを押している間 */
   surfacePressed: string;
   /** 区切り線、面の枠 */
   border: string;
+  /** 枠線のボタンの枠。部品として見分けられる濃さにする */
+  borderStrong: string;
   /** 本文の文字(インク) */
   fg: string;
   /** 補足の文字(時刻、話者、説明) */
@@ -27,10 +30,12 @@ export interface ColorPalette {
   listening: string;
   /** 聞き取り中の帯の塗り */
   listeningSoft: string;
-  /** 誤りの文字 */
+  /** 誤りと止める操作の文字 */
   danger: string;
-  /** 誤りの帯の塗り */
+  /** 誤りの帯と止める操作の塗り */
   dangerSoft: string;
+  /** 止める操作を押している間 */
+  dangerSoftPressed: string;
 }
 
 export const colors = {
@@ -39,30 +44,34 @@ export const colors = {
     surface: "#EFECE4",
     surfacePressed: "#E4E0D6",
     border: "#DDD8CC",
+    borderStrong: "#8F897C",
     fg: "#2C2A26",
     fgMuted: "#6A665D",
-    primary: "#3A3833",
-    primaryPressed: "#514E47",
+    primary: "#2F5D43",
+    primaryPressed: "#264B36",
     onPrimary: "#F8F6F1",
     listening: "#3F6B4F",
     listeningSoft: "#E4EBE1",
     danger: "#9C3B2E",
     dangerSoft: "#F4E3DD",
+    dangerSoftPressed: "#EBD3CB",
   },
   dark: {
     canvas: "#191816",
     surface: "#25231F",
     surfacePressed: "#312E29",
     border: "#37342E",
+    borderStrong: "#7D786C",
     fg: "#E9E5DC",
     fgMuted: "#A5A095",
-    primary: "#E0DBCF",
-    primaryPressed: "#C9C4B8",
-    onPrimary: "#22201C",
+    primary: "#9CCBA9",
+    primaryPressed: "#86B694",
+    onPrimary: "#16211A",
     listening: "#93BE9F",
     listeningSoft: "#26302A",
     danger: "#E5A293",
     dangerSoft: "#3A2622",
+    dangerSoftPressed: "#4A302B",
   },
 } as const satisfies Record<"light" | "dark", ColorPalette>;
 
@@ -126,4 +135,6 @@ export const contrastPairs: { fg: ColorName; bg: ColorName; min: number }[] = [
   { fg: "listening", bg: "listeningSoft", min: 4.5 },
   { fg: "listening", bg: "canvas", min: 4.5 },
   { fg: "danger", bg: "dangerSoft", min: 4.5 },
+  { fg: "danger", bg: "dangerSoftPressed", min: 4.5 },
+  { fg: "borderStrong", bg: "canvas", min: 3 },
 ];

@@ -71,7 +71,7 @@ export function SpeakerSheet({
               onPress={() => choose("unknown")}
             />
           </ScrollView>
-          <Button label="閉じる" onPress={onClose} />
+          <Button label="閉じる" variant="ghost" onPress={onClose} />
         </View>
       </View>
     </Modal>

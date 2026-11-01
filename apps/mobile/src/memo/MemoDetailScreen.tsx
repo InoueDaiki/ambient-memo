@@ -92,7 +92,7 @@ export function MemoDetailScreen() {
   return (
     <Screen>
       <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md, paddingBottom: spacing.md }}>
-        <Button label="戻る" variant="secondary" onPress={() => navigation.goBack()} />
+        <Button label="戻る" variant="ghost" onPress={() => navigation.goBack()} />
         <MemoModeBanner />
         {error !== undefined && (
           <StatusBanner tone="danger" message="メモを読み込めませんでした。" />
