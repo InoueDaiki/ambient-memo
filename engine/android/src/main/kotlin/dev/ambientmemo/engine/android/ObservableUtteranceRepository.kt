@@ -14,4 +14,7 @@ internal class ObservableUtteranceRepository(
 
     override suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance> =
         delegate.insertAll(utterances).also { onChanged() }
+
+    override suspend fun setSpeaker(id: Long, speakerId: Long?): Boolean =
+        delegate.setSpeaker(id, speakerId).also { onChanged() }
 }

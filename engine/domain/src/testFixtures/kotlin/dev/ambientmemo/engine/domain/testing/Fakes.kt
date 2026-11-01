@@ -11,11 +11,18 @@ import dev.ambientmemo.engine.domain.Memo
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NewMemo
 import dev.ambientmemo.engine.domain.NewUtterance
+import dev.ambientmemo.engine.domain.SelfAdaptation
 import dev.ambientmemo.engine.domain.Speaker
+import dev.ambientmemo.engine.domain.SpeakerDecision
+import dev.ambientmemo.engine.domain.SpeakerDecisionBucket
+import dev.ambientmemo.engine.domain.SpeakerDecisionLog
+import dev.ambientmemo.engine.domain.SpeakerDecisionSample
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
+import dev.ambientmemo.engine.domain.SpeakerMerge
 import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerRepository
+import dev.ambientmemo.engine.domain.scoreBucket
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.StoredSpeakerEmbedding
 import dev.ambientmemo.engine.domain.TimedTranscription
@@ -165,23 +172,98 @@ class InMemoryUtteranceRepository : UtteranceRepository {
     override suspend fun listRecent(limit: Int): List<Utterance> = rows
         .sortedWith(compareByDescending<Utterance> { it.startedAtMillis }.thenByDescending { it.id })
         .take(limit)
+
+    override suspend fun find(id: Long): Utterance? = rows.firstOrNull { it.id == id }
+
+    override suspend fun setSpeaker(id: Long, speakerId: Long?): Boolean {
+        val exists = rows.any { it.id == id }
+        rows.replaceAll { if (it.id == id) it.copy(speakerId = speakerId, speakerConfidence = null) else it }
+        return exists
+    }
+
+    override suspend fun countBySpeaker(): Map<Long, Int> =
+        rows.mapNotNull { it.speakerId }.groupingBy { it }.eachCount()
+
+    /** 話者の統合で発話を付け替える。本物は 1 つのトランザクションで行う。 */
+    fun moveSpeaker(fromId: Long, intoId: Long) {
+        rows.replaceAll {
+            if (it.speakerId == fromId) it.copy(speakerId = intoId, speakerConfidence = null) else it
+        }
+    }
 }
 
-class InMemorySpeakerRepository : SpeakerRepository {
-    private class Saved(val embedding: SpeakerEmbedding, val sampleCount: Int, val updatedAtMillis: Long)
+class InMemorySpeakerDecisionLog : SpeakerDecisionLog {
+    private class Key(val day: Long, val decision: SpeakerDecision, val bucket: Int)
+
+    private val lock = Mutex()
+    private val rows = mutableListOf<Pair<Key, SpeakerDecisionSample>>()
+
+    override suspend fun record(samples: List<SpeakerDecisionSample>, nowMillis: Long) = lock.withLock {
+        samples.forEach { rows += Key(day(nowMillis), it.decision, scoreBucket(it.selfScore)) to it }
+    }
+
+    override suspend fun summarize(fromMillis: Long): List<SpeakerDecisionBucket> = lock.withLock {
+        rows.filter { (key, _) -> key.day >= day(fromMillis) }
+            .groupBy { (key, _) -> key.decision to key.bucket }
+            .map { (group, items) ->
+                SpeakerDecisionBucket(
+                    group.first,
+                    group.second,
+                    items.size.toLong(),
+                    items.sumOf { (_, sample) -> sample.voicedMillis },
+                )
+            }
+            .sortedWith(compareBy({ it.decision.name.lowercase() }, { it.bucket }))
+    }
+
+    override suspend fun prune(beforeMillis: Long) {
+        lock.withLock { rows.removeAll { (key, _) -> key.day < day(beforeMillis) } }
+    }
+
+    private fun day(millis: Long) = Math.floorDiv(millis, MILLIS_PER_DAY)
+
+    private companion object {
+        const val MILLIS_PER_DAY = 86_400_000L
+    }
+}
+
+@Suppress("TooManyFunctions") // 本物と同じ窓口を持つ
+class InMemorySpeakerRepository(
+    private val utterances: InMemoryUtteranceRepository = InMemoryUtteranceRepository(),
+) : SpeakerRepository {
+    private class Saved(
+        val embedding: SpeakerEmbedding,
+        val sampleCount: Int,
+        val updatedAtMillis: Long,
+        val voicedMillis: Long,
+    )
 
     private val lock = Mutex()
     private val speakers = mutableListOf<Speaker>()
     private val embeddings = mutableMapOf<Pair<Long, String>, Saved>()
+    private val adaptations = mutableMapOf<String, SelfAdaptation>()
+    private var nextId = 1L
 
     private fun add(name: String, source: SpeakerNameSource, isSelf: Boolean, nowMillis: Long): Speaker {
-        val speaker = Speaker(speakers.size + 1L, name, source, isSelf, nowMillis)
+        val speaker = Speaker(nextId++, name, source, isSelf, nowMillis)
         speakers += speaker
         return speaker
     }
 
-    private fun save(speakerId: Long, embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long) {
-        embeddings[speakerId to embedding.modelVersion] = Saved(embedding, sampleCount, nowMillis)
+    private fun addProvisional(nowMillis: Long): Speaker {
+        val used = speakers.map { it.displayName }.toSet()
+        val number = generateSequence(1) { it + 1 }.first { "話者$it" !in used }
+        return add("話者$number", SpeakerNameSource.PROVISIONAL, false, nowMillis)
+    }
+
+    private fun save(
+        speakerId: Long,
+        embedding: SpeakerEmbedding,
+        sampleCount: Int,
+        nowMillis: Long,
+        voicedMillis: Long,
+    ) {
+        embeddings[speakerId to embedding.modelVersion] = Saved(embedding, sampleCount, nowMillis, voicedMillis)
     }
 
     private fun rename(speakerId: Long, name: String, source: SpeakerNameSource) {
@@ -207,6 +289,9 @@ class InMemorySpeakerRepository : SpeakerRepository {
                         key.first in isSelf,
                         saved.embedding.vector.copyOf(),
                         saved.sampleCount,
+                        saved.voicedMillis,
+                        speakers.first { it.id == key.first }.nameSource,
+                        saved.updatedAtMillis,
                     )
                 }
         }
@@ -214,25 +299,61 @@ class InMemorySpeakerRepository : SpeakerRepository {
     override suspend fun saveSelfEmbedding(embedding: SpeakerEmbedding, sampleCount: Int, nowMillis: Long): Speaker =
         lock.withLock {
             val self = speakers.firstOrNull { it.isSelf } ?: add("自分", SpeakerNameSource.SELF, true, nowMillis)
-            save(self.id, embedding, sampleCount, nowMillis)
+            save(self.id, embedding, sampleCount, nowMillis, 0)
+            adaptations.clear()
             self
         }
 
-    override suspend fun createProvisionalSpeaker(embedding: SpeakerEmbedding, nowMillis: Long): Speaker =
-        lock.withLock {
-            val number = speakers.count { !it.isSelf } + 1
-            val speaker = add("話者$number", SpeakerNameSource.PROVISIONAL, false, nowMillis)
-            save(speaker.id, embedding, 1, nowMillis)
-            speaker
-        }
+    override suspend fun createProvisionalSpeaker(
+        embedding: SpeakerEmbedding,
+        nowMillis: Long,
+        voicedMillis: Long,
+    ): Speaker = lock.withLock {
+        val speaker = addProvisional(nowMillis)
+        save(speaker.id, embedding, 1, nowMillis, voicedMillis)
+        speaker
+    }
+
+    override suspend fun createProvisionalSpeakerWithoutVoice(nowMillis: Long): Speaker =
+        lock.withLock { addProvisional(nowMillis) }
 
     override suspend fun updateEmbedding(
         speakerId: Long,
         embedding: SpeakerEmbedding,
         sampleCount: Int,
         nowMillis: Long,
+        voicedMillis: Long,
     ) {
-        lock.withLock { save(speakerId, embedding, sampleCount, nowMillis) }
+        lock.withLock { save(speakerId, embedding, sampleCount, nowMillis, voicedMillis) }
+    }
+
+    override suspend fun mergeSpeakers(merges: List<SpeakerMerge>, nowMillis: Long, renumberProvisional: Boolean) {
+        lock.withLock {
+            merges.filter { merge -> speakers.any { it.id == merge.fromId && !it.isSelf } }.forEach { merge ->
+                utterances.moveSpeaker(merge.fromId, merge.intoId)
+                embeddings.keys.removeAll { it.first == merge.fromId }
+                speakers.removeAll { it.id == merge.fromId }
+                merge.merged?.let {
+                    save(merge.intoId, it.embedding, it.sampleCount, nowMillis, it.voicedMillis)
+                }
+            }
+            if (renumberProvisional) renumber()
+        }
+    }
+
+    private fun renumber() {
+        val taken = speakers.filter { it.nameSource != SpeakerNameSource.PROVISIONAL }.map { it.displayName }.toSet()
+        val names = generateSequence(1) { it + 1 }.map { "話者$it" }.filter { it !in taken }.iterator()
+        speakers.replaceAll {
+            if (it.nameSource == SpeakerNameSource.PROVISIONAL) it.copy(displayName = names.next()) else it
+        }
+    }
+
+    override suspend fun findSelfAdaptation(modelVersion: String): SelfAdaptation? =
+        lock.withLock { adaptations[modelVersion] }
+
+    override suspend fun saveSelfAdaptation(adaptation: SelfAdaptation, nowMillis: Long) {
+        lock.withLock { adaptations[adaptation.modelVersion] = adaptation }
     }
 
     override suspend fun setManualName(speakerId: Long, name: String): Boolean = lock.withLock {

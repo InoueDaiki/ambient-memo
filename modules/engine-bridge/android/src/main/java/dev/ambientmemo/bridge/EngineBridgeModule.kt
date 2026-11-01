@@ -19,6 +19,7 @@ import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
 import dev.ambientmemo.engine.android.TodoNotFoundException
 import dev.ambientmemo.engine.android.TranscriptionMode
+import dev.ambientmemo.engine.android.parseSpeakerTarget
 import dev.ambientmemo.engine.android.toWire
 import dev.ambientmemo.engine.domain.ModelDownloadFailure
 import dev.ambientmemo.engine.domain.ModelDownloadPhase
@@ -62,6 +63,12 @@ private class EnrollmentFailedException(failure: EnrollmentFailure) : CodedExcep
     EnrollmentFailure.CANCELLED -> "cancelled"
   },
   message = failure.name,
+  cause = null,
+)
+
+private class SpeakerNotFoundCodedException : CodedException(
+  code = "speaker-not-found",
+  message = "直す先の発話か話者がありません",
   cause = null,
 )
 
@@ -113,6 +120,8 @@ class EngineBridgeModule : Module() {
         engine.organizeChanges.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "organize-changed")) }
       }
       engine.addMemoListener(memoListener)
+      // 以前の版で増えた話者を、聞き取りを始める前でも一覧でまとまって見えるようにする
+      moduleScope.launch { engine.consolidateSpeakers() }
     }
 
     OnDestroy {
@@ -201,6 +210,31 @@ class EngineBridgeModule : Module() {
     AsyncFunction("listUtterances") Coroutine { limit: Int ->
       val speakers = engine.speakers()
       engine.recentUtterances(limit).map { it.toWire(speakers) }
+    }
+
+    AsyncFunction("listSpeakers") Coroutine { ->
+      engine.speakerSummaries().map { it.toWire() }
+    }
+
+    AsyncFunction("setUtteranceSpeaker") Coroutine { utteranceId: String, target: String ->
+      val id = utteranceId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
+      val parsed = parseSpeakerTarget(target) ?: throw SpeakerNotFoundCodedException()
+      if (!engine.reassignUtterance(id, parsed)) throw SpeakerNotFoundCodedException()
+    }
+
+    AsyncFunction("mergeSpeakers") Coroutine { fromId: String, intoId: String ->
+      val from = fromId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
+      val into = intoId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
+      if (!engine.mergeSpeakers(from, into)) throw SpeakerNotFoundCodedException()
+    }
+
+    AsyncFunction("renameSpeaker") Coroutine { speakerId: String, name: String ->
+      val id = speakerId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
+      if (!engine.renameSpeaker(id, name)) throw SpeakerNotFoundCodedException()
+    }
+
+    AsyncFunction("getSpeakerDiagnostics") Coroutine { ->
+      engine.speakerDiagnostics().toWire()
     }
 
     AsyncFunction("listMemos") Coroutine { limit: Int ->

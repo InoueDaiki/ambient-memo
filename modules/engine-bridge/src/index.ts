@@ -12,6 +12,8 @@ import {
   type ModelDownloadStatus,
   type OrganizerModelStatus,
   type MemoEngineClient,
+  type SpeakerDiagnostics,
+  type SpeakerInfo,
   type TranscriptEngineClient,
 } from "@ambient-memo/engine-client";
 import { requireNativeModule, type EventSubscription } from "expo";
@@ -31,6 +33,11 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   startListening(): Promise<void>;
   stopListening(): Promise<void>;
   listUtterances(limit: number): Promise<NativeUtterance[]>;
+  listSpeakers(): Promise<SpeakerInfo[]>;
+  setUtteranceSpeaker(utteranceId: string, target: string): Promise<void>;
+  mergeSpeakers(fromId: string, intoId: string): Promise<void>;
+  renameSpeaker(speakerId: string, name: string): Promise<void>;
+  getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
   enrollSelf(): Promise<void>;
   cancelSelfEnrollment(): Promise<void>;
@@ -84,6 +91,11 @@ export function createEngineClient(): TranscriptEngineClient {
     stopListening: () => native.stopListening(),
     listUtterances: ({ limit }) =>
       native.listUtterances(limit).then((items) => items.map(toUtterance)),
+    listSpeakers: () => native.listSpeakers(),
+    setUtteranceSpeaker: (utteranceId, target) => native.setUtteranceSpeaker(utteranceId, target),
+    mergeSpeakers: (fromId, intoId) => native.mergeSpeakers(fromId, intoId),
+    renameSpeaker: (speakerId, name) => native.renameSpeaker(speakerId, name),
+    getSpeakerDiagnostics: () => native.getSpeakerDiagnostics(),
     getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),
     enrollSelf: () =>
       native.enrollSelf().catch((error: unknown) => {

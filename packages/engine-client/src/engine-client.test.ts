@@ -6,6 +6,7 @@ import { sampleMemos } from "./sample-memos.ts";
 import {
   SelfEnrollmentError,
   type EngineEvent,
+  type SpeakerInfo,
   type TranscriptEngineClient,
   type Utterance,
 } from "./types.ts";
@@ -337,5 +338,76 @@ describe("見本のメモ", () => {
     for (const item of sampleMemos) {
       expect(item.todos.every((entry) => entry.memoId === item.id)).toBe(true);
     }
+  });
+});
+
+describe("FakeEngineClient の話者", () => {
+  const speakers: SpeakerInfo[] = [
+    { id: "1", name: "自分", kind: "self", utteranceCount: 0 },
+    { id: "2", name: "話者1", kind: "provisional", utteranceCount: 0 },
+  ];
+  const row: Utterance = {
+    id: "10",
+    text: "本文",
+    speaker: "other",
+    speakerId: "2",
+    speakerName: "話者1",
+    startedAt: 0,
+  };
+
+  it("発話の話者を直すと utterances-changed が届く", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+    const events: string[] = [];
+    client.subscribe((event) => events.push(event.type));
+
+    await client.setUtteranceSpeaker("10", "self");
+
+    expect(events).toEqual(["utterances-changed"]);
+    const [saved] = await client.listUtterances({ limit: 1 });
+    expect(saved).toMatchObject({ speaker: "self", speakerId: "1", speakerName: "自分" });
+  });
+
+  it("不明に直すと話者の id と名前がなくなる", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+
+    await client.setUtteranceSpeaker("10", "unknown");
+
+    const [saved] = await client.listUtterances({ limit: 1 });
+    expect(saved?.speaker).toBe("unknown");
+    expect(saved?.speakerId).toBeUndefined();
+    expect(saved?.speakerName).toBeUndefined();
+  });
+
+  it("ない発話やない話者は reject する", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+
+    await expect(client.setUtteranceSpeaker("99", "self")).rejects.toThrow();
+    await expect(client.setUtteranceSpeaker("10", "99")).rejects.toThrow();
+  });
+
+  it("統合すると統合元が消え、発話が移る。自分は統合元にできない", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+
+    await expect(client.mergeSpeakers("1", "2")).rejects.toThrow();
+    await client.mergeSpeakers("2", "1");
+
+    expect((await client.listSpeakers()).map((item) => item.id)).toEqual(["1"]);
+    expect((await client.listUtterances({ limit: 1 }))[0]?.speaker).toBe("self");
+  });
+
+  it("名前を付けると named になり、空の名前は reject する", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+
+    await expect(client.renameSpeaker("2", "  ")).rejects.toThrow();
+    await client.renameSpeaker("2", " 母 ");
+
+    expect((await client.listSpeakers())[1]).toMatchObject({ name: "母", kind: "named" });
+    expect((await client.listUtterances({ limit: 1 }))[0]?.speakerName).toBe("母");
+  });
+
+  it("発話の数を話者に添える", async () => {
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+
+    expect((await client.listSpeakers())[1]?.utteranceCount).toBe(1);
   });
 });

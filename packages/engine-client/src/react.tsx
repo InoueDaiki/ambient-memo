@@ -16,6 +16,9 @@ import {
   type OrganizerModelStatus,
   type SelfEnrollmentFailure,
   type SelfEnrollmentStatus,
+  type SpeakerDiagnostics,
+  type SpeakerInfo,
+  type SpeakerTarget,
   type Todo,
   type TranscriptEngineClient,
   type TranscriptionMode,
@@ -370,6 +373,113 @@ export function useUtterances({ limit }: { limit: number }): UseUtterancesResult
   }, [client, limit]);
 
   return { utterances, error };
+}
+
+export interface UseSpeakersResult {
+  // 最初の取得が終わるまでは undefined
+  speakers: SpeakerInfo[] | undefined;
+  error: unknown;
+}
+
+// 話者の統合や発話の直しでも utterances-changed が届く
+export function useSpeakers(): UseSpeakersResult {
+  const client = useEngineClient();
+  const [speakers, setSpeakers] = useState<SpeakerInfo[]>();
+  const [error, setError] = useState<unknown>();
+
+  useEffect(() => {
+    let active = true;
+    let latest = 0;
+    const load = () => {
+      const request = ++latest;
+      client
+        .listSpeakers()
+        .then((items) => {
+          if (!active || request !== latest) return;
+          setSpeakers(items);
+          setError(undefined);
+        })
+        .catch((e: unknown) => {
+          if (active && request === latest) setError(e);
+        });
+    };
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "utterances-changed") load();
+    });
+    load();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [client]);
+
+  return { speakers, error };
+}
+
+export interface UseSpeakerActionsResult {
+  // 直している間は true
+  isPending: boolean;
+  // 最後の操作の失敗。次の操作で消える
+  error: unknown;
+  setUtteranceSpeaker: (utteranceId: string, target: SpeakerTarget) => Promise<boolean>;
+  mergeSpeakers: (fromId: string, intoId: string) => Promise<boolean>;
+  renameSpeaker: (speakerId: string, name: string) => Promise<boolean>;
+}
+
+// 操作の結果は成功したかどうかで返す。失敗の中身は error に残す
+export function useSpeakerActions(): UseSpeakerActionsResult {
+  const client = useEngineClient();
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<unknown>();
+
+  const run = useCallback((action: () => Promise<void>) => {
+    setIsPending(true);
+    setError(undefined);
+    return action()
+      .then(() => true)
+      .catch((e: unknown) => {
+        setError(e);
+        return false;
+      })
+      .finally(() => setIsPending(false));
+  }, []);
+
+  const setUtteranceSpeaker = useCallback(
+    (utteranceId: string, target: SpeakerTarget) =>
+      run(() => client.setUtteranceSpeaker(utteranceId, target)),
+    [client, run],
+  );
+  const mergeSpeakers = useCallback(
+    (fromId: string, intoId: string) => run(() => client.mergeSpeakers(fromId, intoId)),
+    [client, run],
+  );
+  const renameSpeaker = useCallback(
+    (speakerId: string, name: string) => run(() => client.renameSpeaker(speakerId, name)),
+    [client, run],
+  );
+
+  return { isPending, error, setUtteranceSpeaker, mergeSpeakers, renameSpeaker };
+}
+
+// 開いたときの値を出す。調整の確認に使うだけなので、更新は追わない
+export function useSpeakerDiagnostics(): SpeakerDiagnostics | undefined {
+  const client = useEngineClient();
+  const [diagnostics, setDiagnostics] = useState<SpeakerDiagnostics>();
+
+  useEffect(() => {
+    let active = true;
+    client
+      .getSpeakerDiagnostics()
+      .then((current) => {
+        if (active) setDiagnostics(current);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
+  }, [client]);
+
+  return diagnostics;
 }
 
 const MemoClientContext = createContext<MemoEngineClient | undefined>(undefined);

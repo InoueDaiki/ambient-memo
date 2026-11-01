@@ -24,18 +24,28 @@ function failureMessage(failure: ReturnType<typeof useSelfEnrollment>["failure"]
   }
 }
 
-// 初回に自分の声を登録する案内。登録すると消える。声は端末の中だけで扱い、音声は残さない
-export function SelfEnrollmentCard({ isListening }: { isListening: boolean }) {
+// 自分の声を登録する案内。声は端末の中だけで扱い、音声は残さない。
+// 初回は登録すると消える。again を渡すと、登録済みのときも登録し直す操作を出す
+export function SelfEnrollmentCard({
+  isListening,
+  again = false,
+}: {
+  isListening: boolean;
+  again?: boolean;
+}) {
   const { status, isEnrolling, failure, enroll, cancel } = useSelfEnrollment();
-  if (status !== "not-enrolled") return null;
+  const isAgain = again && status === "enrolled";
+  if (status !== "not-enrolled" && !isAgain) return null;
 
   return (
     <View style={{ gap: spacing.sm }}>
       <Text variant="label" accessibilityRole="header">
-        自分の声を登録する
+        {isAgain ? "声を登録し直す" : "自分の声を登録する"}
       </Text>
       <Text variant="caption" color="fgMuted">
-        「自分」と他の人を見分けるために使います。録音は端末の外へ送らず、保存もしません。
+        {isAgain
+          ? "ふだん聞き取りをする端末の置き場所で読むと、見分けやすくなります。過去の発話の話者は変わりません。"
+          : "「自分」と他の人を見分けるために使います。録音は端末の外へ送らず、保存もしません。"}
       </Text>
       {isEnrolling && (
         <>
@@ -48,7 +58,7 @@ export function SelfEnrollmentCard({ isListening }: { isListening: boolean }) {
       )}
       {failure !== undefined && <StatusBanner tone="danger" message={failureMessage(failure)} />}
       <Button
-        label={isEnrolling ? "登録をやめる" : "声を登録する"}
+        label={isEnrolling ? "登録をやめる" : isAgain ? "声を登録し直す" : "声を登録する"}
         variant="secondary"
         disabled={isListening}
         onPress={isEnrolling ? cancel : enroll}

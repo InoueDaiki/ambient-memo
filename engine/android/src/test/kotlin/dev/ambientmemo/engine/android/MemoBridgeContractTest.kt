@@ -143,7 +143,7 @@ class MemoBridgeContractTest {
         val detail = bridge.getMemo(id.toString())!!
 
         val utterance = (detail["utterances"] as List<*>).single() as Map<*, *>
-        assertEquals(setOf("id", "text", "speaker", "speakerName", "startedAt"), utterance.keys)
+        assertEquals(setOf("id", "text", "speaker", "speakerId", "speakerName", "startedAt"), utterance.keys)
         assertEquals("発話", utterance["text"])
         assertEquals("self", utterance["speaker"])
         assertEquals("自分", utterance["speakerName"])

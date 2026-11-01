@@ -53,6 +53,28 @@ FROM utterance
 WHERE organized_at_ms IS NULL
 ORDER BY started_at_ms, id;
 
+findById:
+SELECT *
+FROM utterance
+WHERE id = :id;
+
+-- 手で直した話者。類似度はもとの判定の値なので残さない
+setSpeaker:
+UPDATE utterance
+SET speaker_id = :speakerId, speaker_confidence = NULL
+WHERE id = :id;
+
+moveSpeaker:
+UPDATE utterance
+SET speaker_id = :intoId, speaker_confidence = NULL
+WHERE speaker_id = :fromId;
+
+countBySpeaker:
+SELECT speaker_id, count(*)
+FROM utterance
+WHERE speaker_id IS NOT NULL
+GROUP BY speaker_id;
+
 countUnorganized:
 SELECT count(*)
 FROM utterance

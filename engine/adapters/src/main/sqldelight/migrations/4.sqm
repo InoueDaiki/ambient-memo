@@ -1,0 +1,22 @@
+-- 版 4 から 5: 話者の重心を発話の長さで重み付けし、自分の声の更新と判定の集計を足す
+-- 既存の特徴量は長さを記録していなかったので、1 サンプルを 2 秒として扱う
+ALTER TABLE speaker_embedding ADD COLUMN voiced_ms INTEGER NOT NULL DEFAULT 0;
+
+UPDATE speaker_embedding SET voiced_ms = sample_count * 2000;
+
+CREATE TABLE self_voice_adaptation (
+  model_version TEXT NOT NULL PRIMARY KEY,
+  vector BLOB NOT NULL,
+  voiced_ms INTEGER NOT NULL,
+  updated_at_ms INTEGER NOT NULL,
+  CHECK (voiced_ms > 0)
+);
+
+CREATE TABLE speaker_decision_stat (
+  day_ms INTEGER NOT NULL,
+  decision TEXT NOT NULL,
+  bucket INTEGER NOT NULL,
+  runs INTEGER NOT NULL,
+  voiced_ms INTEGER NOT NULL,
+  PRIMARY KEY (day_ms, decision, bucket)
+);

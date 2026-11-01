@@ -16,6 +16,9 @@ import type {
   MemoDetail,
   MemoEngineClient,
   MemoMode,
+  SpeakerDiagnostics,
+  SpeakerInfo,
+  SpeakerTarget,
   Todo,
   TranscriptEngineClient,
   Utterance,
@@ -25,6 +28,7 @@ export interface FakeEngineClientOptions {
   status?: EngineStatus;
   listeningStatus?: ListeningStatus;
   utterances?: Utterance[];
+  speakers?: SpeakerInfo[];
   permissions?: EnginePermissions;
   selfEnrollment?: SelfEnrollmentStatus;
   modelDownload?: ModelDownloadStatus;
@@ -58,6 +62,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   readonly #listeners = new Set<EngineListener>();
   #listeningStatus: ListeningStatus;
   #utterances: Utterance[];
+  #speakers: SpeakerInfo[];
   #startError: Error | undefined;
   #permissions: EnginePermissions;
   #settingsOpened = 0;
@@ -80,6 +85,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
     listeningStatus = "stopped",
     utterances = [],
+    speakers = [{ id: "1", name: "自分", kind: "self", utteranceCount: 0 }],
     permissions = { microphone: true, notifications: true },
     selfEnrollment = "enrolled",
     modelDownload,
@@ -92,6 +98,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     this.#status = status;
     this.#listeningStatus = listeningStatus;
     this.#utterances = [...utterances];
+    this.#speakers = [...speakers];
     this.#permissions = permissions;
     this.#selfEnrollment = selfEnrollment;
     this.#modelDownload =
@@ -146,6 +153,113 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   listUtterances({ limit }: { limit: number }): Promise<Utterance[]> {
     const newestFirst = [...this.#utterances].sort((a, b) => b.startedAt - a.startedAt);
     return Promise.resolve(newestFirst.slice(0, limit));
+  }
+
+  listSpeakers(): Promise<SpeakerInfo[]> {
+    const counted = this.#speakers.map((speaker) => ({
+      ...speaker,
+      utteranceCount: this.#utterances.filter((item) => item.speakerId === speaker.id).length,
+    }));
+    return Promise.resolve(counted);
+  }
+
+  setUtteranceSpeaker(utteranceId: string, target: SpeakerTarget): Promise<void> {
+    const speaker = this.#resolveTarget(target);
+    if (speaker === undefined && target !== "unknown") {
+      return Promise.reject(new Error("speaker-not-found"));
+    }
+    if (!this.#utterances.some((item) => item.id === utteranceId)) {
+      return Promise.reject(new Error("speaker-not-found"));
+    }
+    this.#utterances = this.#utterances.map((item) => {
+      if (item.id !== utteranceId) return item;
+      const { speakerId: _id, speakerName: _name, ...rest } = item;
+      if (speaker === undefined) return { ...rest, speaker: "unknown" };
+      return {
+        ...rest,
+        speaker: speaker.kind === "self" ? "self" : "other",
+        speakerId: speaker.id,
+        speakerName: speaker.name,
+      };
+    });
+    this.#emit({ type: "utterances-changed" });
+    return Promise.resolve();
+  }
+
+  #resolveTarget(target: SpeakerTarget): SpeakerInfo | undefined {
+    if (target === "self") return this.#speakers.find((item) => item.kind === "self");
+    if (target === "new") {
+      const id = String(Math.max(0, ...this.#speakers.map((item) => Number(item.id))) + 1);
+      const provisional = this.#speakers.filter((item) => item.kind === "provisional").length;
+      const created: SpeakerInfo = {
+        id,
+        name: `話者${provisional + 1}`,
+        kind: "provisional",
+        utteranceCount: 0,
+      };
+      this.#speakers = [...this.#speakers, created];
+      return created;
+    }
+    return this.#speakers.find((item) => item.id === target);
+  }
+
+  mergeSpeakers(fromId: string, intoId: string): Promise<void> {
+    const from = this.#speakers.find((item) => item.id === fromId);
+    const into = this.#speakers.find((item) => item.id === intoId);
+    if (!from || !into || from.kind === "self" || fromId === intoId) {
+      return Promise.reject(new Error("speaker-not-found"));
+    }
+    this.#speakers = this.#speakers.filter((item) => item.id !== fromId);
+    this.#utterances = this.#utterances.map((item) =>
+      item.speakerId === fromId
+        ? {
+            ...item,
+            speaker: into.kind === "self" ? "self" : "other",
+            speakerId: intoId,
+            speakerName: into.name,
+          }
+        : item,
+    );
+    this.#emit({ type: "utterances-changed" });
+    return Promise.resolve();
+  }
+
+  renameSpeaker(speakerId: string, name: string): Promise<void> {
+    const trimmed = name.trim();
+    if (trimmed === "" || !this.#speakers.some((item) => item.id === speakerId)) {
+      return Promise.reject(new Error("speaker-not-found"));
+    }
+    this.#speakers = this.#speakers.map((item) =>
+      item.id === speakerId
+        ? { ...item, name: trimmed, kind: item.kind === "self" ? "self" : "named" }
+        : item,
+    );
+    this.#utterances = this.#utterances.map((item) =>
+      item.speakerId === speakerId ? { ...item, speakerName: trimmed } : item,
+    );
+    this.#emit({ type: "utterances-changed" });
+    return Promise.resolve();
+  }
+
+  getSpeakerDiagnostics(): Promise<SpeakerDiagnostics> {
+    return Promise.resolve({
+      days: 7,
+      selfRuns: 6,
+      otherRuns: 3,
+      unknownRuns: 1,
+      selfSeconds: 30,
+      otherSeconds: 12,
+      unknownSeconds: 2,
+      histogram: [
+        { floor: 0.3, self: 0, other: 3, unknown: 0 },
+        { floor: 0.4, self: 1, other: 0, unknown: 1 },
+        { floor: 0.5, self: 5, other: 0, unknown: 0 },
+      ],
+      provisionalSpeakers: this.#speakers.filter((item) => item.kind === "provisional").length,
+      hasAdaptedVoice: false,
+      selfThreshold: 0.45,
+      unknownFloor: 0.35,
+    });
   }
 
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus> {

@@ -107,7 +107,7 @@ class SpeakerToSqliteIntegrationTest {
                     embedder,
                     speakers,
                     clock,
-                    SpeakerConfig(minReliableMillis = 400, minReliableRunMillis = 400),
+                    SpeakerConfig(minReliableMillis = 400, minReliableRunMillis = 400, minNewSpeakerRunMillis = 400),
                 ),
             ).run()
             assertTrue(embedder.received.all { it.isReleased })
