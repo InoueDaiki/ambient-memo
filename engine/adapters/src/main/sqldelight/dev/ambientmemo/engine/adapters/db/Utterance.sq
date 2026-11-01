@@ -69,6 +69,10 @@ UPDATE utterance
 SET speaker_id = :intoId, speaker_confidence = NULL
 WHERE speaker_id = :fromId;
 
+clearSpeakers:
+UPDATE utterance
+SET speaker_id = NULL, speaker_confidence = NULL;
+
 countBySpeaker:
 SELECT speaker_id, count(*)
 FROM utterance

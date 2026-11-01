@@ -224,6 +224,21 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     return Promise.resolve();
   }
 
+  resetSpeakers(): Promise<void> {
+    if (this.#listeningStatus !== "stopped") {
+      return Promise.reject(new Error("speaker-reset-busy"));
+    }
+    this.#speakers = [];
+    this.#selfEnrollment = "not-enrolled";
+    this.#utterances = this.#utterances.map((item) => {
+      const { speakerId: _id, speakerName: _name, ...rest } = item;
+      return { ...rest, speaker: "unknown" };
+    });
+    this.#emit({ type: "utterances-changed" });
+    this.#emit({ type: "speakers-reset" });
+    return Promise.resolve();
+  }
+
   renameSpeaker(speakerId: string, name: string): Promise<void> {
     const trimmed = name.trim();
     if (trimmed === "" || !this.#speakers.some((item) => item.id === speakerId)) {

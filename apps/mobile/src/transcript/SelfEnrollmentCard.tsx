@@ -59,7 +59,7 @@ export function SelfEnrollmentCard({
       {failure !== undefined && <StatusBanner tone="danger" message={failureMessage(failure)} />}
       <Button
         label={isEnrolling ? "登録をやめる" : isAgain ? "声を登録し直す" : "声を登録する"}
-        variant="secondary"
+        variant={isEnrolling ? "danger" : "secondary"}
         disabled={isListening}
         onPress={isEnrolling ? cancel : enroll}
       />

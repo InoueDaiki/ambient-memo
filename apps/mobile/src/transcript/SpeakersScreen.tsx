@@ -31,8 +31,8 @@ function RenameForm({
   return (
     <View style={{ gap: spacing.sm }}>
       <TextField label={`${speaker.name} の名前`} value={name} onChangeText={setName} />
-      <Button label="名前を保存する" variant="secondary" onPress={() => onSubmit(name)} />
-      <Button label="やめる" variant="secondary" onPress={onCancel} />
+      <Button label="名前を保存する" variant="primary" onPress={() => onSubmit(name)} />
+      <Button label="やめる" variant="ghost" onPress={onCancel} />
     </View>
   );
 }
@@ -55,8 +55,8 @@ function MergeForm({
         <Text variant="caption">
           {speaker.name} の発話を {into.name} に移します。取り消せません。
         </Text>
-        <Button label="統合する" variant="secondary" onPress={() => onSubmit(into)} />
-        <Button label="やめる" variant="secondary" onPress={onCancel} />
+        <Button label="統合する" variant="danger" onPress={() => onSubmit(into)} />
+        <Button label="やめる" variant="ghost" onPress={onCancel} />
       </View>
     );
   }
@@ -73,7 +73,7 @@ function MergeForm({
             onPress={() => setInto(item)}
           />
         ))}
-      <Button label="やめる" variant="secondary" onPress={onCancel} />
+      <Button label="やめる" variant="ghost" onPress={onCancel} />
     </View>
   );
 }
@@ -119,11 +119,50 @@ function Diagnostics({ diagnostics }: { diagnostics: SpeakerDiagnostics }) {
   );
 }
 
+// 取り消せず、自分の声も消えるので、押してすぐには消さない
+function ResetSpeakers({ isListening, onReset }: { isListening: boolean; onReset: () => void }) {
+  const [isConfirming, setIsConfirming] = useState(false);
+  if (!isConfirming) {
+    return (
+      <View style={{ gap: spacing.sm }}>
+        <Button
+          label="話者をリセットする"
+          variant="danger"
+          disabled={isListening}
+          onPress={() => setIsConfirming(true)}
+        />
+        {isListening && (
+          <Text variant="caption" color="fgMuted">
+            聞き取りを止めるとリセットできます。
+          </Text>
+        )}
+      </View>
+    );
+  }
+  return (
+    <View style={{ gap: spacing.sm }}>
+      <Text>
+        自分の声を含むすべての話者と判定の記録を消します。これまでの発話の話者は「不明」になり、元に戻せません。文字起こしとメモは残ります。リセットのあとは、声を登録し直してください。
+      </Text>
+      <Button
+        label="すべての話者を消す"
+        variant="danger"
+        disabled={isListening}
+        onPress={() => {
+          setIsConfirming(false);
+          onReset();
+        }}
+      />
+      <Button label="やめる" variant="ghost" onPress={() => setIsConfirming(false)} />
+    </View>
+  );
+}
+
 // 話者の名前、統合、声の登録のやり直しと、判定の記録を見る画面
 export function SpeakersScreen() {
   const navigation = useNavigation<RootNavigation>();
   const { speakers, error: loadError } = useSpeakers();
-  const { error, renameSpeaker, mergeSpeakers } = useSpeakerActions();
+  const { error, renameSpeaker, mergeSpeakers, resetSpeakers } = useSpeakerActions();
   const diagnostics = useSpeakerDiagnostics();
   const { status } = useListening();
   const [editing, setEditing] = useState<Editing>();
@@ -133,7 +172,9 @@ export function SpeakersScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ paddingHorizontal: spacing.lg, gap: spacing.lg }}>
-        <Button label="戻る" variant="secondary" onPress={() => navigation.goBack()} />
+        <View style={{ alignSelf: "flex-start" }}>
+          <Button label="戻る" variant="ghost" onPress={() => navigation.goBack()} />
+        </View>
         <Text variant="title" accessibilityRole="header">
           話者
         </Text>
@@ -196,6 +237,7 @@ export function SpeakersScreen() {
         })}
         <SelfEnrollmentCard isListening={status === "listening"} again />
         {diagnostics !== undefined && <Diagnostics diagnostics={diagnostics} />}
+        <ResetSpeakers isListening={status === "listening"} onReset={() => void resetSpeakers()} />
       </ScrollView>
     </Screen>
   );

@@ -351,6 +351,22 @@ abstract class SpeakerRepositoryContract {
     }
 
     @Test
+    fun `リセットすると自分も含めて誰もいなくなり、次の話者は話者1から始まる`() = runTest {
+        val repository = repository()
+        repository.saveSelfEmbedding(SpeakerEmbedding(floatArrayOf(1f, 0f), "v1"), 3, 100)
+        repository.saveSelfAdaptation(SelfAdaptation(floatArrayOf(1f, 0f), 1_000, "v1"), 100)
+        repository.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f), "v1"), 100)
+
+        repository.resetSpeakers()
+
+        assertTrue(repository.listSpeakers().isEmpty())
+        assertTrue(repository.listEmbeddings("v1", 10).isEmpty())
+        assertNull(repository.findSelfAdaptation("v1"))
+        val next = repository.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f), "v1"), 200)
+        assertEquals("話者1", next.displayName)
+    }
+
+    @Test
     fun `振り直すと仮の話者だけを id の順に番号を付ける`() = runTest {
         val repository = repository()
         val speakers = List(4) { repository.createProvisionalSpeaker(first, 100) }

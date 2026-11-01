@@ -56,7 +56,7 @@ function RunningSection({ status, stop }: { status: OrganizeStatus; stop: () => 
       </Text>
       <Button
         label={isStopping ? "止めています" : "止める"}
-        variant="secondary"
+        variant="danger"
         onPress={stop}
         disabled={isStopping}
       />
@@ -93,7 +93,7 @@ function IdleSection({
       <Text variant="caption" color="fgMuted">
         {idleGuide(status)}
       </Text>
-      <Button label="今すぐ整理する" variant="secondary" onPress={start} disabled={hasNothing} />
+      <Button label="今すぐ整理する" variant="primary" onPress={start} disabled={hasNothing} />
     </View>
   );
 }

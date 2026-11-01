@@ -125,11 +125,11 @@ export function OrganizerModelSection({ status, start, cancel }: UseOrganizerMod
         </Text>
       )}
       {status.state === "running" ? (
-        <Button label="取得を止める" variant="secondary" onPress={cancel} />
+        <Button label="取得を止める" variant="danger" onPress={cancel} />
       ) : (
         <Button
           label={canResume ? "整理のモデルを続きから取得する" : "整理のモデルを取得する"}
-          variant="secondary"
+          variant="primary"
           onPress={start}
         />
       )}
@@ -146,7 +146,7 @@ export function ModelDownloadButton({
   variant = "primary",
 }: UseModelDownloadResult & { variant?: "primary" | "secondary" }) {
   if (status?.state === "running") {
-    return <Button label="取得を止める" variant="secondary" onPress={cancel} />;
+    return <Button label="取得を止める" variant="danger" onPress={cancel} />;
   }
   const canResume =
     status !== undefined && "downloadedBytes" in status && status.downloadedBytes > 0;

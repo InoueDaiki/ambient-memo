@@ -198,7 +198,9 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
     };
     // 話者のモデルは取得で揃うので、そのときに unavailable から変わる
     const unsubscribe = client.subscribe((event) => {
-      if (event.type === "model-download-changed" && event.status.state !== "running") load();
+      const isModelReady =
+        event.type === "model-download-changed" && event.status.state !== "running";
+      if (isModelReady || event.type === "speakers-reset") load();
     });
     load();
     return () => {
@@ -424,6 +426,7 @@ export interface UseSpeakerActionsResult {
   setUtteranceSpeaker: (utteranceId: string, target: SpeakerTarget) => Promise<boolean>;
   mergeSpeakers: (fromId: string, intoId: string) => Promise<boolean>;
   renameSpeaker: (speakerId: string, name: string) => Promise<boolean>;
+  resetSpeakers: () => Promise<boolean>;
 }
 
 // 操作の結果は成功したかどうかで返す。失敗の中身は error に残す
@@ -458,24 +461,33 @@ export function useSpeakerActions(): UseSpeakerActionsResult {
     [client, run],
   );
 
-  return { isPending, error, setUtteranceSpeaker, mergeSpeakers, renameSpeaker };
+  const resetSpeakers = useCallback(() => run(() => client.resetSpeakers()), [client, run]);
+
+  return { isPending, error, setUtteranceSpeaker, mergeSpeakers, renameSpeaker, resetSpeakers };
 }
 
-// 開いたときの値を出す。調整の確認に使うだけなので、更新は追わない
+// 開いたときの値を出す。調整の確認に使うだけなので、リセット以外の更新は追わない
 export function useSpeakerDiagnostics(): SpeakerDiagnostics | undefined {
   const client = useEngineClient();
   const [diagnostics, setDiagnostics] = useState<SpeakerDiagnostics>();
 
   useEffect(() => {
     let active = true;
-    client
-      .getSpeakerDiagnostics()
-      .then((current) => {
-        if (active) setDiagnostics(current);
-      })
-      .catch(() => undefined);
+    const load = () => {
+      client
+        .getSpeakerDiagnostics()
+        .then((current) => {
+          if (active) setDiagnostics(current);
+        })
+        .catch(() => undefined);
+    };
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "speakers-reset") load();
+    });
+    load();
     return () => {
       active = false;
+      unsubscribe();
     };
   }, [client]);
 

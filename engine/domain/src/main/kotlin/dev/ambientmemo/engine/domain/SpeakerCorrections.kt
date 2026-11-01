@@ -19,6 +19,9 @@ class RecentVoices(private val capacity: Int = DEFAULT_CAPACITY) {
     @Synchronized
     fun take(utteranceId: Long): TurnVoice? = voices.remove(utteranceId)
 
+    @Synchronized
+    fun clear() = voices.clear()
+
     private companion object {
         const val DEFAULT_CAPACITY = 256
     }

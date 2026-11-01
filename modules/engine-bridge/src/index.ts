@@ -36,6 +36,7 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   listSpeakers(): Promise<SpeakerInfo[]>;
   setUtteranceSpeaker(utteranceId: string, target: string): Promise<void>;
   mergeSpeakers(fromId: string, intoId: string): Promise<void>;
+  resetSpeakers(): Promise<void>;
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
@@ -94,6 +95,7 @@ export function createEngineClient(): TranscriptEngineClient {
     listSpeakers: () => native.listSpeakers(),
     setUtteranceSpeaker: (utteranceId, target) => native.setUtteranceSpeaker(utteranceId, target),
     mergeSpeakers: (fromId, intoId) => native.mergeSpeakers(fromId, intoId),
+    resetSpeakers: () => native.resetSpeakers(),
     renameSpeaker: (speakerId, name) => native.renameSpeaker(speakerId, name),
     getSpeakerDiagnostics: () => native.getSpeakerDiagnostics(),
     getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),

@@ -395,6 +395,18 @@ describe("FakeEngineClient の話者", () => {
     expect((await client.listUtterances({ limit: 1 }))[0]?.speaker).toBe("self");
   });
 
+  it("リセットすると話者と登録が消え、発話は不明になる。聞き取り中は reject する", async () => {
+    const listening = new FakeEngineClient({ speakers, listeningStatus: "listening" });
+    await expect(listening.resetSpeakers()).rejects.toThrow();
+
+    const client = new FakeEngineClient({ speakers, utterances: [row] });
+    await client.resetSpeakers();
+
+    expect(await client.listSpeakers()).toEqual([]);
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+    expect((await client.listUtterances({ limit: 1 }))[0]?.speaker).toBe("unknown");
+  });
+
   it("名前を付けると named になり、空の名前は reject する", async () => {
     const client = new FakeEngineClient({ speakers, utterances: [row] });
 

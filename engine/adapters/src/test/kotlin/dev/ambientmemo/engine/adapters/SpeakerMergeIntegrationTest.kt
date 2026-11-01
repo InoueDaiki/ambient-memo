@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
@@ -34,6 +35,23 @@ class SpeakerMergeIntegrationTest {
         speakers.createProvisionalSpeaker(SpeakerEmbedding(axis(index), model), 1, 2_000)
 
     private suspend fun utter(speakerId: Long?) = utterances.insert(NewUtterance(0, 1, "本文", null, 1, speakerId, 0.5))
+
+    @Test
+    fun `リセットすると発話は残り、話者だけが外れる`() = runTest {
+        val self = speakers.saveSelfEmbedding(SpeakerEmbedding(axis(0), model), 3, 1)
+        val other = provisional(1)
+        val rows = listOf(utter(self.id), utter(other.id), utter(null))
+
+        speakers.resetSpeakers()
+
+        assertTrue(speakers.listSpeakers().isEmpty())
+        rows.forEach { row ->
+            val stored = checkNotNull(utterances.find(row.id))
+            assertEquals("本文", stored.text)
+            assertNull(stored.speakerId)
+            assertNull(stored.speakerConfidence)
+        }
+    }
 
     @Test
     fun `途中で失敗すると何も変わらない`() = runTest {

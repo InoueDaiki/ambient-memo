@@ -124,6 +124,9 @@ interface SpeakerRepository {
      */
     suspend fun mergeSpeakers(merges: List<SpeakerMerge>, nowMillis: Long, renumberProvisional: Boolean = false)
 
+    /** 自分を含むすべての話者と声を消し、すべての発話の話者を外す。すべて記録するか、何も記録しないかのどちらか。 */
+    suspend fun resetSpeakers()
+
     /** 育てた自分の声を返す。[modelVersion] で育てたものだけを返す。 */
     suspend fun findSelfAdaptation(modelVersion: String): SelfAdaptation?
 

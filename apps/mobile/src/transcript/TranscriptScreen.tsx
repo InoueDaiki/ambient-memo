@@ -135,11 +135,7 @@ export function TranscriptScreen() {
           <Text variant="title" accessibilityRole="header">
             文字起こし
           </Text>
-          <Button
-            label="話者"
-            variant="secondary"
-            onPress={() => navigation.navigate("Speakers")}
-          />
+          <Button label="話者" variant="ghost" onPress={() => navigation.navigate("Speakers")} />
         </View>
         <SelfEnrollmentCard isListening={isListening} />
         {needsModels && <ModelDownloadNotice status={modelDownload.status} />}
@@ -209,7 +205,7 @@ export function TranscriptScreen() {
         ) : (
           <Button
             label={isListening ? "聞き取りを止める" : "聞き取りを始める"}
-            variant={isListening ? "secondary" : "primary"}
+            variant={isListening ? "danger" : "primary"}
             disabled={status === undefined || isChanging}
             onPress={isListening ? stop : start}
           />

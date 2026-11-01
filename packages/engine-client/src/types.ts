@@ -175,6 +175,8 @@ export type EngineEvent =
   | { type: "listening-changed"; status: ListeningStatus; interrupted?: boolean }
   // 発話の追加のほか、話者の更新でも届く。受け取ったら listUtterances で取り直す
   | { type: "utterances-changed" }
+  // 自分の声も消えたので、受け取ったら getSelfEnrollmentStatus で取り直す
+  | { type: "speakers-reset" }
   // 受け取ったら getPermissions で取り直す
   | { type: "permissions-changed" }
   // 進み具合もこれで届く
@@ -208,6 +210,9 @@ export interface TranscriptEngineClient extends EngineClient {
   setUtteranceSpeaker(utteranceId: string, target: SpeakerTarget): Promise<void>;
   // fromId の発話を intoId へ移し、fromId を消す。自分は統合元にできない。取り消せない
   mergeSpeakers(fromId: string, intoId: string): Promise<void>;
+  // 自分を含むすべての話者と判定の記録を消し、発話を話者なしに戻す。文字起こしとメモは残す。
+  // 聞き取りや登録の途中は reject する。取り消せない
+  resetSpeakers(): Promise<void>;
   // 手で名前を付ける。空の名前は reject する。自分の名前も変えられるが、整理では「自分」のまま
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   // 直近の話者の判定の集計を返す

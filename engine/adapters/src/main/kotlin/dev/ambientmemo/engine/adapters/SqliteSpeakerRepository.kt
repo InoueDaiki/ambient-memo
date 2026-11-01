@@ -105,6 +105,15 @@ class SqliteSpeakerRepository(
         }
     }
 
+    override suspend fun resetSpeakers(): Unit = withContext(ioContext) {
+        database.transaction {
+            database.utteranceQueries.clearSpeakers()
+            queries.deleteAdaptations()
+            queries.deleteAllEmbeddings()
+            queries.deleteAll()
+        }
+    }
+
     private fun apply(merge: SpeakerMerge, nowMillis: Long) {
         val isOther = queries.listAll(::toSpeaker).executeAsList().any { it.id == merge.fromId && !it.isSelf }
         if (!isOther) return

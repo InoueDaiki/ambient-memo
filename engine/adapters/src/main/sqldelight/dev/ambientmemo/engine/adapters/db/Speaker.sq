@@ -87,6 +87,12 @@ deleteOther:
 DELETE FROM speaker
 WHERE id = :id AND is_self = 0;
 
+deleteAll:
+DELETE FROM speaker;
+
+deleteAllEmbeddings:
+DELETE FROM speaker_embedding;
+
 changes:
 SELECT changes();
 
