@@ -477,9 +477,7 @@ describe("今すぐ整理する", () => {
 
     await userEvent.press(await screen.findByRole("button", { name: "止める" }));
 
-    await screen.findByText(
-      "区切りがつくと止まります。モデルの読み込み中は、読み込みの後に止まります。",
-    );
+    await screen.findByText("区切りがつくと止まります。");
     await act(async () => client.finishOrganize("stopped", 1));
     await screen.findByText("整理を止めました。残りは次の整理で続きから処理します。");
   });

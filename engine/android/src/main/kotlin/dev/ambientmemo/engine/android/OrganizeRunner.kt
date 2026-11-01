@@ -69,6 +69,10 @@ internal class OrganizeRunner(
 
     val isRunning: Boolean get() = status.isRunning
 
+    /** 止める依頼のあと、モデルの読み込みを待っている。まとまりに入る前なので、捨てても失うものがない。 */
+    val isStoppingBeforeChunks: Boolean
+        get() = status.let { it.phase == OrganizePhase.STOPPING && it.totalChunks == 0 }
+
     fun start(requested: OrganizeTrigger): OrganizeStart = synchronized(lock) {
         if (status.isRunning) return join(requested)
         trigger = requested

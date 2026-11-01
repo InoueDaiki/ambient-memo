@@ -56,6 +56,10 @@ class OrganizeRunnerTest {
     @Volatile
     private var duringFirstChunk: () -> Unit = {}
 
+    /** モデルを読み込んでいる間に呼ぶ。 */
+    @Volatile
+    private var duringLoad: () -> Unit = {}
+
     private inner class ScriptedNative : NativeLlm {
         private var calls = 0
 
@@ -77,6 +81,7 @@ class OrganizeRunnerTest {
                 openLlm = {
                     LocalLlm("stub-1", {
                         loads++
+                        duringLoad()
                         ScriptedNative()
                     })
                 },
@@ -161,6 +166,37 @@ class OrganizeRunnerTest {
         assertEquals(OrganizeRunResult.STOPPED to OrganizeEnding.TOO_HOT, awaitFinished())
         assertEquals(1, memoCount())
         assertEquals(OrganizeEnding.TOO_HOT, runner.status.ending)
+    }
+
+    @Test
+    fun `読み込み中に止めると、まとまりに入る前だと分かる`() {
+        sayConversations(2)
+        var beforeChunks = false
+        duringLoad = {
+            runner.requestStop()
+            beforeChunks = runner.isStoppingBeforeChunks
+        }
+
+        runner.start(OrganizeTrigger.MANUAL)
+
+        assertEquals(OrganizeRunResult.STOPPED to OrganizeEnding.STOPPED, awaitFinished())
+        assertTrue(beforeChunks)
+        assertEquals(2, unorganized())
+    }
+
+    @Test
+    fun `まとまりの処理中に止めても、読み込み待ちとは扱わない`() {
+        sayConversations(2)
+        var beforeChunks = true
+        duringFirstChunk = {
+            runner.requestStop()
+            beforeChunks = runner.isStoppingBeforeChunks
+        }
+
+        runner.start(OrganizeTrigger.MANUAL)
+
+        assertEquals(OrganizeRunResult.STOPPED to OrganizeEnding.STOPPED, awaitFinished())
+        assertFalse(beforeChunks)
     }
 
     @Test

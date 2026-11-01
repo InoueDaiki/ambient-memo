@@ -47,6 +47,12 @@ private const val ATTEMPTS_FILE = "organize-attempts.properties"
 /** 止まらなくなった実行が電池を使い続けないようにする上限。dataSync の 6 時間の制限と揃える。 */
 private const val WAKE_LOCK_TIMEOUT_MILLIS = 6L * 60 * 60 * 1000
 
+/** 読み込み中に止める依頼が来てから、プロセスごと終えるまでの猶予。 */
+private const val LOAD_STOP_GRACE_MILLIS = 5_000L
+
+/** 終わりの状態が見守り側に届くのを待つ時間。 */
+private const val STATUS_DELIVERY_MILLIS = 500L
+
 /**
  * 別のプロセス(`:organize`)で LLM を動かす。定期実行では [OrganizeWorker] が bind して使う。
  * 手動の実行では、画面の操作から dataSync 型の Foreground Service として開始し、アプリを離れても完了まで動く。
@@ -82,7 +88,7 @@ class OrganizeService : Service() {
             when (message.what) {
                 MESSAGE_START -> startScheduled(message.replyTo)
                 MESSAGE_STOP -> runner.requestSchedulerStop()
-                MESSAGE_STOP_BY_USER -> runner.requestStop()
+                MESSAGE_STOP_BY_USER -> stopByUser()
                 MESSAGE_SUBSCRIBE -> subscribe(message.replyTo)
             }
             true
@@ -104,12 +110,25 @@ class OrganizeService : Service() {
         when (intent?.action) {
             ACTION_START -> startManual(startId)
             ACTION_STOP -> {
-                runner.requestStop()
+                stopByUser()
                 if (!runner.isRunning) stopSelf(startId)
             }
             else -> stopSelf(startId)
         }
         return START_NOT_STICKY
+    }
+
+    private fun stopByUser() {
+        runner.requestStop()
+        main.postDelayed(::endStuckLoad, LOAD_STOP_GRACE_MILLIS)
+    }
+
+    /** モデルの読み込みはネイティブの中で止められず、終わらないこともあるので、別プロセスごと終える。 */
+    private fun endStuckLoad() {
+        if (!runner.isStoppingBeforeChunks) return
+        runner.abandon(OrganizeEnding.STOPPED)
+        leaveForeground(OrganizeEnding.STOPPED)
+        main.postDelayed({ Process.killProcess(Process.myPid()) }, STATUS_DELIVERY_MILLIS)
     }
 
     private fun startScheduled(replyTo: Messenger?) {
