@@ -356,7 +356,7 @@ class EngineBridgeModule : Module() {
       "endsAt" to status.endsAtMillis?.toDouble(),
       "sizeBytes" to status.sizeBytes.toDouble(),
       "isFull" to status.isFull,
-    )
+    ).filterValues { it != null } // JS の型は項目なしで表す。null を渡すと記録があるように見える
   }
 
   private fun statusOf(state: CaptureState): String = when (state) {
