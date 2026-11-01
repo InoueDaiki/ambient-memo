@@ -176,6 +176,12 @@ export interface UseSelfEnrollmentResult {
   isEnrolling: boolean;
   // 最後の登録の失敗。止める操作は失敗に含めない。次の操作で消える
   failure: SelfEnrollmentFailure | "unknown" | undefined;
+  // 今回の登録で使えた発話の数
+  acceptedSamples: number;
+  // 最後の発話が短いなどの理由で使えなかったら true
+  isLastRejected: boolean;
+  // 今回の登録が終わったら true
+  isCompleted: boolean;
   enroll: () => void;
   cancel: () => void;
 }
@@ -185,6 +191,9 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
   const [status, setStatus] = useState<SelfEnrollmentStatus>();
   const [isEnrolling, setIsEnrolling] = useState(false);
   const [failure, setFailure] = useState<UseSelfEnrollmentResult["failure"]>();
+  const [acceptedSamples, setAcceptedSamples] = useState(0);
+  const [isLastRejected, setIsLastRejected] = useState(false);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -200,7 +209,11 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
     const unsubscribe = client.subscribe((event) => {
       const isModelReady =
         event.type === "model-download-changed" && event.status.state !== "running";
-      if (isModelReady || event.type === "speakers-reset") load();
+      if (isModelReady || event.type === "self-enrollment-changed") load();
+      if (event.type === "enrollment-progress") {
+        setAcceptedSamples(event.acceptedSamples);
+        setIsLastRejected(event.isRejected);
+      }
     });
     load();
     return () => {
@@ -212,9 +225,15 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
   const enroll = useCallback(() => {
     setIsEnrolling(true);
     setFailure(undefined);
+    setAcceptedSamples(0);
+    setIsLastRejected(false);
+    setIsCompleted(false);
     client
       .enrollSelf()
-      .then(() => setStatus("enrolled"))
+      .then(() => {
+        setStatus("enrolled");
+        setIsCompleted(true);
+      })
       .catch((e: unknown) => {
         const reason = e instanceof SelfEnrollmentError ? e.failure : "unknown";
         if (reason !== "cancelled") setFailure(reason);
@@ -226,7 +245,16 @@ export function useSelfEnrollment(): UseSelfEnrollmentResult {
     client.cancelSelfEnrollment().catch(() => undefined);
   }, [client]);
 
-  return { status, isEnrolling, failure, enroll, cancel };
+  return {
+    status,
+    isEnrolling,
+    failure,
+    acceptedSamples,
+    isLastRejected,
+    isCompleted,
+    enroll,
+    cancel,
+  };
 }
 
 export interface UseModelDownloadResult {
@@ -482,7 +510,7 @@ export function useSpeakerDiagnostics(): SpeakerDiagnostics | undefined {
         .catch(() => undefined);
     };
     const unsubscribe = client.subscribe((event) => {
-      if (event.type === "speakers-reset") load();
+      if (event.type === "self-enrollment-changed") load();
     });
     load();
     return () => {

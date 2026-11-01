@@ -9,7 +9,7 @@ data class EnrollmentConfig(
     val requiredSamples: Int = DEFAULT_REQUIRED_SAMPLES,
     /** これより短い区間は登録に使わない。 */
     val minSampleMillis: Long = DEFAULT_MIN_SAMPLE_MILLIS,
-    /** これだけ聞いても集まらなければ諦める。 */
+    /** 次の発話が使えるまで、これだけ聞いても集まらなければ諦める。 */
     val maxListeningMillis: Long = DEFAULT_MAX_LISTENING_MILLIS,
 ) {
     init {
@@ -26,6 +26,14 @@ data class EnrollmentConfig(
         const val DEFAULT_MAX_LISTENING_MILLIS = 45_000L
     }
 }
+
+/** 登録の途中の知らせ。音声も特徴量も含まない。 */
+data class EnrollmentProgress(
+    /** ここまでに使えた発話の数。 */
+    val acceptedSamples: Int,
+    /** 話した発話が、短いなどの理由で使えなかった。 */
+    val isRejected: Boolean = false,
+)
 
 enum class EnrollmentOutcome {
     /** 自分の特徴量を記録した。 */
@@ -50,6 +58,7 @@ class SelfEnrollment(
     private val clock: Clock,
     private val captureConfig: CaptureConfig = CaptureConfig(),
     private val config: EnrollmentConfig = EnrollmentConfig(),
+    private val onProgress: (EnrollmentProgress) -> Unit = {},
 ) {
     suspend fun run(): EnrollmentOutcome {
         val sampleRateHz = audioSource.sampleRateHz
@@ -61,8 +70,9 @@ class SelfEnrollment(
             var heardSamples = 0L
             audioSource.frames().takeWhile { frame ->
                 val isSpeech = voiceActivityDetector.isSpeech(frame)
+                val accepted = vectors.size
                 embedAll(segmenter.accept(frame, isSpeech), vectors)
-                heardSamples += frame.samples.size
+                heardSamples = if (vectors.size > accepted) 0 else heardSamples + frame.samples.size
                 vectors.size < config.requiredSamples && heardSamples < maxSamples
             }.collect()
             if (vectors.size < config.requiredSamples) embedAll(listOfNotNull(segmenter.flush()), vectors)
@@ -75,9 +85,22 @@ class SelfEnrollment(
     /** 途中で失敗しても、残りの発話を含めてすべて解放する。 */
     private suspend fun embedAll(segments: List<SpeechSegment>, vectors: MutableList<FloatArray>) {
         try {
-            segments.forEach { segment -> vectorOf(segment)?.let(vectors::add) }
+            segments.forEach { segment -> accept(segment, vectors) }
         } finally {
             segments.forEach(SpeechSegment::close)
+        }
+    }
+
+    private suspend fun accept(segment: SpeechSegment, vectors: MutableList<FloatArray>) {
+        val vector = vectorOf(segment)
+        val millis = segment.endedAtMillis - segment.startedAtMillis
+        when {
+            vector != null -> {
+                vectors += vector
+                onProgress(EnrollmentProgress(vectors.size))
+            }
+            // 咳や物音まで読み直しを頼まない
+            millis >= config.minSampleMillis / 2 -> onProgress(EnrollmentProgress(vectors.size, isRejected = true))
         }
     }
 

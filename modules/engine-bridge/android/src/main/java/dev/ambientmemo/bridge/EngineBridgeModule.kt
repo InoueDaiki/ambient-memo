@@ -123,6 +123,18 @@ class EngineBridgeModule : Module() {
         engine.utterancesChanged.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "utterances-changed")) }
       }
       moduleScope.launch {
+        engine.enrollmentProgress.collect {
+          sendEvent(
+            EVENT_ENGINE,
+            mapOf(
+              "type" to "enrollment-progress",
+              "acceptedSamples" to it.acceptedSamples,
+              "isRejected" to it.isRejected,
+            ),
+          )
+        }
+      }
+      moduleScope.launch {
         engine.organizeChanges.collect { sendEvent(EVENT_ENGINE, mapOf("type" to "organize-changed")) }
       }
       engine.addMemoListener(memoListener)
@@ -236,7 +248,7 @@ class EngineBridgeModule : Module() {
 
     AsyncFunction("resetSpeakers") Coroutine { ->
       if (!engine.resetSpeakers()) throw SpeakerResetBusyException()
-      sendEvent(EVENT_ENGINE, mapOf("type" to "speakers-reset"))
+      sendEvent(EVENT_ENGINE, mapOf("type" to "self-enrollment-changed"))
     }
 
     AsyncFunction("renameSpeaker") Coroutine { speakerId: String, name: String ->
@@ -297,6 +309,7 @@ class EngineBridgeModule : Module() {
       } catch (e: SelfEnrollmentException) {
         throw EnrollmentFailedException(e.failure)
       }
+      sendEvent(EVENT_ENGINE, mapOf("type" to "self-enrollment-changed"))
     }
 
     AsyncFunction("cancelSelfEnrollment") {

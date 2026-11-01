@@ -425,21 +425,50 @@ describe("自分の声の登録", () => {
     expect(screen.queryByText("自分の声を登録する")).toBeNull();
   });
 
-  it("読み上げる文を出して聞き取り、終わると案内が消える", async () => {
+  it("1文ずつ出し、認識できたら次の文に進み、終わると案内が消える", async () => {
     const client = notEnrolled();
     await renderApp(client);
     await screen.findByText("自分の声を登録する");
 
     await press("声を登録する");
+    await press("読み上げを始める");
 
     await screen.findByText(/今日の予定を確認してから/);
+    screen.getByText("1 / 3 文目");
+    expect(screen.queryByText(/週末は友人と会って/)).toBeNull();
 
     await act(async () => {
+      client.reportEnrollmentProgress(1);
+    });
+    await screen.findByText(/週末は友人と会って/);
+    screen.getByText("聞き取れました。次の文を読んでください。");
+    expect(screen.queryByText(/今日の予定を確認してから/)).toBeNull();
+
+    await act(async () => {
+      client.reportEnrollmentProgress(2);
+      client.reportEnrollmentProgress(3);
       client.finishEnrollment();
     });
+    await screen.findByText("登録しました。");
 
+    await press("閉じる");
     expect(screen.queryByText("自分の声を登録する")).toBeNull();
     expect(await client.getSelfEnrollmentStatus()).toBe("enrolled");
+  });
+
+  it("短くて使えなければ、同じ文のまま読み直しを頼む", async () => {
+    const client = notEnrolled();
+    await renderApp(client);
+    await screen.findByText("自分の声を登録する");
+    await press("声を登録する");
+    await press("読み上げを始める");
+
+    await act(async () => {
+      client.reportEnrollmentProgress(0, true);
+    });
+
+    await screen.findByText("短かったので、もう一度読んでください。");
+    screen.getByText(/今日の予定を確認してから/);
   });
 
   it("やめると元に戻り、エラーを出さない", async () => {
@@ -448,10 +477,24 @@ describe("自分の声の登録", () => {
     await screen.findByText("自分の声を登録する");
 
     await press("声を登録する");
+    await press("読み上げを始める");
     await press("登録をやめる");
 
-    await screen.findByRole("button", { name: "声を登録する" });
+    await screen.findByRole("button", { name: "読み上げを始める" });
     expect(screen.queryByText(/登録できませんでした/)).toBeNull();
+    expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
+  });
+
+  it("途中で戻ると登録をやめる", async () => {
+    const client = notEnrolled();
+    await renderApp(client);
+    await screen.findByText("自分の声を登録する");
+    await press("声を登録する");
+    await press("読み上げを始める");
+
+    await press("戻る");
+
+    await screen.findByRole("button", { name: "声を登録する" });
     expect(await client.getSelfEnrollmentStatus()).toBe("not-enrolled");
   });
 
@@ -462,11 +505,12 @@ describe("自分の声の登録", () => {
     await screen.findByText("自分の声を登録する");
 
     await press("声を登録する");
+    await press("読み上げを始める");
 
     await screen.findByText(
       "声を十分に聞き取れませんでした。静かな場所で、もう一度試してください。",
     );
-    await press("声を登録する");
+    await press("読み上げを始める");
     expect(screen.queryByText(/声を十分に聞き取れませんでした/)).toBeNull();
   });
 

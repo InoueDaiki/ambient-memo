@@ -15,6 +15,7 @@ import dev.ambientmemo.engine.domain.CapturePipeline
 import dev.ambientmemo.engine.domain.EnrollmentOutcome
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
+import dev.ambientmemo.engine.domain.EnrollmentProgress
 import dev.ambientmemo.engine.domain.RecentVoices
 import dev.ambientmemo.engine.domain.SelfEnrollment
 import dev.ambientmemo.engine.domain.Speaker
@@ -54,6 +55,7 @@ import java.util.concurrent.CopyOnWriteArraySet
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
 private const val MODELS_DIRECTORY = "models"
+private const val ENROLLMENT_PROGRESS_BUFFER = 8
 private const val STAT_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1_000
 
 /** 文字起こしの状態。モデルが内部ストレージになければ [UNAVAILABLE]。 */
@@ -109,6 +111,10 @@ class Engine private constructor(context: Context) {
     }
 
     private val enrollmentRunner = EnrollmentRunner(scope, ::enrollmentPrecondition, ::runEnrollment)
+    private val enrollmentChanges = MutableSharedFlow<EnrollmentProgress>(
+        extraBufferCapacity = ENROLLMENT_PROGRESS_BUFFER,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST,
+    )
     private val changes = MutableSharedFlow<Unit>(
         extraBufferCapacity = 1,
         onBufferOverflow = BufferOverflow.DROP_OLDEST,
@@ -148,6 +154,9 @@ class Engine private constructor(context: Context) {
 
     /** 発話が保存されるたびに流れる。 */
     val utterancesChanged: SharedFlow<Unit> = changes.asSharedFlow()
+
+    /** 声の登録の進み具合。 */
+    val enrollmentProgress: SharedFlow<EnrollmentProgress> = enrollmentChanges.asSharedFlow()
 
     val transcriptionMode: TranscriptionMode
         get() = if (modelStore.isInstalled(models)) TranscriptionMode.READY else TranscriptionMode.UNAVAILABLE
@@ -262,7 +271,10 @@ class Engine private constructor(context: Context) {
      *
      * @throws SelfEnrollmentException 登録できなかったとき
      */
-    suspend fun enrollSelf() = enrollmentRunner.run()
+    suspend fun enrollSelf() {
+        enrollmentRunner.run()
+        notifySpeakersChanged()
+    }
 
     /** 登録の聞き取りを止める。何も記録しない。動いていなければ何もしない。 */
     fun cancelEnrollment() = enrollmentRunner.cancel()
@@ -286,6 +298,7 @@ class Engine private constructor(context: Context) {
                     speakers = speakerRepository,
                     clock = SystemClock,
                     captureConfig = SherpaSettings.enrollmentCaptureConfig(),
+                    onProgress = { enrollmentChanges.tryEmit(it) },
                 ).run()
             }
         }

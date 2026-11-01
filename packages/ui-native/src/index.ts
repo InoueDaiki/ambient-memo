@@ -2,6 +2,8 @@ export { Button } from "./Button.tsx";
 export type { ButtonProps, ButtonVariant } from "./Button.tsx";
 export { CheckItem } from "./CheckItem.tsx";
 export type { CheckItemProps } from "./CheckItem.tsx";
+export { Disclosure } from "./Disclosure.tsx";
+export type { DisclosureProps } from "./Disclosure.tsx";
 export { EmptyState } from "./EmptyState.tsx";
 export type { EmptyStateProps } from "./EmptyState.tsx";
 export { ListItem } from "./ListItem.tsx";

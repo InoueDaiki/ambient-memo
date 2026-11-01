@@ -33,6 +33,10 @@ const todo = (overrides: Partial<Todo> & { id: string; task: string }): Todo => 
   ...overrides,
 });
 
+async function openSection(name: string | RegExp) {
+  await userEvent.press(await screen.findByRole("button", { name }));
+}
+
 async function openTab(client: FakeEngineClient, name: "メモ" | "ToDo") {
   await render(<App client={client} memoClient={client} />);
   await screen.findByText(/^(止まっています|聞き取り中)$/);
@@ -130,6 +134,7 @@ describe("メモの詳細", () => {
       "買い物の相談",
     );
 
+    await openSection(/^根拠の発話/);
     await screen.findByText("話者1");
     expect(screen.queryByText("それ以外")).toBeNull();
   });
@@ -149,12 +154,31 @@ describe("メモの詳細", () => {
     await openMemo(client, "買い物の相談");
 
     await screen.findByText("週末にまとめて買い物をする。");
-    screen.getByRole("header", { name: "根拠の発話" });
+    await openSection("根拠の発話(2 件)");
     const lines = screen.getAllByText(/^(週末に行こう|卵も買おう)$/);
     expect(lines.map((node) => node.props.children)).toEqual(["週末に行こう", "卵も買おう"]);
     screen.getByText("自分");
     screen.getByText("それ以外");
     screen.getByText("14:35");
+  });
+
+  it("ToDo と根拠の発話は閉じていて、押すと開け閉めできる", async () => {
+    const client = new FakeEngineClient({
+      memos: [memo({ id: "m1", todos: [todo({ id: "t1", task: "卵を買う" })] })],
+    });
+    await openMemo(client, "買い物の相談");
+
+    await screen.findByText("週末にまとめて買い物をする。");
+    expect(screen.queryByText("卵を買う")).toBeNull();
+    expect(screen.queryByText("週末に行こう")).toBeNull();
+
+    await openSection("ToDo(1 件)");
+    screen.getByText("卵を買う");
+    await openSection(/^根拠の発話/);
+    screen.getByText("週末に行こう");
+
+    await openSection("ToDo(1 件)");
+    expect(screen.queryByText("卵を買う")).toBeNull();
   });
 
   it("要約が NULL なら、発話から確かめるよう案内する", async () => {
@@ -182,6 +206,7 @@ describe("メモの詳細", () => {
     await screen.findByText(
       "ToDo を最後まで読み取れませんでした。欠けているものがあるかもしれません。",
     );
+    await openSection("ToDo(1 件)");
     screen.getByText("読めた ToDo");
   });
 
@@ -197,6 +222,7 @@ describe("メモの詳細", () => {
       memos: [memo({ id: "m1", todos: [todo({ id: "t1", task: "卵を買う" })] })],
     });
     await openMemo(client, "買い物の相談");
+    await openSection("ToDo(1 件)");
 
     await userEvent.press(await check("卵を買うを完了にする"));
 
