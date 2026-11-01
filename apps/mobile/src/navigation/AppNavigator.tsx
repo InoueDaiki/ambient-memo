@@ -8,6 +8,7 @@ import { useColorScheme } from "react-native";
 import { MemoDetailScreen } from "../memo/MemoDetailScreen.tsx";
 import { MemoListScreen } from "../memo/MemoListScreen.tsx";
 import { TodoListScreen } from "../memo/TodoListScreen.tsx";
+import { DiagnosticsScreen } from "../transcript/DiagnosticsScreen.tsx";
 import { SelfEnrollmentScreen } from "../transcript/SelfEnrollmentScreen.tsx";
 import { SpeakersScreen } from "../transcript/SpeakersScreen.tsx";
 import { TranscriptScreen } from "../transcript/TranscriptScreen.tsx";
@@ -58,6 +59,7 @@ export function AppNavigator() {
         <Stack.Screen name="MemoDetail" component={MemoDetailScreen} />
         <Stack.Screen name="Speakers" component={SpeakersScreen} />
         <Stack.Screen name="SelfEnrollment" component={SelfEnrollmentScreen} />
+        <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

@@ -526,6 +526,27 @@ describe("自分の声の登録", () => {
   });
 });
 
+describe("動作の記録", () => {
+  it("始めて止めると書き出せて、消すと最初の状態に戻る", async () => {
+    await renderApp(new FakeEngineClient());
+    await press("記録");
+
+    await screen.findByText("記録はありません。");
+    expect(screen.queryByRole("button", { name: "書き出す" })).toBeNull();
+
+    await press("記録を始める");
+    await screen.findByText("記録しています");
+
+    await press("記録を止める");
+    await screen.findByText("記録を止めています");
+    await press("書き出す");
+    expect(screen.queryByText("操作できませんでした")).toBeNull();
+
+    await press("記録を消す");
+    await screen.findByText("記録はありません。");
+  });
+});
+
 describe("話者を手で直す", () => {
   const speakers: SpeakerInfo[] = [
     { id: "1", name: "自分", kind: "self", utteranceCount: 0 },

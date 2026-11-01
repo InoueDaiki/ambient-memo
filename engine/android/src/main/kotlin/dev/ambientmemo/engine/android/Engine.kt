@@ -11,12 +11,15 @@ import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.AudioSource
+import dev.ambientmemo.engine.domain.CaptureChanged
 import dev.ambientmemo.engine.domain.CapturePipeline
+import dev.ambientmemo.engine.domain.DiagnosticProcess
 import dev.ambientmemo.engine.domain.EnrollmentOutcome
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
 import dev.ambientmemo.engine.domain.EnrollmentProgress
 import dev.ambientmemo.engine.domain.RecentVoices
+import dev.ambientmemo.engine.domain.RecordingCaptureGaps
 import dev.ambientmemo.engine.domain.SelfEnrollment
 import dev.ambientmemo.engine.domain.Speaker
 import dev.ambientmemo.engine.domain.SpeakerConsolidation
@@ -35,15 +38,18 @@ import dev.ambientmemo.engine.sherpa.android.androidTranscriber
 import dev.ambientmemo.engine.sherpa.android.androidVoiceActivityDetector
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -57,6 +63,7 @@ private const val START_TIMEOUT_MILLIS = 5_000L
 private const val MODELS_DIRECTORY = "models"
 private const val ENROLLMENT_PROGRESS_BUFFER = 8
 private const val STAT_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1_000
+private const val DIAGNOSTICS_SAMPLE_MILLIS = 5L * 60 * 1_000
 
 /** 文字起こしの状態。モデルが内部ストレージになければ [UNAVAILABLE]。 */
 enum class TranscriptionMode { READY, UNAVAILABLE }
@@ -94,6 +101,8 @@ class Engine private constructor(context: Context) {
         SpeakerCorrections(speakerRepository, utteranceRepository, recentVoices, speakerModel.version, SystemClock)
     }
     private val memoListeners = CopyOnWriteArraySet<(MemoChange) -> Unit>()
+    private val diagnostics = DiagnosticsJournal(this.context.filesDir, DiagnosticProcess.MAIN, SystemClock)
+    private var diagnosticsSampler: Job? = null
 
     /** メモと ToDo の読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
     internal val memoRepository: MemoRepository by lazy {
@@ -165,6 +174,57 @@ class Engine private constructor(context: Context) {
         OrganizeSchedule.ensureScheduled(this.context)
         // 動いている整理に、アプリを開いた時点で繋ぐ
         organizeMonitor
+        scope.launch { captureState.collect(::recordCaptureState) }
+        ensureDiagnosticsSampler()
+    }
+
+    private fun recordCaptureState(state: CaptureState) {
+        when (state) {
+            CaptureState.Listening -> diagnostics.record(CaptureChanged(isListening = true, isInterrupted = false))
+            is CaptureState.Stopped -> diagnostics.record(CaptureChanged(false, state.interrupted))
+            CaptureState.Starting, CaptureState.Stopping -> Unit
+        }
+    }
+
+    /**
+     * 記録の間、端末の状態を定期的に残す。端末が眠っている間は止まり、起きると続く。
+     * 期限で記録が止まると終わる。プロセスが作り直されたときは、アプリか聞き取りが動いた時点で再開する。
+     */
+    @Synchronized
+    private fun ensureDiagnosticsSampler() {
+        if (diagnosticsSampler?.isActive == true || !diagnostics.status().isRecording) return
+        diagnosticsSampler = scope.launch {
+            while (isActive && diagnostics.status().isRecording) {
+                diagnostics.record(deviceSample(context))
+                delay(DIAGNOSTICS_SAMPLE_MILLIS)
+            }
+        }
+    }
+
+    fun diagnosticsStatus(): DiagnosticsStatus = diagnostics.status()
+
+    /** 前の記録を消して始める。 */
+    fun startDiagnostics() {
+        diagnostics.start()
+        ensureDiagnosticsSampler()
+        recordCaptureState(captureState.value)
+    }
+
+    fun stopDiagnostics() = diagnostics.stop()
+
+    fun clearDiagnostics() = diagnostics.clear()
+
+    /** 書き出したファイルを共有の画面に渡す。記録がなければ false を返す。 */
+    suspend fun shareDiagnostics(): Boolean {
+        val summary = encodeSpeakerSummary(speakerDiagnostics())
+        return withContext(Dispatchers.IO) {
+            val file = diagnostics.export(
+                File(context.cacheDir, DIAGNOSTICS_EXPORT_DIRECTORY),
+                diagnosticsHeader(context),
+                summary,
+            )
+            file?.let { shareDiagnosticsFile(context, it) } != null
+        }
     }
 
     /**
@@ -173,6 +233,7 @@ class Engine private constructor(context: Context) {
      * 話者のモデルがなくても文字起こしは動かす。そのときの発話の話者は不明になる。
      */
     private suspend fun capture(audioSource: AudioSource) {
+        ensureDiagnosticsSampler()
         val canIdentifySpeakers = withContext(Dispatchers.IO) { modelStore.verify(speakerModel) }
         consolidateSpeakers()
         androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
@@ -183,7 +244,7 @@ class Engine private constructor(context: Context) {
                         voiceActivityDetector = voiceActivityDetector,
                         transcriber = transcriber,
                         utterances = utteranceRepository,
-                        captureGaps = SqliteCaptureGapRepository(database),
+                        captureGaps = RecordingCaptureGaps(SqliteCaptureGapRepository(database), diagnostics),
                         clock = SystemClock,
                         config = SherpaSettings.captureConfig(),
                         processingContext = Dispatchers.Default,
@@ -195,6 +256,7 @@ class Engine private constructor(context: Context) {
                         },
                         recentVoices = recentVoices,
                         speakerLock = speakerLock,
+                        diagnostics = diagnostics,
                     ).run()
                 }
             }

@@ -13,6 +13,7 @@ import kotlinx.coroutines.yield
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
 import kotlin.math.abs
+import kotlin.time.TimeSource
 
 /**
  * 音声から発話を切り出し、文字起こしを保存する。
@@ -39,6 +40,7 @@ class CapturePipeline(
     private val speakerIdentifier: SpeakerIdentifier? = null,
     private val recentVoices: RecentVoices? = null,
     private val speakerLock: Mutex = Mutex(),
+    private val diagnostics: DiagnosticsLog = DiagnosticsLog.NONE,
 ) {
     /**
      * 音声の終わりまで処理する。
@@ -120,31 +122,55 @@ class CapturePipeline(
      */
     @Suppress("TooGenericExceptionCaught") // ポートの実装が何を投げるかは決めていない
     private suspend fun process(segment: SpeechSegment, backlog: SegmentBacklog) = segment.use {
+        val waitMillis = clock.nowMillis() - segment.endedAtMillis
+        val started = TimeSource.Monotonic.markNow()
+        val durationMillis = segment.endedAtMillis - segment.startedAtMillis
         try {
             val transcription = transcriber.transcribe(segment)
-            val durationMillis = segment.endedAtMillis - segment.startedAtMillis
-            if (transcription.text.isNotBlank() && transcriptionFilter.shouldSave(transcription.text, durationMillis)) {
-                save(segment, transcription)
+            val transcribeMillis = started.elapsedNow().inWholeMilliseconds
+            val text = transcription.text
+            val isKept = text.isNotBlank() && transcriptionFilter.shouldSave(text, durationMillis)
+            val turns = if (isKept) save(segment, transcription) else 0
+            val outcome = when {
+                isKept -> SegmentOutcome.SAVED
+                text.isBlank() -> SegmentOutcome.BLANK
+                else -> SegmentOutcome.FILTERED
             }
+            val totalMillis = started.elapsedNow().inWholeMilliseconds
+            diagnostics.record(
+                SegmentProcessed(
+                    durationMillis,
+                    waitMillis,
+                    transcribeMillis,
+                    totalMillis - transcribeMillis,
+                    text.length,
+                    turns,
+                    outcome,
+                ),
+            )
         } catch (e: Exception) {
             val isStopping = !currentCoroutineContext().isActive
             val reason = if (isStopping) CaptureGapReason.PIPELINE_STOPPED else CaptureGapReason.PROCESSING_FAILED
             backlog.addGap(CaptureGap(segment.startedAtMillis, segment.endedAtMillis, reason))
             if (isStopping) throw e
+            val totalMillis = started.elapsedNow().inWholeMilliseconds
+            val failed = SegmentProcessed(durationMillis, waitMillis, totalMillis, 0, 0, 0, SegmentOutcome.FAILED)
+            diagnostics.record(failed)
         }
     }
 
     /**
      * 判定から保存までを [speakerLock] の内側で行う。手の操作で話者が統合されても、消えた話者の行を残さない。
-     * 文字起こしは含めないので、待つのは判定の間だけ。
+     * 文字起こしは含めないので、待つのは判定の間だけ。保存した行の数を返す。
      */
-    private suspend fun save(segment: SpeechSegment, transcription: TimedTranscription) = speakerLock.withLock {
+    private suspend fun save(segment: SpeechSegment, transcription: TimedTranscription): Int = speakerLock.withLock {
         val createdAtMillis = clock.nowMillis()
         val turns = identifySpeakers(segment, transcription)
         val saved = utterances.insertAll(turns.map { it.toUtterance(transcription, createdAtMillis) })
         saved.zip(turns).forEach { (utterance, turn) ->
             turn.voice?.let { recentVoices?.remember(utterance.id, it) }
         }
+        saved.size
     }
 
     /**

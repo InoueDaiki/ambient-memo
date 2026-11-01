@@ -1,11 +1,16 @@
 package dev.ambientmemo.engine.android
 
+import dev.ambientmemo.engine.domain.DiagnosticsLog
 import dev.ambientmemo.engine.domain.Llm
+import dev.ambientmemo.engine.domain.LlmLoaded
+import dev.ambientmemo.engine.domain.OrganizeFinished
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
 import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.OrganizeResult
+import dev.ambientmemo.engine.domain.TimedLlm
 import dev.ambientmemo.engine.llm.LocalLlm
+import kotlin.time.TimeSource
 
 /** 1回の整理の結果。 */
 enum class OrganizeRunResult {
@@ -27,6 +32,7 @@ enum class OrganizeRunResult {
  *
  * 読み込みには数十秒かかり、数 GB を使うので、モデルがないときや止めるときは読み込まない。
  */
+@Suppress("LongParameterList") // 読み込みと結果の受け口を、実行の組み立てごとに差し替える
 internal class OrganizeSession(
     private val isModelReady: () -> Boolean,
     private val openLlm: () -> LocalLlm,
@@ -34,6 +40,7 @@ internal class OrganizeSession(
     private val onFailure: (Exception) -> Unit = {},
     private val onResult: (OrganizeResult) -> Unit = {},
     private val onProgress: (OrganizeProgress) -> Unit = {},
+    private val diagnostics: DiagnosticsLog = DiagnosticsLog.NONE,
 ) {
     suspend fun run(shouldContinue: () -> Boolean): OrganizeRunResult = when {
         !isModelReady() -> OrganizeRunResult.MODEL_MISSING
@@ -45,16 +52,31 @@ internal class OrganizeSession(
 
     // 実行基盤の失敗は型で絞れない。読み込めない端末でも、聞き取りには影響させない
     @Suppress("TooGenericExceptionCaught")
-    private fun load(llm: LocalLlm): Boolean = try {
-        llm.load()
-        true
-    } catch (e: Exception) {
-        onFailure(e)
-        false
+    private fun load(llm: LocalLlm): Boolean {
+        val started = TimeSource.Monotonic.markNow()
+        val isLoaded = try {
+            llm.load()
+            true
+        } catch (e: Exception) {
+            onFailure(e)
+            false
+        }
+        diagnostics.record(LlmLoaded(started.elapsedNow().inWholeMilliseconds, isLoaded))
+        return isLoaded
     }
 
     private suspend fun organize(llm: Llm, shouldContinue: () -> Boolean): OrganizeRunResult {
-        val result = jobFor(llm).run(shouldContinue, onProgress)
+        val started = TimeSource.Monotonic.markNow()
+        val result = jobFor(TimedLlm(llm, diagnostics)).run(shouldContinue, onProgress)
+        diagnostics.record(
+            OrganizeFinished(
+                result.outcome,
+                result.memoCount,
+                result.todoCount,
+                result.unreadableCount,
+                started.elapsedNow().inWholeMilliseconds,
+            ),
+        )
         onResult(result)
         return when (result.outcome) {
             OrganizeOutcome.COMPLETED -> OrganizeRunResult.COMPLETED

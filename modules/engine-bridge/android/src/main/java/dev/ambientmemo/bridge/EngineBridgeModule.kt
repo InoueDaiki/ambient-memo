@@ -78,6 +78,12 @@ private class SpeakerResetBusyException : CodedException(
   cause = null,
 )
 
+private class DiagnosticsEmptyException : CodedException(
+  code = "diagnostics-empty",
+  message = "書き出す記録がありません",
+  cause = null,
+)
+
 private class TodoNotFoundCodedException : CodedException(
   code = "todo-not-found",
   message = "ToDo がありません",
@@ -260,6 +266,31 @@ class EngineBridgeModule : Module() {
       engine.speakerDiagnostics().toWire()
     }
 
+    AsyncFunction("getDiagnosticsStatus") {
+      diagnosticsStatus()
+    }
+
+    // 利用者の操作でだけ呼ぶ。前の記録は消える
+    AsyncFunction("startDiagnostics") {
+      engine.startDiagnostics()
+      diagnosticsStatus()
+    }
+
+    AsyncFunction("stopDiagnostics") {
+      engine.stopDiagnostics()
+      diagnosticsStatus()
+    }
+
+    AsyncFunction("clearDiagnostics") {
+      engine.clearDiagnostics()
+      diagnosticsStatus()
+    }
+
+    // 利用者の操作でだけ呼ぶ。OS の共有の画面を開き、送り先は利用者が選ぶ
+    AsyncFunction("shareDiagnostics") Coroutine { ->
+      if (!engine.shareDiagnostics()) throw DiagnosticsEmptyException()
+    }
+
     AsyncFunction("listMemos") Coroutine { limit: Int ->
       engine.memoBridge.listMemos(limit)
     }
@@ -315,6 +346,17 @@ class EngineBridgeModule : Module() {
     AsyncFunction("cancelSelfEnrollment") {
       engine.cancelEnrollment()
     }
+  }
+
+  private fun diagnosticsStatus(): Map<String, Any?> {
+    val status = engine.diagnosticsStatus()
+    return mapOf(
+      "isRecording" to status.isRecording,
+      "startedAt" to status.startedAtMillis?.toDouble(),
+      "endsAt" to status.endsAtMillis?.toDouble(),
+      "sizeBytes" to status.sizeBytes.toDouble(),
+      "isFull" to status.isFull,
+    ).filterValues { it != null } // JS の型は項目なしで表す。null を渡すと記録があるように見える
   }
 
   private fun statusOf(state: CaptureState): String = when (state) {

@@ -9,6 +9,7 @@ import com.google.ai.edge.litertlm.Engine
 import com.google.ai.edge.litertlm.EngineConfig
 import com.google.ai.edge.litertlm.LiteRtLmJniException
 import com.google.ai.edge.litertlm.SamplerConfig
+import dev.ambientmemo.engine.domain.LlmBackend
 import dev.ambientmemo.engine.domain.LlmInputTooLongException
 import dev.ambientmemo.engine.domain.LlmRequest
 import dev.ambientmemo.engine.llm.LlmSettings
@@ -24,11 +25,15 @@ import dev.ambientmemo.engine.llm.isInputTooLong
 class LiteRtLlmLoader(
     private val modelPath: String,
     private val cacheDirectory: String,
+    private val onBackendChosen: (LlmBackend) -> Unit = {},
 ) : NativeLlmLoader {
     override fun load(): NativeLlm = try {
-        open(Backend.GPU()).also { it.confirmUsable() }
+        open(Backend.GPU()).also {
+            it.confirmUsable()
+            onBackendChosen(LlmBackend.GPU)
+        }
     } catch (_: LiteRtLmJniException) {
-        open(Backend.CPU(LlmSettings.CPU_THREADS))
+        open(Backend.CPU(LlmSettings.CPU_THREADS)).also { onBackendChosen(LlmBackend.CPU) }
     }
 
     private fun open(backend: Backend): LiteRtNativeLlm {

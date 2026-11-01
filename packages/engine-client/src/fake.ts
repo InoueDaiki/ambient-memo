@@ -17,6 +17,7 @@ import type {
   MemoEngineClient,
   MemoMode,
   SpeakerDiagnostics,
+  DiagnosticsStatus,
   SpeakerInfo,
   SpeakerTarget,
   Todo,
@@ -58,6 +59,7 @@ function toMemo(detail: MemoDetail): Memo {
 
 // エンジンなしで画面を開発・テストするための実装
 export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClient {
+  #diagnostics: DiagnosticsStatus = { isRecording: false, sizeBytes: 0, isFull: false };
   #status: EngineStatus;
   readonly #listeners = new Set<EngineListener>();
   #listeningStatus: ListeningStatus;
@@ -253,6 +255,41 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
       item.speakerId === speakerId ? { ...item, speakerName: trimmed } : item,
     );
     this.#emit({ type: "utterances-changed" });
+    return Promise.resolve();
+  }
+
+  getDiagnosticsStatus(): Promise<DiagnosticsStatus> {
+    return Promise.resolve(this.#diagnostics);
+  }
+
+  startDiagnostics(): Promise<DiagnosticsStatus> {
+    const startedAt = Date.now();
+    this.#diagnostics = {
+      isRecording: true,
+      startedAt,
+      endsAt: startedAt + 7 * 24 * 60 * 60 * 1000,
+      sizeBytes: 0,
+      isFull: false,
+    };
+    return this.getDiagnosticsStatus();
+  }
+
+  stopDiagnostics(): Promise<DiagnosticsStatus> {
+    if (this.#diagnostics.isRecording) {
+      this.#diagnostics = { ...this.#diagnostics, isRecording: false, endsAt: Date.now() };
+    }
+    return this.getDiagnosticsStatus();
+  }
+
+  clearDiagnostics(): Promise<DiagnosticsStatus> {
+    this.#diagnostics = { isRecording: false, sizeBytes: 0, isFull: false };
+    return this.getDiagnosticsStatus();
+  }
+
+  shareDiagnostics(): Promise<void> {
+    if (this.#diagnostics.startedAt === undefined) {
+      return Promise.reject(new Error("diagnostics-empty"));
+    }
     return Promise.resolve();
   }
 

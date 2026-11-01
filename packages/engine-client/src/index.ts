@@ -3,6 +3,7 @@ export type { FakeEngineClientOptions } from "./fake.ts";
 export { sampleMemos } from "./sample-memos.ts";
 export { EngineStartError, MAX_PROVISIONAL_SPEAKERS, SelfEnrollmentError } from "./types.ts";
 export type {
+  DiagnosticsStatus,
   EngineClient,
   EngineEvent,
   EngineListener,
