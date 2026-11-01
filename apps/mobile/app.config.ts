@@ -27,7 +27,16 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
   orientation: "portrait",
   // 画面の明暗を端末の設定に合わせる
   userInterfaceStyle: "automatic",
+  // 開発版は色を変えて、普段使いの版と見分ける。作り直しは scripts/generate-app-icon.swift
+  icon: isProduction ? "./assets/icon.png" : "./assets/icon-dev.png",
   android: {
+    adaptiveIcon: {
+      foregroundImage: isProduction
+        ? "./assets/adaptive-foreground.png"
+        : "./assets/adaptive-foreground-dev.png",
+      monochromeImage: "./assets/adaptive-monochrome.png",
+      backgroundColor: isProduction ? "#3F6B4F" : "#C2701E",
+    },
     package: isProduction ? baseId : `${baseId}.dev`,
     versionCode: versionCode(),
     // Android の自動バックアップは端末内のデータを Google Drive へ送るので切る
