@@ -190,6 +190,11 @@ class InMemoryUtteranceRepository : UtteranceRepository {
             if (it.speakerId == fromId) it.copy(speakerId = intoId, speakerConfidence = null) else it
         }
     }
+
+    /** 話者のリセットで発話の話者を外す。本物は 1 つのトランザクションで行う。 */
+    fun clearSpeakers() {
+        rows.replaceAll { it.copy(speakerId = null, speakerConfidence = null) }
+    }
 }
 
 class InMemorySpeakerDecisionLog : SpeakerDecisionLog {
@@ -338,6 +343,15 @@ class InMemorySpeakerRepository(
                 }
             }
             if (renumberProvisional) renumber()
+        }
+    }
+
+    override suspend fun resetSpeakers() {
+        lock.withLock {
+            utterances.clearSpeakers()
+            adaptations.clear()
+            embeddings.clear()
+            speakers.clear()
         }
     }
 

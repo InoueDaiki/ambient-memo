@@ -229,6 +229,18 @@ class Engine private constructor(context: Context) {
         speakerLock.withLock { speakerCorrections.merge(fromId, intoId) }
             .also { if (it) notifySpeakersChanged() }
 
+    /** 自分の声も消すので、登録し直すまで「自分」の判定はしない。聞き取りや登録の途中は false を返す。 */
+    suspend fun resetSpeakers(): Boolean {
+        if (captureState.value !is CaptureState.Stopped || enrollmentRunner.isRunning) return false
+        speakerLock.withLock {
+            speakerRepository.resetSpeakers()
+            speakerRepository.prune(Long.MAX_VALUE)
+            recentVoices.clear()
+        }
+        notifySpeakersChanged()
+        return true
+    }
+
     suspend fun renameSpeaker(speakerId: Long, name: String): Boolean =
         speakerLock.withLock { speakerCorrections.rename(speakerId, name) }
             .also { if (it) notifySpeakersChanged() }

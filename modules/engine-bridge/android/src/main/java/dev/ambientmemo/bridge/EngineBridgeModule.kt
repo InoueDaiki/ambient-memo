@@ -72,6 +72,12 @@ private class SpeakerNotFoundCodedException : CodedException(
   cause = null,
 )
 
+private class SpeakerResetBusyException : CodedException(
+  code = "speaker-reset-busy",
+  message = "聞き取りや声の登録の途中はリセットできません",
+  cause = null,
+)
+
 private class TodoNotFoundCodedException : CodedException(
   code = "todo-not-found",
   message = "ToDo がありません",
@@ -226,6 +232,11 @@ class EngineBridgeModule : Module() {
       val from = fromId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
       val into = intoId.toLongOrNull() ?: throw SpeakerNotFoundCodedException()
       if (!engine.mergeSpeakers(from, into)) throw SpeakerNotFoundCodedException()
+    }
+
+    AsyncFunction("resetSpeakers") Coroutine { ->
+      if (!engine.resetSpeakers()) throw SpeakerResetBusyException()
+      sendEvent(EVENT_ENGINE, mapOf("type" to "speakers-reset"))
     }
 
     AsyncFunction("renameSpeaker") Coroutine { speakerId: String, name: String ->
