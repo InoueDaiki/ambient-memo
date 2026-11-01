@@ -412,15 +412,26 @@ class FakeLlm(
     }
 
     companion object {
-        /** 要約と ToDo の依頼を見分けて、固定の出力を返す。 */
-        fun organizing(summary: String = "- 要約", todos: String = """{"items": []}""") = FakeLlm { _, request ->
-            if (request.isTodoRequest) todos else summary
+        /** 要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。 */
+        fun organizing(
+            summary: String = "- 要約",
+            todos: String = """{"items": []}""",
+            title: String = summary,
+        ) = FakeLlm { _, request ->
+            when {
+                request.isTodoRequest -> todos
+                request.isTitleRequest -> title
+                else -> summary
+            }
         }
     }
 }
 
 val LlmRequest.isTodoRequest: Boolean
     get() = "JSON だけを出力" in user
+
+val LlmRequest.isTitleRequest: Boolean
+    get() = "タイトルだけを" in user
 
 /** [utterances] の発話を整理の対象として読む。本物と同じ 1 件ずつの記録だけを行う。 */
 @Suppress("TooManyFunctions") // MemoRepository の項目を実装している

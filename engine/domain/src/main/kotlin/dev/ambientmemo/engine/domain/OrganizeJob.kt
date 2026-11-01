@@ -186,10 +186,11 @@ class OrganizeJob(
         val endedOn = CalendarDate.of(chunk.endedAtMillis, timeZone)
         val summary = summarize(spokenOn, transcript)
         val parsed = extractTodos(spokenOn, transcript)
+        val title = summary?.let { titleOf(it) }
         return NewMemo(
             startedAtMillis = chunk.startedAtMillis,
             endedAtMillis = chunk.endedAtMillis,
-            title = summary?.let(::titleOf),
+            title = title,
             summary = summary,
             todoExtraction = if (parsed.isComplete) TodoExtraction.COMPLETE else TodoExtraction.INCOMPLETE,
             modelVersion = llm.modelVersion,
@@ -225,9 +226,13 @@ class OrganizeJob(
     private fun LlmRequest.forAttempt(attempt: Int, retryNote: String) =
         if (attempt == 0) this else copy(user = user + retryNote)
 
-    /** タイトルは要約の1行目から作る。検証していないプロンプトと LLM の呼び出しを増やさないため。 */
-    private fun titleOf(summary: String): String =
-        summary.lineSequence().first().removePrefix("- ").trim().take(MAX_TITLE_CHARS)
+    /** タイトルは要約から別に作る。使えない出力なら、要約の行で代わりにする。 */
+    private suspend fun titleOf(summary: String): String {
+        val generated = parseTitle(llm.generate(OrganizePrompts.title(summary)))
+        val lines = summary.lines().map(::cleanTitle).filter { it.isNotEmpty() }
+        val title = generated ?: lines.firstOrNull { !isDateOnly(it) } ?: lines.first()
+        return title.take(MAX_TITLE_CHARS)
+    }
 
     private fun RawTodo.toNewTodo(due: AssessedDue) = NewTodo(
         task = task,
