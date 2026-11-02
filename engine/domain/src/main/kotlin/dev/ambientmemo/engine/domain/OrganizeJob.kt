@@ -198,7 +198,9 @@ class OrganizeJob(
             utteranceIds = chunk.utterances.map { it.id },
             todos = parsed.items
                 .distinctBy { item -> item.task.filterNot(Char::isWhitespace) }
-                .map { item -> item.toNewTodo(assessDue(item.due, spokenOn, endedOn, spokenText)) },
+                .map { item ->
+                    item.toNewTodo(todoTitleOf(item.task), assessDue(item.due, spokenOn, endedOn, spokenText))
+                },
         )
     }
 
@@ -228,14 +230,19 @@ class OrganizeJob(
 
     /** タイトルは要約から別に作る。使えない出力なら、要約の行で代わりにする。 */
     private suspend fun titleOf(summary: String): String {
-        val generated = parseTitle(llm.generate(OrganizePrompts.title(summary)))
+        val generated = parseTitle(llm.generate(OrganizePrompts.memoTitle(summary)))
         val lines = summary.lines().map(::cleanTitle).filter { it.isNotEmpty() }
         val title = generated ?: lines.firstOrNull { !isDateOnly(it) } ?: lines.first()
         return title.take(MAX_TITLE_CHARS)
     }
 
-    private fun RawTodo.toNewTodo(due: AssessedDue) = NewTodo(
+    /** ToDo のタイトルは内容から別に作る。使えない出力なら、内容で代わりにする。 */
+    private suspend fun todoTitleOf(task: String): String =
+        (parseTitle(llm.generate(OrganizePrompts.todoTitle(task))) ?: task).take(MAX_TITLE_CHARS)
+
+    private fun RawTodo.toNewTodo(title: String, due: AssessedDue) = NewTodo(
         task = task,
+        title = title,
         kind = if (kind?.trim()?.lowercase() == "reminder") TodoKind.REMINDER else TodoKind.TODO,
         dueDate = due.date,
         status = if (due.isConfident) TodoStatus.OPEN else TodoStatus.CANDIDATE,

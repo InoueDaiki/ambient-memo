@@ -183,6 +183,7 @@ private fun Todo.toWire(): WireObject = mapOf(
     "id" to id.toString(),
     "memoId" to memoId.toString(),
     "task" to task,
+    "title" to title,
     "kind" to when (kind) {
         TodoKind.TODO -> "todo"
         TodoKind.REMINDER -> "reminder"

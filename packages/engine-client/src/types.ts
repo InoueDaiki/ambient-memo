@@ -287,6 +287,8 @@ export interface Todo {
   id: string;
   memoId: string;
   task: string;
+  // 一覧に出す短い名前
+  title: string;
   kind: TodoKind;
   // 時差を持たない端末の日付(YYYY-MM-DD)
   dueDate: string | null;

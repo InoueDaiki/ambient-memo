@@ -50,6 +50,7 @@ class SqliteMemoRepository(
                 database.todoQueries.insert(
                     memoId,
                     todo.task,
+                    todo.title,
                     todo.kind.toColumn(),
                     todo.dueDate?.toString(),
                     todo.status.toColumn(),
@@ -166,10 +167,12 @@ private fun toTodo(
     createdAtMillis: Long,
     completedAtMillis: Long?,
     completedFromStatus: String?,
+    title: String,
 ) = Todo(
     id,
     memoId,
     task,
+    title,
     kind.toTodoKind(),
     dueDate?.toCalendarDate(),
     status.toTodoStatus(),

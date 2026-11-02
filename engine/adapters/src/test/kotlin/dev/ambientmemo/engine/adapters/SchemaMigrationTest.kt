@@ -78,7 +78,7 @@ class SchemaMigrationTest {
 
     @TestFactory
     fun `移行した話者の特徴量は長さを持ち、まとめ直しと統計に使える`(): List<DynamicTest> =
-        (3L..<schema.version).map { version ->
+        (3L..4L).map { version ->
             dynamicTest("版 $version から") {
                 val path = dir.resolve("speaker-$version.db")
                 Files.copy(snapshot(version), path)
@@ -126,11 +126,30 @@ class SchemaMigrationTest {
         }
 
     @Test
+    fun `移行した ToDo は内容をタイトルにする`() {
+        val path = dir.resolve("todo-title.db")
+        Files.copy(snapshot(5), path)
+        JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
+            seedStatements(seed(5)!!).forEach { driver.execute(null, it, 0) }
+            driver.execute(null, "PRAGMA user_version = 5", 0)
+        }
+
+        openTestDriver(path).use { driver ->
+            val repository = SqliteMemoRepository(AmbientMemoDatabase(driver), Dispatchers.Unconfined)
+            runTest {
+                val todos = repository.listTodos(memoId = 1)
+                assertTrue(todos.isNotEmpty())
+                assertEquals(todos.map { it.task }, todos.map { it.title })
+            }
+        }
+    }
+
+    @Test
     fun `完了の前の状態を、取り消しのために残す`() {
         openTestDriver(dir.resolve("from-status.db")).use { driver ->
             val database = AmbientMemoDatabase(driver)
             database.memoQueries.insert(1, 2, null, null, "complete", "fake-1", 3)
-            database.todoQueries.insert(1, "作業", "todo", null, "candidate", 3)
+            database.todoQueries.insert(1, "作業", "作業", "todo", null, "candidate", 3)
 
             database.todoQueries.complete(4, 1)
 

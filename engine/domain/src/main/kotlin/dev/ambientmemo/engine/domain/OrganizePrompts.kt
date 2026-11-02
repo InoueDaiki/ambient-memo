@@ -5,7 +5,7 @@ package dev.ambientmemo.engine.domain
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
  * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
- * タイトルのプロンプトだけは評価していない。
+ * タイトルのプロンプトは評価していない。
  */
 internal object OrganizePrompts {
     /** 日付の表の日数。今日を含む。 */
@@ -40,7 +40,7 @@ internal object OrganizePrompts {
     )
 
     /** 文字起こしより短くて誤りの少ない要約から作る。 */
-    fun title(summary: String) = LlmRequest(
+    fun memoTitle(summary: String) = LlmRequest(
         SYSTEM,
         """
         |次のメモに、一覧で見分けるためのタイトルを付けてください。
@@ -52,6 +52,22 @@ internal object OrganizePrompts {
         |メモ:
         |
         """.trimMargin() + summary.trim(),
+        MAX_TITLE_OUTPUT_TOKENS,
+    )
+
+    /** 抽出した内容から作る。文字起こしは渡さず、内容にないことを足させない。 */
+    fun todoTitle(task: String) = LlmRequest(
+        SYSTEM,
+        """
+        |次の ToDo に、一覧で見分けるためのタイトルを付けてください。
+        |
+        |- やることが分かる日本語の短い句で、20文字以内
+        |- 日付や曜日だけのタイトルにしない
+        |- タイトルだけを1行で出力する。記号や説明は付けない
+        |
+        |ToDo:
+        |
+        """.trimMargin() + task.trim(),
         MAX_TITLE_OUTPUT_TOKENS,
     )
 

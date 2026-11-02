@@ -28,6 +28,7 @@ export const todo = (id: string, overrides: Partial<Todo> = {}): Todo => ({
   id,
   memoId: "m",
   task: `内容 ${id}`,
+  title: `題名 ${id}`,
   kind: "todo",
   dueDate: null,
   status: "open",

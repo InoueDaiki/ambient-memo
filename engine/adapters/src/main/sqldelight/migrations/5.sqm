@@ -1,0 +1,4 @@
+-- 版 5 から 6: ToDo のタイトルを足す。既存の ToDo は内容をそのままタイトルにする
+ALTER TABLE todo ADD COLUMN title TEXT NOT NULL DEFAULT '';
+
+UPDATE todo SET title = task;

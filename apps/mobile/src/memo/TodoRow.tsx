@@ -9,18 +9,21 @@ export interface TodoRowProps {
   onComplete: (id: string) => void;
   // 渡すと、行を押して抽出元のメモを開ける
   onOpenMemo?: (memoId: string) => void;
+  // タイトルの代わりに内容を全部出す
+  showsTask?: boolean;
 }
 
-export function TodoRow({ todo, isCompleting, onComplete, onOpenMemo }: TodoRowProps) {
+export function TodoRow({ todo, isCompleting, onComplete, onOpenMemo, showsTask }: TodoRowProps) {
   const isDone = todo.status === "done";
+  const text = showsTask ? todo.task : todo.title;
   return (
     <CheckItem
-      text={todo.task}
+      text={text}
       label={todoKindLabels[todo.kind]}
       meta={confirmedDue(todo)}
       tag={candidateTag(todo)}
       checked={isDone}
-      checkLabel={isDone ? `${todo.task}は完了済み` : `${todo.task}を完了にする`}
+      checkLabel={isDone ? `${text}は完了済み` : `${text}を完了にする`}
       // 完了を取り消す操作はまだない
       disabled={isDone || isCompleting}
       onCheck={() => onComplete(todo.id)}

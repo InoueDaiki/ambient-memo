@@ -26,6 +26,7 @@ const memo = (overrides: Partial<MemoDetail> & { id: string }): MemoDetail => ({
 
 const todo = (overrides: Partial<Todo> & { id: string; task: string }): Todo => ({
   memoId: "m1",
+  title: overrides.task,
   kind: "todo",
   dueDate: null,
   status: "open",
@@ -181,6 +182,18 @@ describe("メモの詳細", () => {
     expect(screen.queryByText("卵を買う")).toBeNull();
   });
 
+  it("メモの詳細の ToDo は内容を全部出す", async () => {
+    const task = "週末までに駅前の店で卵を買う";
+    const client = new FakeEngineClient({
+      memos: [memo({ id: "m1", todos: [todo({ id: "t1", task, title: "卵を買う" })] })],
+    });
+    await openMemo(client, "買い物の相談");
+
+    await openSection("ToDo(1 件)");
+    screen.getByText(task);
+    expect(screen.queryByText("卵を買う")).toBeNull();
+  });
+
   it("要約が NULL なら、発話から確かめるよう案内する", async () => {
     const client = new FakeEngineClient({
       memos: [memo({ id: "m1", title: null, summary: null })],
@@ -268,6 +281,17 @@ describe("ToDo の一覧", () => {
     await openTab(new FakeEngineClient(), "ToDo");
 
     await screen.findByText("まだ ToDo はありません");
+  });
+
+  it("ToDo の一覧はタイトルを出す", async () => {
+    const task = "週末までに駅前の店で卵を買う";
+    const client = new FakeEngineClient({
+      memos: [memo({ id: "m1", todos: [todo({ id: "t1", task, title: "卵を買う" })] })],
+    });
+    await openTab(client, "ToDo");
+
+    await screen.findByText("卵を買う");
+    expect(screen.queryByText(task)).toBeNull();
   });
 
   it("確定した期限と、種類を出す", async () => {

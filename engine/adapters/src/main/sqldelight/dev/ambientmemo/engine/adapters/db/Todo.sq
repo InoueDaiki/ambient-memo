@@ -1,6 +1,7 @@
 -- メモから抽出した ToDo。due_date は端末の日付で YYYY-MM-DD。時刻までは抽出しない
 -- kind と status は SqliteMemoRepository の対応表で読み書きする
 -- completed_at_ms は完了した時刻。completed_from_status は完了の前の status で、取り消しのときに戻す
+-- title は一覧に出す短い名前。task から作る
 CREATE TABLE todo (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   memo_id INTEGER NOT NULL REFERENCES memo (id),
@@ -10,14 +11,15 @@ CREATE TABLE todo (
   status TEXT NOT NULL,
   created_at_ms INTEGER NOT NULL,
   completed_at_ms INTEGER,
-  completed_from_status TEXT
+  completed_from_status TEXT,
+  title TEXT NOT NULL DEFAULT ''
 );
 
 CREATE INDEX todo_memo ON todo (memo_id);
 
 insert:
-INSERT INTO todo (memo_id, task, kind, due_date, status, created_at_ms)
-VALUES (?, ?, ?, ?, ?, ?);
+INSERT INTO todo (memo_id, task, title, kind, due_date, status, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?, ?);
 
 listByMemo:
 SELECT *

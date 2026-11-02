@@ -594,7 +594,7 @@ abstract class MemoRepositoryContract {
         val first = stores.utterance(100)
         val second = stores.utterance(200)
         val todos = listOf(
-            NewTodo("期限のある作業", TodoKind.REMINDER, CalendarDate(2026, 11, 5), TodoStatus.OPEN),
+            NewTodo("期限のある作業", TodoKind.REMINDER, CalendarDate(2026, 11, 5), TodoStatus.OPEN, title = "題名"),
             NewTodo("期限のない作業", TodoKind.TODO, null, TodoStatus.CANDIDATE),
         )
 
@@ -604,6 +604,7 @@ abstract class MemoRepositoryContract {
         assertEquals(listOf(first, second), stores.memos.listUtteranceIds(saved.id))
         val read = stores.memos.listTodos(saved.id)
         assertEquals(todos.map { it.task }, read.map { it.task })
+        assertEquals(todos.map { it.title }, read.map { it.title })
         assertEquals(todos.map { it.kind }, read.map { it.kind })
         assertEquals(todos.map { it.dueDate }, read.map { it.dueDate })
         assertEquals(todos.map { it.status }, read.map { it.status })

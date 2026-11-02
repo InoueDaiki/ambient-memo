@@ -67,6 +67,7 @@ function MemoBody({ memo }: { memo: MemoDetail }) {
               todo={todo}
               isCompleting={pendingIds.has(todo.id)}
               onComplete={complete}
+              showsTask
             />
           ))}
         </Disclosure>

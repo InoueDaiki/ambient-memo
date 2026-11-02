@@ -412,14 +412,16 @@ class FakeLlm(
     }
 
     companion object {
-        /** 要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。 */
+        /** 要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。 */
         fun organizing(
             summary: String = "- 要約",
             todos: String = """{"items": []}""",
             title: String = summary,
+            todoTitle: (String) -> String = { it },
         ) = FakeLlm { _, request ->
             when {
                 request.isTodoRequest -> todos
+                request.isTodoTitleRequest -> todoTitle(request.user.substringAfter("ToDo:\n"))
                 request.isTitleRequest -> title
                 else -> summary
             }
@@ -432,6 +434,9 @@ val LlmRequest.isTodoRequest: Boolean
 
 val LlmRequest.isTitleRequest: Boolean
     get() = "タイトルだけを" in user
+
+val LlmRequest.isTodoTitleRequest: Boolean
+    get() = isTitleRequest && "ToDo:" in user
 
 /** [utterances] の発話を整理の対象として読む。本物と同じ 1 件ずつの記録だけを行う。 */
 @Suppress("TooManyFunctions") // MemoRepository の項目を実装している
@@ -466,7 +471,16 @@ class InMemoryMemoRepository(
             createdAtMillis = memo.createdAtMillis,
         )
         val todos = memo.todos.map {
-            Todo(nextTodoId.getAndIncrement(), saved.id, it.task, it.kind, it.dueDate, it.status, memo.createdAtMillis)
+            Todo(
+                nextTodoId.getAndIncrement(),
+                saved.id,
+                it.task,
+                it.title,
+                it.kind,
+                it.dueDate,
+                it.status,
+                memo.createdAtMillis,
+            )
         }
         records += Record(saved, memo.utteranceIds, todos)
         organized += memo.utteranceIds

@@ -310,7 +310,7 @@ class OrganizeJobIntegrationTest {
         var isBroken = false
         var calls = 0
         val llm = FakeLlm { _, request ->
-            if (++calls == 4) isBroken = true
+            if (++calls == 5) isBroken = true
             if (isBroken) throw IOException("メモリ不足")
             if (request.isTodoRequest) todoJson else "- 要約"
         }
@@ -418,7 +418,34 @@ class OrganizeJobIntegrationTest {
         assertNull(memo.summary)
         assertEquals(1, db.memos.listTodos(memo.id).size)
         assertEquals(1, db.memos.listUtteranceIds(memo.id).size)
-        assertEquals(3, llm.received.size)
+        assertEquals(4, llm.received.size)
+    }
+
+    @Test
+    fun `ToDo のタイトルは内容から別に作り、使えない出力なら内容で代わりにする`() = withDatabase { db ->
+        db.say(evening, "予定をいくつか片付ける")
+        val long = "あ".repeat(40)
+        val todos = """
+            {"items": [
+              {"task": "来週の会議の資料を部長に送る", "kind": "todo", "due": null},
+              {"task": "日付だけの出力", "kind": "todo", "due": null},
+              {"task": "$long", "kind": "todo", "due": null}
+            ]}
+        """.trimIndent()
+        val llm = FakeLlm.organizing(todos = todos) { task ->
+            when (task) {
+                "来週の会議の資料を部長に送る" -> "タイトル: 「資料を送る」"
+                "日付だけの出力" -> "2026年11月1日"
+                else -> ""
+            }
+        }
+
+        db.job(llm).run()
+
+        val read = db.memos.listTodos(db.memos.listMemos().single().id).associateBy { it.task }
+        assertEquals("資料を送る", read.getValue("来週の会議の資料を部長に送る").title)
+        assertEquals("日付だけの出力", read.getValue("日付だけの出力").title)
+        assertEquals("あ".repeat(30), read.getValue(long).title)
     }
 
     @Test

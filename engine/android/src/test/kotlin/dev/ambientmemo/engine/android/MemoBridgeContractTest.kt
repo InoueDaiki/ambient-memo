@@ -150,6 +150,7 @@ class MemoBridgeContractTest {
         val todo = (detail["todos"] as List<*>).single() as Map<*, *>
         assertEquals(id.toString(), todo["memoId"])
         assertEquals("作業", todo["task"])
+        assertEquals("作業", todo["title"])
     }
 
     @Test

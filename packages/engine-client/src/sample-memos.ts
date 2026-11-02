@@ -12,7 +12,7 @@ const said = (id: string, startedAt: number, text: string, speaker: Speaker): Ut
   speaker,
 });
 
-const todo = (overrides: Partial<Todo> & Pick<Todo, "id" | "memoId" | "task">): Todo => ({
+const todo = (overrides: Partial<Todo> & Pick<Todo, "id" | "memoId" | "task" | "title">): Todo => ({
   kind: "todo",
   dueDate: null,
   status: "open",
@@ -39,12 +39,14 @@ export const sampleMemos: MemoDetail[] = [
         id: "sample-todo-1",
         memoId: "sample-memo-1",
         task: "園芸店で培養土を買う",
+        title: "培養土を買う",
         dueDate: "2026-11-07",
       }),
       todo({
         id: "sample-todo-2",
         memoId: "sample-memo-1",
         task: "古い鉢を出す",
+        title: "古い鉢を出す",
         dueDate: "2026-11-09",
         status: "candidate",
       }),
@@ -66,6 +68,7 @@ export const sampleMemos: MemoDetail[] = [
         id: "sample-todo-3",
         memoId: "sample-memo-2",
         task: "読書会",
+        title: "読書会",
         kind: "reminder",
         dueDate: "2026-12-13",
       }),
@@ -73,6 +76,7 @@ export const sampleMemos: MemoDetail[] = [
         id: "sample-todo-4",
         memoId: "sample-memo-2",
         task: "課題の本を読む",
+        title: "課題の本を読む",
         status: "candidate",
       }),
     ],

@@ -76,9 +76,12 @@ data class NewTodo(
     val kind: TodoKind,
     val dueDate: CalendarDate?,
     val status: TodoStatus,
+    /** 一覧に出す短い名前。 */
+    val title: String = task,
 ) {
     init {
         require(task.isNotBlank()) { "内容が空です" }
+        require(title.isNotBlank()) { "タイトルが空です" }
         require(status != TodoStatus.DONE) { "完了は記録の後に completeTodo で行います" }
     }
 }
@@ -87,6 +90,8 @@ data class Todo(
     val id: Long,
     val memoId: Long,
     val task: String,
+    /** 一覧に出す短い名前。タイトルのなかった版の ToDo では [task] と同じ。 */
+    val title: String,
     val kind: TodoKind,
     val dueDate: CalendarDate?,
     val status: TodoStatus,
