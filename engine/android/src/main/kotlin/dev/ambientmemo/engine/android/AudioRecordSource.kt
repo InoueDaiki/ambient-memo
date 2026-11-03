@@ -8,7 +8,11 @@ import dev.ambientmemo.engine.domain.AudioSource
 import kotlin.math.max
 
 private const val SAMPLE_RATE_HZ = 16_000
-private const val BUFFER_MILLIS = 1_000L
+/** 1 回に読む長さ。メモに残るまでがこの分だけ遅れる。 */
+private const val READ_MILLIS = 1_000L
+
+/** OS 側のバッファ。読んだ音声を処理している間も溢れないように、1 回に読む長さより長くする。 */
+private const val BUFFER_MILLIS = 3_000L
 private const val BYTES_PER_SAMPLE = 2
 private const val MILLIS_PER_SECOND = 1_000L
 
@@ -16,6 +20,7 @@ private const val MILLIS_PER_SECOND = 1_000L
 internal fun microphoneAudioSource(): AudioSource = PcmReaderAudioSource(
     sampleRateHz = SAMPLE_RATE_HZ,
     maxLagMillis = BUFFER_MILLIS,
+    readMillis = READ_MILLIS,
     openReader = ::openAudioRecord,
 )
 

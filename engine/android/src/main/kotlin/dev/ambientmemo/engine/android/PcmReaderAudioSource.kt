@@ -23,6 +23,9 @@ internal interface PcmReader : AutoCloseable {
 /**
  * [PcmReader] のサンプルを [AudioFrame] にして流す。読み終えた配列は 0 で塗りつぶす。
  *
+ * OS からは [readMillis] ずつまとめて読み、0.1 秒のフレームに分けて流す。読む回数が減るほど、
+ * このプロセスが CPU を起こす回数が減る。フレームの長さは変えないので、区切りの判定は読む長さに依らない。
+ *
  * フレームの時刻はサンプル数から数える。読み取りが少し遅れても、OS のバッファに残った音声は失われないため。
  * 壁時計との差が [maxLagMillis] を超えたらバッファから溢れて音声が失われたとみなし、時刻を壁時計に合わせる。
  * パイプラインはこの飛びを欠落として記録する。
@@ -30,11 +33,13 @@ internal interface PcmReader : AutoCloseable {
 internal class PcmReaderAudioSource(
     override val sampleRateHz: Int,
     private val maxLagMillis: Long,
+    private val readMillis: Long = FRAME_MILLIS,
     private val clock: Clock = SystemClock,
     private val openReader: () -> PcmReader,
 ) : AudioSource {
     override fun frames(): Flow<AudioFrame> = flow {
-        val buffer = ShortArray((sampleRateHz * FRAME_MILLIS / MILLIS_PER_SECOND).toInt())
+        val buffer = ShortArray((sampleRateHz * readMillis / MILLIS_PER_SECOND).toInt())
+        val frame = ShortArray((sampleRateHz * FRAME_MILLIS / MILLIS_PER_SECOND).toInt())
         var position: Position? = null
         try {
             openReader().use { reader ->
@@ -44,13 +49,20 @@ internal class PcmReaderAudioSource(
                     if (count < 0) throw AudioCaptureException("音声を読み取れません: $count")
                     if (count == 0) break
                     val next = advance(position, count)
-                    val samples = if (count == buffer.size) buffer else buffer.copyOf(count)
-                    emit(AudioFrame(next.frameStartMillis, samples))
+                    var offset = 0
+                    while (offset < count) {
+                        val size = minOf(frame.size, count - offset)
+                        val samples = if (size == frame.size) frame else ShortArray(size)
+                        buffer.copyInto(samples, 0, offset, offset + size)
+                        emit(AudioFrame(next.frameStartMillis + offset * MILLIS_PER_SECOND / sampleRateHz, samples))
+                        offset += size
+                    }
                     position = next
                 }
             }
         } finally {
             buffer.fill(0)
+            frame.fill(0)
         }
     }
 
