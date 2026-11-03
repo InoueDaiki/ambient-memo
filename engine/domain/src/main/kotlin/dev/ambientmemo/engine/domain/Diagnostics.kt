@@ -150,6 +150,7 @@ private val DiagnosticEvent.name: String
         is LlmGenerated -> "llm_generate"
         is OrganizeFinished -> "organize"
         is DeviceSample -> "device"
+        is AudioLevelSummary -> "audio_level"
     }
 
 private fun DiagnosticEvent.fields(): List<Pair<String, Any>> = when (this) {
@@ -194,5 +195,11 @@ private fun DiagnosticEvent.fields(): List<Pair<String, Any>> = when (this) {
         "processCpuMs" to processCpuMillis,
         "rssKb" to rssKilobytes,
         "peakRssKb" to peakRssKilobytes,
+    )
+    is AudioLevelSummary -> listOf(
+        "frames" to frames,
+        "skippedFrames" to skippedFrames,
+        // 帯の下端の dBFS:フレームの数
+        "histogram" to histogram.joinToString(" ") { (band, count) -> "$band:$count" },
     )
 }

@@ -8,6 +8,7 @@ import dev.ambientmemo.engine.domain.testing.AudioSourceContract
 import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.TEST_SAMPLE_RATE_HZ
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
@@ -80,6 +81,25 @@ class PcmReaderAudioSourceTest {
         val starts = source(reader).frames().take(2).toList().map(AudioFrame::startedAtMillis)
 
         assertEquals(listOf(9_900L, 14_900L), starts)
+    }
+
+    @Test
+    fun `まとめて読んだ音声を 100 ミリ秒のフレームに分け、時刻を続ける`() = runTest {
+        val samples = ShortArray(FRAME_SAMPLES * 15) { (it / FRAME_SAMPLES).toShort() }
+        val reader = ScriptedReader(samples, onRead = { clock.advanceBy(1_000) })
+        val source = PcmReaderAudioSource(
+            TEST_SAMPLE_RATE_HZ,
+            maxLagMillis = 3_000,
+            readMillis = 1_000,
+            clock = clock,
+        ) { reader }
+
+        val frames = source.frames().map { AudioFrame(it.startedAtMillis, it.samples.copyOf()) }.toList()
+
+        assertEquals(15, frames.size)
+        assertTrue(frames.all { it.samples.size == FRAME_SAMPLES })
+        assertEquals((0 until 15).map { 10_000L + it * 100 }, frames.map(AudioFrame::startedAtMillis))
+        assertEquals((0 until 15).toList(), frames.map { it.samples.first().toInt() })
     }
 
     @Test

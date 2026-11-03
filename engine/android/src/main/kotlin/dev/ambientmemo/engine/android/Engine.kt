@@ -11,6 +11,7 @@ import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
+import dev.ambientmemo.engine.domain.AudioLevelCounter
 import dev.ambientmemo.engine.domain.AudioSource
 import dev.ambientmemo.engine.domain.CaptureChanged
 import dev.ambientmemo.engine.domain.CapturePipeline
@@ -18,6 +19,7 @@ import dev.ambientmemo.engine.domain.DiagnosticProcess
 import dev.ambientmemo.engine.domain.EnrollmentOutcome
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NoiseTextFilter
+import dev.ambientmemo.engine.domain.QuietGatedVoiceActivityDetector
 import dev.ambientmemo.engine.domain.EnrollmentProgress
 import dev.ambientmemo.engine.domain.RecentVoices
 import dev.ambientmemo.engine.domain.RecordingCaptureGaps
@@ -98,6 +100,9 @@ class Engine private constructor(context: Context) {
     /** 判定から保存までと、手の操作やまとめ直しが、話者を同時に書き換えないようにする。 */
     private val speakerLock = Mutex()
     private val recentVoices = RecentVoices()
+
+    /** 聞き取りの音の大きさの分布。記録の間だけ、端末の状態と一緒に残す。 */
+    private val audioLevels = AudioLevelCounter()
     private val speakerCorrections by lazy {
         SpeakerCorrections(speakerRepository, utteranceRepository, recentVoices, speakerModel.version, SystemClock)
     }
@@ -197,6 +202,7 @@ class Engine private constructor(context: Context) {
         diagnosticsSampler = scope.launch {
             while (isActive && diagnostics.status().isRecording) {
                 diagnostics.record(deviceSample(context))
+                audioLevels.drain()?.let(diagnostics::record)
                 delay(DIAGNOSTICS_SAMPLE_MILLIS)
             }
         }
@@ -206,6 +212,8 @@ class Engine private constructor(context: Context) {
 
     /** 前の記録を消して始める。 */
     fun startDiagnostics() {
+        // 記録の前に数えた分を、最初の記録に混ぜない
+        audioLevels.drain()
         diagnostics.start()
         ensureDiagnosticsSampler()
         recordCaptureState(captureState.value)
@@ -255,7 +263,10 @@ class Engine private constructor(context: Context) {
                 androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
                     CapturePipeline(
                         audioSource = audioSource,
-                        voiceActivityDetector = voiceActivityDetector,
+                        voiceActivityDetector = QuietGatedVoiceActivityDetector(
+                            voiceActivityDetector,
+                            levels = audioLevels,
+                        ),
                         transcriber = transcriber,
                         utterances = utteranceRepository,
                         captureGaps = RecordingCaptureGaps(SqliteCaptureGapRepository(database), diagnostics),

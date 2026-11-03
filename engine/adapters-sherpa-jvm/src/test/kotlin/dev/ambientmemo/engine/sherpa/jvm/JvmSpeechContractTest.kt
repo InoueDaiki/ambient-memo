@@ -2,6 +2,7 @@
 
 package dev.ambientmemo.engine.sherpa.jvm
 
+import dev.ambientmemo.engine.domain.QuietGatedVoiceActivityDetector
 import dev.ambientmemo.engine.domain.SpeakerEmbedder
 import dev.ambientmemo.engine.domain.SpeechSegment
 import dev.ambientmemo.engine.domain.Transcriber
@@ -41,6 +42,16 @@ class JvmVoiceActivityDetectorContractTest : VoiceActivityDetectorContract() {
     override fun detector(speechMillis: LongRange): VoiceActivityDetector {
         val models = ModelCatalog.ACTIVE
         return jvmVoiceActivityDetector(TestModels.storeFor(models), models)
+    }
+}
+
+/** 静かな間を飛ばしても、本物の VAD の判定の契約を保つ。 */
+class QuietGatedJvmVoiceActivityDetectorContractTest : VoiceActivityDetectorContract() {
+    override fun speech(): ShortArray = TestModels.speech()
+
+    override fun detector(speechMillis: LongRange): VoiceActivityDetector {
+        val models = ModelCatalog.ACTIVE
+        return QuietGatedVoiceActivityDetector(jvmVoiceActivityDetector(TestModels.storeFor(models), models))
     }
 }
 
