@@ -52,6 +52,11 @@ class ScriptedVoiceActivityDetectorContractTest : VoiceActivityDetectorContract(
     override fun detector(speechMillis: LongRange) = ScriptedVoiceActivityDetector(listOf(speechMillis))
 }
 
+class QuietGatedVoiceActivityDetectorContractTest : VoiceActivityDetectorContract() {
+    override fun detector(speechMillis: LongRange) =
+        QuietGatedVoiceActivityDetector(ScriptedVoiceActivityDetector(listOf(speechMillis)))
+}
+
 class FakeTranscriberContractTest : TranscriberContract() {
     override fun transcriber() = FakeTranscriber()
 }
