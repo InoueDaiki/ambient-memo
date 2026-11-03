@@ -1,6 +1,7 @@
 package dev.ambientmemo.engine.android
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
@@ -214,17 +215,18 @@ class Engine private constructor(context: Context) {
 
     fun clearDiagnostics() = diagnostics.clear()
 
-    /** 書き出したファイルを共有の画面に渡す。記録がなければ false を返す。 */
-    suspend fun shareDiagnostics(): Boolean {
+    /** 書き出したファイルを共有の画面に渡す。共有の画面は [activity] の上に開く。記録がなければ false を返す。 */
+    suspend fun shareDiagnostics(activity: Activity?): Boolean {
         val summary = encodeSpeakerSummary(speakerDiagnostics())
-        return withContext(Dispatchers.IO) {
-            val file = diagnostics.export(
+        val file = withContext(Dispatchers.IO) {
+            diagnostics.export(
                 File(context.cacheDir, DIAGNOSTICS_EXPORT_DIRECTORY),
                 diagnosticsHeader(context),
                 summary,
             )
-            file?.let { shareDiagnosticsFile(context, it) } != null
-        }
+        } ?: return false
+        withContext(Dispatchers.Main) { shareDiagnosticsFile(context, activity, file) }
+        return true
     }
 
     /**

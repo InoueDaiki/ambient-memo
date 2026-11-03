@@ -288,7 +288,7 @@ class EngineBridgeModule : Module() {
 
     // 利用者の操作でだけ呼ぶ。OS の共有の画面を開き、送り先は利用者が選ぶ
     AsyncFunction("shareDiagnostics") Coroutine { ->
-      if (!engine.shareDiagnostics()) throw DiagnosticsEmptyException()
+      if (!engine.shareDiagnostics(appContext.currentActivity)) throw DiagnosticsEmptyException()
     }
 
     AsyncFunction("listMemos") Coroutine { limit: Int ->

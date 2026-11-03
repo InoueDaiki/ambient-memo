@@ -1,5 +1,7 @@
 package dev.ambientmemo.engine.android
 
+import android.app.Activity
+import android.content.ClipData
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -100,12 +102,24 @@ internal fun encodeSpeakerSummary(diagnostics: SpeakerDiagnostics): String {
     )
 }
 
-/** OS の共有の画面を開く。送り先は利用者が選ぶ。 */
-internal fun shareDiagnosticsFile(context: Context, file: File) {
+/**
+ * OS の共有の画面を開く。送り先は利用者が選ぶ。
+ *
+ * [activity] から開くと、共有の画面がアプリの上に重なり、閉じるとアプリに戻る。
+ * アプリの context から新しいタスクで開くと、アプリが裏に回って閉じたように見えるので、Activity がないときだけそうする。
+ */
+internal fun shareDiagnosticsFile(context: Context, activity: Activity?, file: File) {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.diagnostics", file)
     val send = Intent(Intent.ACTION_SEND)
         .setType("text/plain")
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    // 共有の画面が中身を読めるように、URI の読み取りの許可を ClipData で渡す
+    send.clipData = ClipData.newRawUri(null, uri)
+    val chooser = Intent.createChooser(send, null)
+    if (activity != null) {
+        activity.startActivity(chooser)
+    } else {
+        context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
 }
