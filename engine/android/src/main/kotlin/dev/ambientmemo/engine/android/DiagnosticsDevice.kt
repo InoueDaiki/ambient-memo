@@ -2,6 +2,7 @@ package dev.ambientmemo.engine.android
 
 import android.app.Activity
 import android.content.ClipData
+import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
@@ -10,6 +11,8 @@ import android.os.Build
 import android.os.PowerManager
 import android.os.Process
 import android.os.SystemClock
+import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import androidx.core.content.FileProvider
 import dev.ambientmemo.engine.domain.DeviceSample
 import dev.ambientmemo.engine.domain.SpeakerDiagnostics
@@ -17,9 +20,13 @@ import dev.ambientmemo.engine.domain.currentEngineStatus
 import dev.ambientmemo.engine.domain.encodeFields
 import dev.ambientmemo.engine.sherpa.ModelCatalog
 import java.io.File
+import java.io.IOException
 import java.util.TimeZone
 
 internal const val DIAGNOSTICS_EXPORT_DIRECTORY = "diagnostics-export"
+
+// 1 行 1 JSON(JSON Lines)
+private const val DIAGNOSTICS_MIME_TYPE = "application/x-ndjson"
 
 private const val PERCENT = 100
 private const val MILLIS_PER_MINUTE = 60_000
@@ -112,7 +119,7 @@ internal fun shareDiagnosticsFile(context: Context, activity: Activity?, file: F
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.diagnostics", file)
     // text/plain だと、受け取る側が本文の共有として扱い、ファイルを保存できないことがある
     val send = Intent(Intent.ACTION_SEND)
-        .setType("application/x-ndjson")
+        .setType(DIAGNOSTICS_MIME_TYPE)
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     // 共有の画面が中身を読めるように、URI の読み取りの許可を ClipData で渡す
@@ -123,4 +130,33 @@ internal fun shareDiagnosticsFile(context: Context, activity: Activity?, file: F
     } else {
         context.startActivity(chooser.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
     }
+}
+
+/**
+ * 端末のダウンロードに写す。MediaStore を使うので、ストレージの権限は要らない。
+ * 書き終えるまでは IS_PENDING で他のアプリから見えなくし、途中で失敗したら消す。
+ */
+@RequiresApi(Build.VERSION_CODES.Q)
+internal fun saveDiagnosticsFileToDownloads(context: Context, file: File) {
+    val resolver = context.contentResolver
+    val values = ContentValues().apply {
+        put(MediaStore.Downloads.DISPLAY_NAME, file.name)
+        put(MediaStore.Downloads.MIME_TYPE, DIAGNOSTICS_MIME_TYPE)
+        put(MediaStore.Downloads.IS_PENDING, 1)
+    }
+    val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+        ?: throw IOException("ダウンロードに保存する場所を作れない")
+    var isSaved = false
+    try {
+        resolver.openOutputStream(uri)?.use { out ->
+            file.inputStream().use { it.copyTo(out) }
+            isSaved = true
+        }
+        if (isSaved) {
+            resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
+        }
+    } finally {
+        if (!isSaved) resolver.delete(uri, null, null)
+    }
+    if (!isSaved) throw IOException("ダウンロードに書けない")
 }

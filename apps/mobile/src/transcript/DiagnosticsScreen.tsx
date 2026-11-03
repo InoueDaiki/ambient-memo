@@ -44,7 +44,8 @@ function StatusSummary({ status }: { status: DiagnosticsStatus }) {
 // 実機の確認のために、必要な期間だけ数値を記録して書き出す
 export function DiagnosticsScreen() {
   const navigation = useNavigation<RootNavigation>();
-  const { status, isPending, hasFailed, start, stop, clear, share } = useDiagnostics();
+  const { status, isPending, hasFailed, hasSaved, start, stop, clear, share, save } =
+    useDiagnostics();
   const hasRecord = status?.startedAt !== undefined;
 
   return (
@@ -60,6 +61,7 @@ export function DiagnosticsScreen() {
           日で止まります。
         </Text>
         {hasFailed && <StatusBanner tone="danger" message="操作できませんでした" />}
+        {hasSaved && <StatusBanner tone="neutral" message="ダウンロードに保存しました" />}
         {status !== undefined && <StatusSummary status={status} />}
         {status?.isRecording === true ? (
           <Button label="記録を止める" variant="primary" disabled={isPending} onPress={stop} />
@@ -73,6 +75,14 @@ export function DiagnosticsScreen() {
         )}
         {hasRecord && (
           <Button label="書き出す" variant="secondary" disabled={isPending} onPress={share} />
+        )}
+        {hasRecord && (
+          <Button
+            label="ダウンロードに保存"
+            variant="secondary"
+            disabled={isPending}
+            onPress={save}
+          />
         )}
         {hasRecord && status?.isRecording === false && (
           <Button label="記録を消す" variant="danger" disabled={isPending} onPress={clear} />

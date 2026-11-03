@@ -328,6 +328,7 @@ describe("FakeEngineClient の診断の記録", () => {
   it("始めて止めると書き出せて、消すと書き出せない", async () => {
     const client = new FakeEngineClient();
     await expect(client.shareDiagnostics()).rejects.toThrow();
+    await expect(client.saveDiagnostics()).rejects.toThrow();
 
     expect((await client.startDiagnostics()).isRecording).toBe(true);
     const stopped = await client.stopDiagnostics();
@@ -335,9 +336,11 @@ describe("FakeEngineClient の診断の記録", () => {
     expect(stopped.isRecording).toBe(false);
     expect(stopped.startedAt).toBeDefined();
     await client.shareDiagnostics();
+    await client.saveDiagnostics();
 
     await client.clearDiagnostics();
     await expect(client.shareDiagnostics()).rejects.toThrow();
+    await expect(client.saveDiagnostics()).rejects.toThrow();
   });
 });
 

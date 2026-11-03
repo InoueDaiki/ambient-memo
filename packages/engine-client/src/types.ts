@@ -237,6 +237,8 @@ export interface TranscriptEngineClient extends EngineClient {
   clearDiagnostics(): Promise<DiagnosticsStatus>;
   // OS の共有の画面を開く。送り先は利用者が選ぶので、操作でだけ呼ぶ。記録がなければ reject する
   shareDiagnostics(): Promise<void>;
+  // 端末のダウンロードに保存する。端末の外へは出さない。記録がないときや保存できない端末では reject する
+  saveDiagnostics(): Promise<void>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
   // 自分の声を聞き取って登録する。登録済みなら置き換える。声は端末の中だけで扱い、音声は残さない。
   // 未許可のマイクの権限があれば OS の確認を出す。登録できないときは SelfEnrollmentError で reject する

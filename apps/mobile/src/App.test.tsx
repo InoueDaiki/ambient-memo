@@ -541,8 +541,11 @@ describe("動作の記録", () => {
     await screen.findByText("記録を止めています");
     await press("書き出す");
     expect(screen.queryByText("操作できませんでした")).toBeNull();
+    await press("ダウンロードに保存");
+    await screen.findByText("ダウンロードに保存しました");
 
     await press("記録を消す");
+    expect(screen.queryByText("ダウンロードに保存しました")).toBeNull();
     await screen.findByText("記録はありません。");
   });
 

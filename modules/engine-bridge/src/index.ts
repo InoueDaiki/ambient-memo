@@ -45,6 +45,7 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   stopDiagnostics(): Promise<DiagnosticsStatus>;
   clearDiagnostics(): Promise<DiagnosticsStatus>;
   shareDiagnostics(): Promise<void>;
+  saveDiagnostics(): Promise<void>;
   getSelfEnrollmentStatus(): Promise<SelfEnrollmentStatus>;
   enrollSelf(): Promise<void>;
   cancelSelfEnrollment(): Promise<void>;
@@ -111,6 +112,9 @@ export function createEngineClient(): TranscriptEngineClient {
     // 値を返さない関数でも、Expo は null で解決する。境界では何も返さない
     shareDiagnostics: async () => {
       await native.shareDiagnostics();
+    },
+    saveDiagnostics: async () => {
+      await native.saveDiagnostics();
     },
     getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),
     enrollSelf: () =>

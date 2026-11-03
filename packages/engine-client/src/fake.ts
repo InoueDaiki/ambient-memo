@@ -293,6 +293,10 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     return Promise.resolve();
   }
 
+  saveDiagnostics(): Promise<void> {
+    return this.shareDiagnostics();
+  }
+
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics> {
     return Promise.resolve({
       days: 7,

@@ -217,16 +217,28 @@ class Engine private constructor(context: Context) {
 
     /** 書き出したファイルを共有の画面に渡す。共有の画面は [activity] の上に開く。記録がなければ false を返す。 */
     suspend fun shareDiagnostics(activity: Activity?): Boolean {
+        val file = exportDiagnostics() ?: return false
+        withContext(Dispatchers.Main) { shareDiagnosticsFile(context, activity, file) }
+        return true
+    }
+
+    /** 書き出したファイルを端末のダウンロードに保存する。記録がなければ false を返す。Android 10 より前は保存できない。 */
+    suspend fun saveDiagnosticsToDownloads(): Boolean {
+        check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { "Android 10 より前はダウンロードに保存できない" }
+        val file = exportDiagnostics() ?: return false
+        withContext(Dispatchers.IO) { saveDiagnosticsFileToDownloads(context, file) }
+        return true
+    }
+
+    private suspend fun exportDiagnostics(): File? {
         val summary = encodeSpeakerSummary(speakerDiagnostics())
-        val file = withContext(Dispatchers.IO) {
+        return withContext(Dispatchers.IO) {
             diagnostics.export(
                 File(context.cacheDir, DIAGNOSTICS_EXPORT_DIRECTORY),
                 diagnosticsHeader(context),
                 summary,
             )
-        } ?: return false
-        withContext(Dispatchers.Main) { shareDiagnosticsFile(context, activity, file) }
-        return true
+        }
     }
 
     /**

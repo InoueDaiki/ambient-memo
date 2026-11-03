@@ -527,10 +527,13 @@ export interface UseDiagnosticsResult {
   status: DiagnosticsStatus | undefined;
   isPending: boolean;
   hasFailed: boolean;
+  // 直前の操作でダウンロードに保存できた
+  hasSaved: boolean;
   start: () => Promise<void>;
   stop: () => Promise<void>;
   clear: () => Promise<void>;
   share: () => Promise<void>;
+  save: () => Promise<void>;
 }
 
 // 記録の状態は操作のたびに返るので、イベントは流さない
@@ -539,6 +542,7 @@ export function useDiagnostics(): UseDiagnosticsResult {
   const [status, setStatus] = useState<DiagnosticsStatus>();
   const [isPending, setIsPending] = useState(false);
   const [hasFailed, setHasFailed] = useState(false);
+  const [hasSaved, setHasSaved] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -556,6 +560,7 @@ export function useDiagnostics(): UseDiagnosticsResult {
   const run = useCallback(async (action: () => Promise<DiagnosticsStatus | void>) => {
     setIsPending(true);
     setHasFailed(false);
+    setHasSaved(false);
     try {
       const next = await action();
       if (next !== undefined) setStatus(next);
@@ -570,6 +575,7 @@ export function useDiagnostics(): UseDiagnosticsResult {
     status,
     isPending,
     hasFailed,
+    hasSaved,
     start: useCallback(() => run(() => client.startDiagnostics()), [client, run]),
     stop: useCallback(() => run(() => client.stopDiagnostics()), [client, run]),
     clear: useCallback(() => run(() => client.clearDiagnostics()), [client, run]),
@@ -578,6 +584,14 @@ export function useDiagnostics(): UseDiagnosticsResult {
       () =>
         run(async () => {
           await client.shareDiagnostics();
+        }),
+      [client, run],
+    ),
+    save: useCallback(
+      () =>
+        run(async () => {
+          await client.saveDiagnostics();
+          setHasSaved(true);
         }),
       [client, run],
     ),

@@ -291,6 +291,11 @@ class EngineBridgeModule : Module() {
       if (!engine.shareDiagnostics(appContext.currentActivity)) throw DiagnosticsEmptyException()
     }
 
+    // 利用者の操作でだけ呼ぶ。端末のダウンロードに保存し、端末の外へは出さない
+    AsyncFunction("saveDiagnostics") Coroutine { ->
+      if (!engine.saveDiagnosticsToDownloads()) throw DiagnosticsEmptyException()
+    }
+
     AsyncFunction("listMemos") Coroutine { limit: Int ->
       engine.memoBridge.listMemos(limit)
     }
