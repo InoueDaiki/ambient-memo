@@ -19,7 +19,8 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.cancel
+import kotlinx.coroutines.cancelAndJoin
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.AfterEach
@@ -102,9 +103,10 @@ class OrganizeRunnerTest {
         onFinished = { result, ending -> finished.complete(result to ending) },
     )
 
+    /** 実行が DB を使い終えるのを待ってから閉じる。待たないと、閉じた DB に触れた例外が次のテストで報告される。 */
     @AfterEach
     fun close() {
-        scope.cancel()
+        runBlocking { scope.coroutineContext.job.cancelAndJoin() }
         driver.close()
     }
 
