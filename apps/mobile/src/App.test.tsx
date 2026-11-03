@@ -4,7 +4,7 @@ import {
   type SpeakerInfo,
   type Utterance,
 } from "@ambient-memo/engine-client";
-import { describe, expect, it } from "@jest/globals";
+import { describe, expect, it, jest } from "@jest/globals";
 import { act, render, screen, userEvent } from "@testing-library/react-native";
 
 import { App } from "./App.tsx";
@@ -544,6 +544,19 @@ describe("動作の記録", () => {
 
     await press("記録を消す");
     await screen.findByText("記録はありません。");
+  });
+
+  it("書き出しがネイティブのように null で解決しても、記録の状態を表示し続ける", async () => {
+    const client = new FakeEngineClient();
+    jest.spyOn(client, "shareDiagnostics").mockResolvedValue(null as unknown as void);
+    await renderApp(client);
+    await press("記録");
+    await press("記録を始める");
+    await screen.findByText("記録しています");
+
+    await press("書き出す");
+    expect(client.shareDiagnostics).toHaveBeenCalled();
+    expect(screen.getByText("記録しています")).toBeTruthy();
   });
 });
 

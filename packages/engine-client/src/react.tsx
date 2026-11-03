@@ -573,7 +573,14 @@ export function useDiagnostics(): UseDiagnosticsResult {
     start: useCallback(() => run(() => client.startDiagnostics()), [client, run]),
     stop: useCallback(() => run(() => client.stopDiagnostics()), [client, run]),
     clear: useCallback(() => run(() => client.clearDiagnostics()), [client, run]),
-    share: useCallback(() => run(() => client.shareDiagnostics()), [client, run]),
+    // 書き出しは状態を返さない。ネイティブの戻り値(null)で状態を上書きしない
+    share: useCallback(
+      () =>
+        run(async () => {
+          await client.shareDiagnostics();
+        }),
+      [client, run],
+    ),
   };
 }
 

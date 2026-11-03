@@ -108,7 +108,10 @@ export function createEngineClient(): TranscriptEngineClient {
     startDiagnostics: () => native.startDiagnostics(),
     stopDiagnostics: () => native.stopDiagnostics(),
     clearDiagnostics: () => native.clearDiagnostics(),
-    shareDiagnostics: () => native.shareDiagnostics(),
+    // 値を返さない関数でも、Expo は null で解決する。境界では何も返さない
+    shareDiagnostics: async () => {
+      await native.shareDiagnostics();
+    },
     getSelfEnrollmentStatus: () => native.getSelfEnrollmentStatus(),
     enrollSelf: () =>
       native.enrollSelf().catch((error: unknown) => {
