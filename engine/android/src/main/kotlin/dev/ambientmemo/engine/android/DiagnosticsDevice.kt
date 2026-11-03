@@ -110,8 +110,9 @@ internal fun encodeSpeakerSummary(diagnostics: SpeakerDiagnostics): String {
  */
 internal fun shareDiagnosticsFile(context: Context, activity: Activity?, file: File) {
     val uri = FileProvider.getUriForFile(context, "${context.packageName}.diagnostics", file)
+    // text/plain だと、受け取る側が本文の共有として扱い、ファイルを保存できないことがある
     val send = Intent(Intent.ACTION_SEND)
-        .setType("text/plain")
+        .setType("application/x-ndjson")
         .putExtra(Intent.EXTRA_STREAM, uri)
         .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     // 共有の画面が中身を読めるように、URI の読み取りの許可を ClipData で渡す
