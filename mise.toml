@@ -50,8 +50,12 @@ run = "scripts/fetch-models.sh"
 description = "取得したモデルを、接続した端末の Debug ビルドの内部ストレージへ入れる"
 run = "scripts/push-models.sh"
 
+[tasks."ios-frameworks:fetch"]
+description = "iOS の推論ライブラリ(sherpa-onnx と ONNX Runtime の xcframework)を engine/.cache/ios に取得する。SHA-256 を確かめる"
+run = "scripts/fetch-ios-frameworks.sh"
+
 [tasks.mobile]
-description = "Metro を起動する。ビルドは mobile:android"
+description = "Metro を起動する。ビルドは mobile:android か mobile:ios"
 run = "pnpm --dir apps/mobile start"
 
 [tasks."mobile:android"]
@@ -76,3 +80,28 @@ run = [
   "scripts/check-release-manifest.sh",
   "scripts/check-release-native-classes.sh",
 ]
+
+[tasks."mobile:ios"]
+description = "開発版をビルドして、iOS のシミュレーターで起動する"
+env = { LANG = "en_US.UTF-8" }
+run = "pnpm --dir apps/mobile exec expo run:ios"
+
+[tasks."mobile:prebuild:ios"]
+description = "apps/mobile/ios を生成し直し、CocoaPods を入れる(手で編集しない)"
+# CocoaPods は端末の文字コードが UTF-8 でないと止まる
+env = { LANG = "en_US.UTF-8" }
+run = [
+  "pnpm --dir apps/mobile exec expo prebuild --platform ios --clean --no-install",
+  "cd apps/mobile/ios && pod install",
+]
+
+[tasks."build:ios:simulator"]
+description = "シミュレーター向けの Debug をビルドする。成果物は apps/mobile/ios/build"
+depends = ["mobile:prebuild:ios"]
+dir = "apps/mobile/ios"
+# ワークスペースとスキームの名前はアプリの名前で変わるので、生成されたものを使う
+run = """
+workspace=$(ls -d *.xcworkspace | head -n 1)
+xcodebuild -workspace "$workspace" -scheme "${workspace%.xcworkspace}" -configuration Debug \
+  -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build build
+"""

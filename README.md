@@ -40,9 +40,9 @@ flowchart LR
 
 | 領域 | 方針 | 状態 |
 |---|---|---|
-| 対象 | Android(Pixel 11)を先に作る。iOS は将来の選択肢 | 決定 |
+| 対象 | Android(Pixel 11)を先に作る。iOS はビルドの土台まで作った | 決定 |
 | アプリ | React Native(Expo) | 決定 |
-| エンジン | 音声処理とビジネスロジックを Kotlin に置く。RN は画面だけを担当 | 決定 |
+| エンジン | 音声処理とビジネスロジックを Android は Kotlin、iOS は Swift に置く。挙動は共通の JSON のテストで揃える。RN は画面だけを担当 | 決定 |
 | テスト | 結合テストを中心にしたテスティングトロフィーと、品質評価、実機指標 | 決定 |
 | CI / 配布 | GitHub Actions。タグで署名済み APK を Actions の artifact に置く | 決定 |
 | モノレポ | pnpm workspace | 決定 |

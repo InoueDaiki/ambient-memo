@@ -18,8 +18,9 @@
 
 ## アーキテクチャ
 
-- 音声処理とビジネスロジックは `engine/` の Kotlin に置く。JS はバックグラウンドで動き続ける前提にしない。
-- `engine/domain` は Android に依存させない。外部はインターフェース越しに使い、依存の向きは `android` / `adapters` → `domain` だけにする。
+- 音声処理とビジネスロジックは `engine/` に置く。Android は Kotlin、iOS は Swift(`engine/ios`)。JS はバックグラウンドで動き続ける前提にしない。
+- `engine/domain` は Android に依存させない。`engine/ios/Sources/EngineDomain` は Foundation だけに依存させる。
+- `domain` を変えたら、Kotlin と Swift の両方を直し、`engine/spec` の共通のケースを足す。外部はインターフェース越しに使い、依存の向きは `android` / `adapters` → `domain` だけにする。
 - DB に書き込むのはエンジンだけ。React Native は `modules/engine-bridge` と `packages/engine-client` を通して使う。
 - 境界の API は小さく保ち、JS 側は Android 固有の型や概念に依らないようにする。
 - 画面の見た目は `packages/design-tokens` と `packages/ui-native` を通して書く。
