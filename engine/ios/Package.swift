@@ -11,6 +11,7 @@ let package = Package(
     products: [
         .library(name: "EngineDomain", targets: ["EngineDomain"]),
         .library(name: "EngineDomainTesting", targets: ["EngineDomainTesting"]),
+        .library(name: "EngineStore", targets: ["EngineStore"]),
     ],
     targets: [
         // Foundation だけに依存する。UIKit や AVFoundation を使わない
@@ -24,9 +25,20 @@ let package = Package(
             dependencies: ["EngineDomain"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
+        // domain のリポジトリのポートを SQLite で実装する。EngineDomain と OS の sqlite3 にだけ依存する
+        .target(
+            name: "EngineStore",
+            dependencies: ["EngineDomain"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
         .testTarget(
             name: "EngineDomainTests",
             dependencies: ["EngineDomain", "EngineDomainTesting"],
+            swiftSettings: [.swiftLanguageMode(.v6)]
+        ),
+        .testTarget(
+            name: "EngineStoreTests",
+            dependencies: ["EngineStore", "EngineDomain", "EngineDomainTesting"],
             swiftSettings: [.swiftLanguageMode(.v6)]
         ),
     ]
