@@ -42,6 +42,11 @@ description = "Kotlin のテスト(engine/ の JUnit)"
 dir = "engine"
 run = "./gradlew test"
 
+[tasks."test:ios"]
+description = "Swift のテスト(engine/spec の共通のケースと、SQLite の契約テスト)。macOS だけで動く"
+dir = "engine/ios"
+run = "swift test"
+
 [tasks."models:fetch"]
 description = "本物のモデルを engine/.cache/models に取得する(開発用)。SHA-256 を確かめる"
 run = "scripts/fetch-models.sh"
@@ -51,7 +56,7 @@ description = "取得したモデルを、接続した端末の Debug ビルド�
 run = "scripts/push-models.sh"
 
 [tasks."ios-frameworks:fetch"]
-description = "iOS の推論ライブラリ(sherpa-onnx と ONNX Runtime の xcframework)を engine/.cache/ios に取得する。SHA-256 を確かめる"
+description = "iOS の推論ライブラリ(sherpa-onnx、ONNX Runtime、LiteRT-LM)を engine/.cache/ios に取得する。SHA-256 を確かめる"
 run = "scripts/fetch-ios-frameworks.sh"
 
 [tasks.mobile]

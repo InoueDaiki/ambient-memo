@@ -13,9 +13,9 @@ private final class EngineCodedException: Exception, @unchecked Sendable {
 }
 
 /// React Native とエンジンの境界。関数とイベントは Android の EngineBridgeModule.kt と同じにする。
-/// エンジンを呼ぶのは [engine] だけ。今は仮の実装で、engine/ios のエンジンができたら差し替える。
+/// エンジンを呼ぶのは [engine] だけ。
 public final class EngineBridgeModule: Module {
-  private let engine: BridgeEngine = UnavailableEngine()
+  private let engine: BridgeEngine = NativeBridgeEngine()
 
   public func definition() -> ModuleDefinition {
     Name("EngineBridge")

@@ -1,0 +1,64 @@
+# iOS のエンジンのテストと、シミュレーター向けのビルド。macOS のランナーで動かす
+name: iOS
+
+on:
+  pull_request:
+    paths:
+      - apps/mobile/**
+      - engine/ios/**
+      - engine/spec/**
+      - modules/**
+      - packages/**
+      - pnpm-lock.yaml
+      - pnpm-workspace.yaml
+      - mise.toml
+      - scripts/fetch-ios-frameworks.sh
+      - .github/actions/**
+      - .github/workflows/ios.yml
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  test:
+    name: Swift のテスト
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: xcodebuild -version
+      - uses: jdx/mise-action@6612f0ef07ed2a736cd1e00a94a065522dd41195 # v5.2.5
+        with:
+          version: 2026.10.4
+      # engine/spec の共通のケースと、SQLite の契約テスト
+      - run: mise run test:ios
+
+  build:
+    name: シミュレーター向けのビルド
+    runs-on: macos-26
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/setup
+        with:
+          android: "false"
+      # キーは取得するライブラリを決めるスクリプトで変わる
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: engine/.cache/ios
+          key: ios-frameworks-${{ hashFiles('scripts/fetch-ios-frameworks.sh') }}
+      - run: mise run ios-frameworks:fetch
+      - run: mise run build:ios:simulator

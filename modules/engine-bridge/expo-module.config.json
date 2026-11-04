@@ -4,6 +4,7 @@
     "modules": ["dev.ambientmemo.bridge.EngineBridgeModule"]
   },
   "ios": {
-    "modules": ["EngineBridgeModule"]
+    "modules": ["EngineBridgeModule"],
+    "appDelegateSubscribers": ["EngineAppDelegateSubscriber"]
   }
 }

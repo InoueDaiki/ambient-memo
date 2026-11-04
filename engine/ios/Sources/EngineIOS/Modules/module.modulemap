@@ -1,0 +1,19 @@
+// CocoaPods では EngineDomain、EngineStore、EngineIOS を 1 つのモジュール(AmbientMemoEngine)にまとめる。
+// Swift Package と同じ `import EngineDomain` と `import EngineStore` をそのまま書けるように、空のモジュールを置く。
+// 型は同じモジュールの中にあるので、空のモジュールを読み込んでも何も変わらない。
+module EngineDomain {
+  header "Empty.h"
+  export *
+}
+
+module EngineStore {
+  header "Empty.h"
+  export *
+}
+
+// bzip2 は iOS の SDK にある libbz2 を使う。Swift から読むためのモジュール
+module CBzip2 [system] {
+  header "CBzip2.h"
+  link "bz2"
+  export *
+}
