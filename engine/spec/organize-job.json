@@ -1,8 +1,8 @@
 {
   "area": "organize-job",
-  "description": "未処理の発話をメモと ToDo に整理する OrganizeJob と、今整理できる量を数える organizeBacklog。無音の長さと文字数でまとまりに分け、話の途中の最後のまとまりは待つ。まとまりごとに要約、タイトル、ToDo、ToDo のタイトルを LLM に頼み、読めない出力は指示を足して再試行する。文脈長を超えたら半分に分け、失敗が続くまとまりは要約のないメモにして先へ進む。記録はメモリの Fake(engine/domain/src/testFixtures の InMemoryMemoRepository)に持つ。本物の DB に依る書き込みの途中の失敗、開き直し、移行と、キャンセル、LLM の内側のタイムアウトは engine/adapters の OrganizeJobIntegrationTest と各言語のテストに残す",
-  "inputSchema": "timeZone: 発話の日付と行の時刻に使う IANA の名前。clockMillis: Fake の時計の時刻(advanceClock でだけ進む)。config: OrganizeConfig の {minSilenceGapMillis, maxChunkChars, maxRetries, maxChunkAttempts}(書かない項目は既定値 300000、1800、1、3)。llm: LLM の Fake。依頼の種類は、user に「JSON だけを出力」があれば todo、「タイトルだけを」と「ToDo:」があれば todoTitle、「タイトルだけを」だけなら title、ほかは summary。rules を前から見て、書いた条件(kind: 種類、contains: user にすべて含む文字列の配列、nthOfKind: その種類の何回目の依頼か(0 から)、calls: 全体で何回目の依頼か(0 から)の配列)をすべて満たす最初の規則で、reply を返すか failure の例外を投げる。failure は \"failed\"(実行基盤の失敗)か \"too-long\"(LlmInputTooLongException)。どの規則にも当たらなければ、summary は summary(省略すると \"- 要約\")、todo は todos(省略すると {\"items\": []})、title は title(省略すると summary と同じ)、todoTitle は todoTitles の ToDo の内容(user の「ToDo:\\n」の後ろ)の値で、なければ内容をそのまま返す。modelVersion は省略すると \"fake-1\"。probes は llmCalls で user に含むかを確かめる文字列。話者と発話の記録は speaker-identifier と同じ世界に持ち、その操作(enrollSelf、createProvisional、setManualName、advanceClock など)も使える。setup(結果を見ない)と steps(結果を比べる)を順に流す。回数の記録(OrganizeAttempts)はケースの中で共有する。整理の操作。{op: \"say\", startedAtMillis, text, durationMillis, speakerId, speakerConfidence}: 発話を保存する。終わりは開始 + durationMillis(省略すると 2000)、文字起こしの信頼度は 0.9、保存の時刻は終わりの時刻、speakerId と speakerConfidence は省略すると null → {utteranceId}。{op: \"run\", continueChecks}: OrganizeJob を 1 回動かす。continueChecks を書くと、まとまりの間の確かめが continueChecks 回目までだけ続けてよいと答える。{op: \"setAttempts\", utteranceId, count}: まとまりの最初の発話の id の回数を記録する → {}。{op: \"attempts\", utteranceId}: 回数を読む。{op: \"backlog\"}: organizeBacklog を、記録にある話者で数える。{op: \"records\"}: 記録したメモと未処理の発話を読む。{op: \"llmCalls\"}: ここまでの LLM の依頼を読む",
-  "expectedSchema": "steps に操作ごとの結果。run は {result: {outcome: \"COMPLETED\"|\"STOPPED\"|\"LLM_FAILED\", memoCount, todoCount, unreadableCount}, progress: 知らせた順に [[終えたまとまりの数, 対象のまとまりの数], ...]}。attempts は {count}。backlog は {readyChunks, hasOngoing}。records は {memos: 開始時刻、id の順に [{id, startedAtMillis, endedAtMillis, title, summary, todoExtraction: \"COMPLETE\"|\"INCOMPLETE\", modelVersion, createdAtMillis, utteranceIds: 根拠の発話の id, todos: 記録した順に [{id, task, title, kind: \"TODO\"|\"REMINDER\", dueDate: \"YYYY-MM-DD\" か null, status: \"CANDIDATE\"|\"OPEN\"}]}], unorganized: 未処理の発話の id を開始時刻、id の順に}。メモと ToDo の id はそれぞれ 1 から記録した順に振る。llmCalls は {calls: 依頼の順に [{kind: \"summary\"|\"todo\"|\"title\"|\"todoTitle\", matched: probes のうち user に含むもの(probes の順)}]}。ほかの操作は speaker-identifier と同じ",
+  "description": "未処理の発話をメモと ToDo に整理する OrganizeJob と、今整理できる量を数える organizeBacklog。無音の長さと文字数でまとまりに分け、話の途中の最後のまとまりは待つ。まとまりを LLM で話題に分け、話題ごとにメモにする。文字数の上限で切ったまとまりの最後の話題は、次のまとまりの頭に回す。まとまりごとに要約、タイトル、ToDo、ToDo のタイトルを LLM に頼み、読めない出力は指示を足して再試行する。文脈長を超えたら半分に分け、失敗が続くまとまりは要約のないメモにして先へ進む。記録はメモリの Fake(engine/domain/src/testFixtures の InMemoryMemoRepository)に持つ。本物の DB に依る書き込みの途中の失敗、開き直し、移行と、キャンセル、LLM の内側のタイムアウトは engine/adapters の OrganizeJobIntegrationTest と各言語のテストに残す",
+  "inputSchema": "timeZone: 発話の日付と行の時刻に使う IANA の名前。clockMillis: Fake の時計の時刻(advanceClock でだけ進む)。config: OrganizeConfig の {minSilenceGapMillis, maxChunkChars, maxRetries, maxChunkAttempts}(書かない項目は既定値 300000、1800、1、3)。llm: LLM の Fake。依頼の種類は、user に「話題ごとに分けて」があれば topics、「JSON だけを出力」があれば todo、「タイトルだけを」と「ToDo:」があれば todoTitle、「タイトルだけを」だけなら title、ほかは summary。rules を前から見て、書いた条件(kind: 種類、contains: user にすべて含む文字列の配列、nthOfKind: その種類の何回目の依頼か(0 から)、calls: 全体で何回目の依頼か(0 から)の配列)をすべて満たす最初の規則で、reply を返すか failure の例外を投げる。failure は \"failed\"(実行基盤の失敗)か \"too-long\"(LlmInputTooLongException)。どの規則にも当たらなければ、summary は summary(省略すると \"- 要約\")、todo は todos(省略すると {\"items\": []})、title は title(省略すると summary と同じ)、topics は topics(省略すると \"1\")、todoTitle は todoTitles の ToDo の内容(user の「ToDo:\\n」の後ろ)の値で、なければ内容をそのまま返す。modelVersion は省略すると \"fake-1\"。probes は llmCalls で user に含むかを確かめる文字列。話者と発話の記録は speaker-identifier と同じ世界に持ち、その操作(enrollSelf、createProvisional、setManualName、advanceClock など)も使える。setup(結果を見ない)と steps(結果を比べる)を順に流す。回数の記録(OrganizeAttempts)はケースの中で共有する。整理の操作。{op: \"say\", startedAtMillis, text, durationMillis, speakerId, speakerConfidence}: 発話を保存する。終わりは開始 + durationMillis(省略すると 2000)、文字起こしの信頼度は 0.9、保存の時刻は終わりの時刻、speakerId と speakerConfidence は省略すると null → {utteranceId}。{op: \"run\", continueChecks}: OrganizeJob を 1 回動かす。continueChecks を書くと、まとまりの間の確かめが continueChecks 回目までだけ続けてよいと答える。{op: \"setAttempts\", utteranceId, count}: まとまりの最初の発話の id の回数を記録する → {}。{op: \"attempts\", utteranceId}: 回数を読む。{op: \"backlog\"}: organizeBacklog を、記録にある話者で数える。{op: \"records\"}: 記録したメモと未処理の発話を読む。{op: \"llmCalls\"}: ここまでの LLM の依頼を読む",
+  "expectedSchema": "steps に操作ごとの結果。run は {result: {outcome: \"COMPLETED\"|\"STOPPED\"|\"LLM_FAILED\", memoCount, todoCount, unreadableCount}, progress: 知らせた順に [[終えたまとまりの数, 対象のまとまりの数], ...]}。attempts は {count}。backlog は {readyChunks, hasOngoing}。records は {memos: 開始時刻、id の順に [{id, startedAtMillis, endedAtMillis, title, summary, todoExtraction: \"COMPLETE\"|\"INCOMPLETE\", modelVersion, createdAtMillis, utteranceIds: 根拠の発話の id, todos: 記録した順に [{id, task, title, kind: \"TODO\"|\"REMINDER\", dueDate: \"YYYY-MM-DD\" か null, status: \"CANDIDATE\"|\"OPEN\"}]}], unorganized: 未処理の発話の id を開始時刻、id の順に}。メモと ToDo の id はそれぞれ 1 から記録した順に振る。llmCalls は {calls: 依頼の順に [{kind: \"topics\"|\"summary\"|\"todo\"|\"title\"|\"todoTitle\", matched: probes のうち user に含むもの(probes の順)}]}。ほかの操作は speaker-identifier と同じ",
   "cases": [
     {
       "name": "発話からメモと ToDo と根拠を作り、発話を処理済みにする",
@@ -574,15 +574,7 @@
           {
             "calls": [
               {
-                "kind": "summary",
-                "matched": []
-              },
-              {
-                "kind": "todo",
-                "matched": []
-              },
-              {
-                "kind": "title",
+                "kind": "topics",
                 "matched": []
               },
               {
@@ -595,6 +587,26 @@
               },
               {
                 "kind": "title",
+                "matched": []
+              },
+              {
+                "kind": "topics",
+                "matched": []
+              },
+              {
+                "kind": "summary",
+                "matched": []
+              },
+              {
+                "kind": "todo",
+                "matched": []
+              },
+              {
+                "kind": "title",
+                "matched": []
+              },
+              {
+                "kind": "topics",
                 "matched": []
               },
               {
@@ -853,6 +865,10 @@
           {
             "calls": [
               {
+                "kind": "topics",
+                "matched": []
+              },
+              {
                 "kind": "summary",
                 "matched": []
               },
@@ -866,6 +882,10 @@
               },
               {
                 "kind": "todoTitle",
+                "matched": []
+              },
+              {
+                "kind": "topics",
                 "matched": []
               },
               {
@@ -1110,9 +1130,8 @@
           "todos": "{\"items\": [{\"task\": \"歯医者に行く\", \"kind\": \"reminder\", \"due\": \"2026-11-04\"}]}",
           "rules": [
             {
-              "calls": [
-                4
-              ],
+              "kind": "summary",
+              "nthOfKind": 1,
               "failure": "failed"
             }
           ]
@@ -2261,6 +2280,1107 @@
       }
     },
     {
+      "name": "1 つのまとまりの中の話題を、時系列で別のメモにする",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "1, 3, 5",
+          "probes": [
+            "話題Aの一言目",
+            "話題Aの二言目",
+            "話題Bの一言目",
+            "話題Bの二言目",
+            "話題Cの一言目",
+            "話題Cの二言目"
+          ]
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610040000,
+            "text": "話題Cの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610050000,
+            "text": "話題Cの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          },
+          {
+            "op": "llmCalls"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 3,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4
+                ],
+                "todos": []
+              },
+              {
+                "id": 3,
+                "startedAtMillis": 1793610040000,
+                "endedAtMillis": 1793610052000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  5,
+                  6
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          },
+          {
+            "calls": [
+              {
+                "kind": "topics",
+                "matched": [
+                  "話題Aの一言目",
+                  "話題Aの二言目",
+                  "話題Bの一言目",
+                  "話題Bの二言目",
+                  "話題Cの一言目",
+                  "話題Cの二言目"
+                ]
+              },
+              {
+                "kind": "summary",
+                "matched": [
+                  "話題Aの一言目",
+                  "話題Aの二言目"
+                ]
+              },
+              {
+                "kind": "todo",
+                "matched": [
+                  "話題Aの一言目",
+                  "話題Aの二言目"
+                ]
+              },
+              {
+                "kind": "title",
+                "matched": []
+              },
+              {
+                "kind": "summary",
+                "matched": [
+                  "話題Bの一言目",
+                  "話題Bの二言目"
+                ]
+              },
+              {
+                "kind": "todo",
+                "matched": [
+                  "話題Bの一言目",
+                  "話題Bの二言目"
+                ]
+              },
+              {
+                "kind": "title",
+                "matched": []
+              },
+              {
+                "kind": "summary",
+                "matched": [
+                  "話題Cの一言目",
+                  "話題Cの二言目"
+                ]
+              },
+              {
+                "kind": "todo",
+                "matched": [
+                  "話題Cの一言目",
+                  "話題Cの二言目"
+                ]
+              },
+              {
+                "kind": "title",
+                "matched": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "文字数の上限で切ったまとまりの最後の話題は、次のまとまりの頭に回して続きと1件のメモにする",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "config": {
+          "maxChunkChars": 64
+        },
+        "llm": {
+          "rules": [
+            {
+              "kind": "topics",
+              "nthOfKind": 0,
+              "reply": "1, 3"
+            }
+          ],
+          "probes": [
+            "話題Aの一言目",
+            "話題Bの一言目",
+            "話題Bの四言目"
+          ]
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610040000,
+            "text": "話題Bの三言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610050000,
+            "text": "話題Bの四言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          },
+          {
+            "op": "llmCalls"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 2,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                2
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                2,
+                2
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610052000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4,
+                  5,
+                  6
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          },
+          {
+            "calls": [
+              {
+                "kind": "topics",
+                "matched": [
+                  "話題Aの一言目",
+                  "話題Bの一言目"
+                ]
+              },
+              {
+                "kind": "summary",
+                "matched": [
+                  "話題Aの一言目"
+                ]
+              },
+              {
+                "kind": "todo",
+                "matched": [
+                  "話題Aの一言目"
+                ]
+              },
+              {
+                "kind": "title",
+                "matched": []
+              },
+              {
+                "kind": "topics",
+                "matched": [
+                  "話題Bの一言目",
+                  "話題Bの四言目"
+                ]
+              },
+              {
+                "kind": "summary",
+                "matched": [
+                  "話題Bの一言目",
+                  "話題Bの四言目"
+                ]
+              },
+              {
+                "kind": "todo",
+                "matched": [
+                  "話題Bの一言目",
+                  "話題Bの四言目"
+                ]
+              },
+              {
+                "kind": "title",
+                "matched": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "最後の話題でも、無音で区切ったまとまりなら回さずに記録する",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "1, 3"
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 2,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "本文が空の発話は前の行と同じ話題に入れる",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "1, 2"
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": ""
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 2,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "範囲の外と重なった番号は除き、1 がなくても最初の行から話題にする",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "「3, 3, 0, 99」"
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 2,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "切れ目が番号だけでなければ、まとまり全体を1件のメモにする",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "話題は 2 つです。1, 3"
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          },
+          {
+            "op": "llmCalls"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 1,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          },
+          {
+            "calls": [
+              {
+                "kind": "topics",
+                "matched": []
+              },
+              {
+                "kind": "summary",
+                "matched": []
+              },
+              {
+                "kind": "todo",
+                "matched": []
+              },
+              {
+                "kind": "title",
+                "matched": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "切れ目の依頼が失敗しても、まとまり全体を1件のメモにする",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "rules": [
+            {
+              "kind": "topics",
+              "failure": "failed"
+            }
+          ]
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 1,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "行が1つなら切れ目を尋ねない",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {},
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          },
+          {
+            "op": "llmCalls"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 1,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610002000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          },
+          {
+            "calls": [
+              {
+                "kind": "summary",
+                "matched": []
+              },
+              {
+                "kind": "todo",
+                "matched": []
+              },
+              {
+                "kind": "title",
+                "matched": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "話題の途中で LLM が止まったら、記録した話題の続きから次回に処理する",
+      "input": {
+        "timeZone": "Asia/Tokyo",
+        "clockMillis": 1793653200000,
+        "llm": {
+          "topics": "1, 3",
+          "rules": [
+            {
+              "kind": "summary",
+              "nthOfKind": 1,
+              "failure": "failed"
+            }
+          ]
+        },
+        "setup": [
+          {
+            "op": "say",
+            "startedAtMillis": 1793610000000,
+            "text": "話題Aの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610010000,
+            "text": "話題Aの二言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610020000,
+            "text": "話題Bの一言目"
+          },
+          {
+            "op": "say",
+            "startedAtMillis": 1793610030000,
+            "text": "話題Bの二言目"
+          }
+        ],
+        "steps": [
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          },
+          {
+            "op": "run"
+          },
+          {
+            "op": "records"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "result": {
+              "outcome": "LLM_FAILED",
+              "memoCount": 1,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": [
+              3,
+              4
+            ]
+          },
+          {
+            "result": {
+              "outcome": "COMPLETED",
+              "memoCount": 1,
+              "todoCount": 0,
+              "unreadableCount": 0
+            },
+            "progress": [
+              [
+                0,
+                1
+              ],
+              [
+                1,
+                1
+              ]
+            ]
+          },
+          {
+            "memos": [
+              {
+                "id": 1,
+                "startedAtMillis": 1793610000000,
+                "endedAtMillis": 1793610012000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  1,
+                  2
+                ],
+                "todos": []
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 1793610020000,
+                "endedAtMillis": 1793610032000,
+                "title": "要約",
+                "summary": "- 要約",
+                "todoExtraction": "COMPLETE",
+                "modelVersion": "fake-1",
+                "createdAtMillis": 1793653200000,
+                "utteranceIds": [
+                  3,
+                  4
+                ],
+                "todos": []
+              }
+            ],
+            "unorganized": []
+          }
+        ]
+      }
+    },
+    {
       "name": "文脈長を超えたまとまりは半分に分けて処理する",
       "input": {
         "timeZone": "Asia/Tokyo",
@@ -3109,6 +4229,10 @@
           },
           {
             "calls": [
+              {
+                "kind": "topics",
+                "matched": []
+              },
               {
                 "kind": "summary",
                 "matched": [

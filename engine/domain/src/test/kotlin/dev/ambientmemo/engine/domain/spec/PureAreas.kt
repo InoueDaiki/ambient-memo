@@ -86,6 +86,7 @@ internal fun organizePrompts(input: JsonObject): JsonElement = when (val op = in
     "todo" -> request(OrganizePrompts.todo(date(input, "date"), input.str("transcript")))
     "memoTitle" -> request(OrganizePrompts.memoTitle(input.str("summary")))
     "todoTitle" -> request(OrganizePrompts.todoTitle(input.str("task")))
+    "topics" -> request(OrganizePrompts.topics(input.strings("lines")))
     "retryNotes" -> obj("summary" to OrganizePrompts.SUMMARY_RETRY_NOTE, "todo" to OrganizePrompts.TODO_RETRY_NOTE)
     "calendarDays" -> obj("days" to OrganizePrompts.CALENDAR_DAYS)
     else -> error("知らない op です: $op")

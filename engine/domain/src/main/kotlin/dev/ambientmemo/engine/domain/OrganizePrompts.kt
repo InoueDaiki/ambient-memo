@@ -5,7 +5,7 @@ package dev.ambientmemo.engine.domain
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
  * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
- * タイトルのプロンプトは評価していない。
+ * タイトルと話題の切れ目のプロンプトは評価していない。
  */
 internal object OrganizePrompts {
     /** 日付の表の日数。今日を含む。 */
@@ -14,6 +14,7 @@ internal object OrganizePrompts {
     private const val WEEKDAYS = "月火水木金土日"
     private const val MAX_OUTPUT_TOKENS = 400
     private const val MAX_TITLE_OUTPUT_TOKENS = 48
+    private const val MAX_TOPIC_OUTPUT_TOKENS = 64
 
     private const val SYSTEM = "あなたは個人用メモアプリの整理係です。" +
         "入力は音声の自動文字起こしで、誤変換、言いよどみ、話者ラベルの誤りが含まれます。" +
@@ -69,6 +70,25 @@ internal object OrganizePrompts {
         |
         """.trimMargin() + task.trim(),
         MAX_TITLE_OUTPUT_TOKENS,
+    )
+
+    /** 行番号を付けて渡し、新しい話題が始まる行の番号だけを答えさせる。文字起こしを書き直させない。 */
+    fun topics(lines: List<String>) = LlmRequest(
+        SYSTEM,
+        """
+        |次の文字起こしを話題ごとに分けてください。行の先頭の数字は行番号です。
+        |
+        |- 新しい話題が始まる行の番号を、小さい順に半角のカンマ区切りで出力する
+        |- 最初の番号は 1 にする。話題が1つだけなら 1 だけを出力する
+        |- 相づちや言いよどみだけの行では話題を変えない
+        |- 番号だけを1行で出力する。説明は付けない
+        |
+        |例: 1〜4 行目が昼食の店の相談、5〜9 行目が週末の予定、10 行目から仕事の締め切りの話なら「1, 5, 10」
+        |
+        |文字起こし:
+        |
+        """.trimMargin() + lines.withIndex().joinToString("\n") { (index, line) -> "${index + 1} $line" },
+        MAX_TOPIC_OUTPUT_TOKENS,
     )
 
     fun todo(date: CalendarDate, transcript: String) = request(

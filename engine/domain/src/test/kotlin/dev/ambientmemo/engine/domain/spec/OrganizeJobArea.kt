@@ -11,6 +11,7 @@ import dev.ambientmemo.engine.domain.organizeBacklog
 import dev.ambientmemo.engine.domain.testing.FakeLlm
 import dev.ambientmemo.engine.domain.testing.InMemoryMemoRepository
 import dev.ambientmemo.engine.domain.testing.isTitleRequest
+import dev.ambientmemo.engine.domain.testing.isTopicRequest
 import dev.ambientmemo.engine.domain.testing.isTodoRequest
 import dev.ambientmemo.engine.domain.testing.isTodoTitleRequest
 import kotlinx.coroutines.test.runTest
@@ -28,6 +29,7 @@ private const val SAY_CONFIDENCE = 0.9
 
 /** 依頼の種類。FakeLlm.organizing と同じ順で見分ける。 */
 private fun requestKind(request: LlmRequest): String = when {
+    request.isTopicRequest -> "topics"
     request.isTodoRequest -> "todo"
     request.isTodoTitleRequest -> "todoTitle"
     request.isTitleRequest -> "title"
@@ -67,10 +69,14 @@ private fun JsonObject.intOrNull(key: String): Int? = get(key)?.takeUnless { it 
 /** `llm` の形は organize-job.json の inputSchema にある。 */
 private fun scriptedLlm(json: JsonObject?): FakeLlm {
     val values = json ?: JsonObject(emptyMap())
-    values.requireKeys(setOf("modelVersion", "summary", "todos", "title", "todoTitles", "rules", "probes"), "llm")
+    values.requireKeys(
+        setOf("modelVersion", "summary", "todos", "title", "topics", "todoTitles", "rules", "probes"),
+        "llm",
+    )
     val summary = values.strOr("summary", "- 要約")
     val todos = values.strOr("todos", """{"items": []}""")
     val title = values.strOr("title", summary)
+    val topics = values.strOr("topics", "1")
     val todoTitles = values.objOrNull("todoTitles")?.mapValues { it.value.jsonPrimitive.content }.orEmpty()
     val rules = values.objects("rules").map(::LlmRule)
     val kindCounts = mutableMapOf<String, Int>()
@@ -79,6 +85,7 @@ private fun scriptedLlm(json: JsonObject?): FakeLlm {
         val nth = kindCounts.getOrDefault(kind, 0)
         kindCounts[kind] = nth + 1
         rules.firstOrNull { it.matches(request, kind, nth, index) }?.respond() ?: when (kind) {
+            "topics" -> topics
             "todo" -> todos
             "todoTitle" -> request.user.substringAfter("ToDo:\n").let { todoTitles[it] ?: it }
             "title" -> title

@@ -23,6 +23,7 @@ import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.FakeLlm
 import dev.ambientmemo.engine.domain.testing.isTitleRequest
 import dev.ambientmemo.engine.domain.testing.isTodoRequest
+import dev.ambientmemo.engine.domain.testing.isTopicRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.TimeoutCancellationException
@@ -189,7 +190,19 @@ class OrganizeJobIntegrationTest {
         assertEquals(3, result.memoCount)
         val memos = db.memos.listMemos()
         assertEquals(conversations, memos.map { db.memos.listUtteranceIds(it.id) })
-        assertEquals(9, llm.received.size)
+        // まとまりごとに、話題の切れ目、要約、ToDo、タイトル
+        assertEquals(12, llm.received.size)
+    }
+
+    @Test
+    fun `1 つのまとまりの中の話題を別のメモにする`() = withDatabase { db ->
+        val ids = (0 until 4).map { db.say(evening + it * minute, "発話$it") }
+        val llm = FakeLlm.organizing(topics = "1, 3")
+
+        assertEquals(2, db.job(llm).run().memoCount)
+
+        assertEquals(listOf(ids.take(2), ids.drop(2)), db.memos.listMemos().map { db.memos.listUtteranceIds(it.id) })
+        assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
     }
 
     @Test
@@ -310,7 +323,8 @@ class OrganizeJobIntegrationTest {
         var isBroken = false
         var calls = 0
         val llm = FakeLlm { _, request ->
-            if (++calls == 5) isBroken = true
+            // 話題の切れ目の依頼は数えない。5 回目は 2 つ目のまとまりの要約
+            if (!request.isTopicRequest && ++calls == 5) isBroken = true
             if (isBroken) throw IOException("メモリ不足")
             if (request.isTodoRequest) todoJson else "- 要約"
         }
@@ -700,8 +714,11 @@ class OrganizeJobIntegrationTest {
             harness.job(llm).run()
 
             val expected = "[18:00] 話者1: 請求書、明日までに送ってくれる?\n[18:01] 自分: はい、送ります。\n[18:02] うん"
-            assertEquals(3, llm.received.size)
-            llm.received.filterNot { it.isTitleRequest }.forEach { assertTrue(it.user.endsWith(expected), it.user) }
+            assertEquals(4, llm.received.size)
+            val (topics, others) = llm.received.filterNot { it.isTitleRequest }.partition { it.isTopicRequest }
+            val numbered = "1 [18:00] 話者1: 請求書、明日までに送ってくれる?\n2 [18:01] 自分: はい、送ります。\n3 [18:02] うん"
+            assertTrue(topics.single().user.endsWith(numbered), topics.single().user)
+            others.forEach { assertTrue(it.user.endsWith(expected), it.user) }
         }
     }
 

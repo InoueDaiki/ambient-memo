@@ -5,7 +5,8 @@ private let MAX_TITLE_CHARS = 30
 /**
  * 未処理の発話をメモと ToDo に整理する。
  *
- * まとまりごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
+ * 発話をまとまりに分け、まとまりを話題に分ける。
+ * 話題ごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
  * 途中で止まっても、記録していないまとまりは未処理のまま残り、次回の実行が続きから処理する。
  *
  * [timeZone] は発話の日付を決める。「今日」は実行時ではなく、話した日にする。
@@ -53,24 +54,86 @@ public final class OrganizeJob: Sendable {
         onProgress: (OrganizeProgress) -> Void = { _ in }
     ) async throws -> OrganizeResult {
         let labels = SpeakerLabels(try await speakers.listSpeakers())
-        let chunks = splitIntoChunks(try await memos.listUnorganizedUtterances(), config, timeZone, labels)
-            .withoutOngoing(clock.nowMillis(), config)
+        let sorted = try await memos.listUnorganizedUtterances()
+        let nowMillis = clock.nowMillis()
+        let readyFrom = { (from: Int) in
+            splitIntoChunks(Array(sorted[from...]), self.config, self.timeZone, labels)
+                .withoutOngoing(nowMillis, self.config)
+        }
+        var chunks = readyFrom(0)
+        let total = chunks.count
         let pass = Pass(labels)
-        onProgress(OrganizeProgress(0, chunks.count))
+        onProgress(OrganizeProgress(0, total))
+        var completed = 0
         var stoppedBy: OrganizeOutcome?
-        for (index, chunk) in chunks.enumerated() {
-            if shouldContinue() {
-                let stopped = try await process(chunk, pass)
-                if stopped == nil { onProgress(OrganizeProgress(index + 1, chunks.count)) }
-                stoppedBy = stopped
-            } else {
-                stoppedBy = .STOPPED
+        while stoppedBy == nil, let chunk = chunks.first {
+            let step = shouldContinue() ? try await processChunk(chunk, pass) : Step(.STOPPED)
+            stoppedBy = step.stoppedBy
+            if stoppedBy == nil {
+                // 回した話題からまとまりを作り直す。作り直すと数が変わるので、進み具合は残りの数から出す
+                if let carried = step.carried {
+                    chunks = readyFrom(sorted.firstIndex { $0.id == carried.id }!)
+                } else {
+                    chunks = Array(chunks.dropFirst())
+                }
+                completed = min(max(total - chunks.count, completed), total)
+                onProgress(OrganizeProgress(completed, total))
             }
-            if stoppedBy != nil { break }
         }
         // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
         let finished: OrganizeOutcome = pass.suspects.isEmpty ? .COMPLETED : .LLM_FAILED
         return OrganizeResult(stoppedBy ?? finished, pass.memoCount, pass.todoCount, pass.unreadableCount)
+    }
+
+    /// まとまりを1つ処理した結果。[carried] は、次のまとまりの頭に回した話題の最初の発話。
+    private struct Step {
+        let stoppedBy: OrganizeOutcome?
+        var carried: Utterance?
+
+        init(_ stoppedBy: OrganizeOutcome?, carried: Utterance? = nil) {
+            self.stoppedBy = stoppedBy
+            self.carried = carried
+        }
+    }
+
+    /**
+     * まとまりを話題に分け、話題ごとにメモにする。
+     * 文字数の上限で切ったまとまりの最後の話題は記録せず、次のまとまりの頭に回す。続きと一緒に1件のメモにするため。
+     * 話題が1つだけなら回さない。回しても同じところで切れて進まないため。
+     */
+    private func processChunk(_ chunk: UtteranceChunk, _ pass: Pass) async throws -> Step {
+        let topics = try await topicsOf(chunk, pass.labels)
+        let carried = chunk.continues && topics.count > 1 ? topics.last : nil
+        for topic in carried == nil ? topics : Array(topics.dropLast()) {
+            if let stopped = try await process(topic, pass) { return Step(stopped) }
+        }
+        return Step(nil, carried: carried?.utterances[0])
+    }
+
+    /**
+     * 話題の切れ目を LLM に頼む。読めないか失敗したら、まとまり全体を1つの話題にする。
+     * 実行基盤の失敗は、続く要約の依頼でも起きて、そこで数える。
+     */
+    // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
+    private func topicsOf(_ chunk: UtteranceChunk, _ labels: SpeakerLabels) async throws -> [UtteranceChunk] {
+        let lines = chunk.transcriptLines(timeZone, labels)
+        let key = chunk.utterances[0].id
+        let attempted = try attempts.count(firstUtteranceId: key)
+        if lines.count < 2 || attempted >= config.maxChunkAttempts { return [chunk] }
+        // 要約と同じく、クラッシュで後の処理が動かなくても回数が残るように、始める前に数える
+        try attempts.set(firstUtteranceId: key, count: attempted + 1)
+        var starts: [Int]?
+        do {
+            starts = parseTopicStarts(try await llm.generate(OrganizePrompts.topics(lines)), lines.count)
+        } catch {
+            try ensureNotCancelled(key, attempted)
+        }
+        if attempted == 0 {
+            try attempts.clear(firstUtteranceId: key)
+        } else {
+            try attempts.set(firstUtteranceId: key, count: attempted)
+        }
+        return starts.map(chunk.splitAtLines) ?? [chunk]
     }
 
     /// 1 回の実行の数え。実行のタスクの中だけで使う。
@@ -94,7 +157,7 @@ public final class OrganizeJob: Sendable {
         case Failed
     }
 
-    /// まとまりを1つ記録する。続けられないときは止まった理由を返す。
+    /// 話題を1つ記録する。続けられないときは止まった理由を返す。
     private func process(_ chunk: UtteranceChunk, _ pass: Pass) async throws -> OrganizeOutcome? {
         if chunk.isBlank {
             try await memos.markOrganized(chunk.utterances.map(\.id), organizedAtMillis: clock.nowMillis())

@@ -1,15 +1,22 @@
 import Foundation
 
-/// メモ1件になる発話のまとまり。発話は開始時刻の順に並ぶ。Kotlin と同じく、空のまとまりは作れない(落ちる)。
+/**
+ * LLM に一度に渡す発話のまとまり。発話は開始時刻の順に並ぶ。話題ごとに分けて、メモにする。
+ * Kotlin と同じく、空のまとまりは作れない(落ちる)。
+ *
+ * [continues] は、無音ではなく文字数の上限で切ったこと。最後の話題が次のまとまりへ続いているかもしれない。
+ */
 struct UtteranceChunk: Sendable {
     let utterances: [Utterance]
+    let continues: Bool
     let startedAtMillis: Int64
     let endedAtMillis: Int64
     let isBlank: Bool
 
-    init(_ utterances: [Utterance]) {
+    init(_ utterances: [Utterance], continues: Bool = false) {
         precondition(!utterances.isEmpty, "List is empty.")
         self.utterances = utterances
+        self.continues = continues
         startedAtMillis = utterances[0].startedAtMillis
         endedAtMillis = utterances.map(\.endedAtMillis).max()!
         isBlank = utterances.allSatisfy(\.text.kotlinIsBlank)
@@ -42,7 +49,30 @@ private func pad2(_ value: Int64) -> String {
 
 extension UtteranceChunk {
     func toTranscript(_ timeZone: TimeZone, _ labels: SpeakerLabels = .NONE) -> String {
-        utterances.filter { !$0.text.kotlinIsBlank }.map { $0.toTranscriptLine(timeZone, labels) }.joined(separator: "\n")
+        transcriptLines(timeZone, labels).joined(separator: "\n")
+    }
+
+    /// 本文のある発話の行。行の番号は話題の切れ目に使う。
+    func transcriptLines(_ timeZone: TimeZone, _ labels: SpeakerLabels = .NONE) -> [String] {
+        utterances.filter { !$0.text.kotlinIsBlank }.map { $0.toTranscriptLine(timeZone, labels) }
+    }
+
+    /**
+     * [starts] の行(1 から数える [transcriptLines] の番号)で話題に分ける。
+     * 本文が空の発話は、前の行と同じ話題にする。最初の行より前なら最初の話題にする。
+     */
+    func splitAtLines(_ starts: [Int]) -> [UtteranceChunk] {
+        let starts = Set(starts)
+        var topics: [[Utterance]] = [[]]
+        var line = 0
+        for utterance in utterances {
+            if !utterance.text.kotlinIsBlank {
+                line += 1
+                if line > 1, starts.contains(line) { topics.append([]) }
+            }
+            topics[topics.count - 1].append(utterance)
+        }
+        return topics.map { UtteranceChunk($0) }
     }
 }
 
@@ -67,7 +97,7 @@ func splitIntoChunks(
         // Kotlin の Long の引き算はあふれても回るので、同じく回して比べる
         let isSilent = utterance.startedAtMillis &- currentEndedAt >= config.minSilenceGapMillis
         if !current.isEmpty, isSilent || currentChars + chars > config.maxChunkChars {
-            chunks.append(UtteranceChunk(current))
+            chunks.append(UtteranceChunk(current, continues: !isSilent))
             current = []
             currentChars = 0
             currentEndedAt = Int64.min

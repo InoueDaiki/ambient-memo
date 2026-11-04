@@ -10,7 +10,8 @@ private const val MAX_TITLE_CHARS = 30
 /**
  * 未処理の発話をメモと ToDo に整理する。
  *
- * まとまりごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
+ * 発話をまとまりに分け、まとまりを話題に分ける。
+ * 話題ごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
  * 途中で止まっても、記録していないまとまりは未処理のまま残り、次回の実行が続きから処理する。
  *
  * [timeZone] は発話の日付を決める。「今日」は実行時ではなく、話した日にする。
@@ -41,22 +42,75 @@ class OrganizeJob(
         onProgress: (OrganizeProgress) -> Unit = {},
     ): OrganizeResult {
         val labels = SpeakerLabels(speakers.listSpeakers())
-        val chunks = splitIntoChunks(memos.listUnorganizedUtterances(), config, timeZone, labels)
-            .withoutOngoing(clock.nowMillis(), config)
+        val sorted = memos.listUnorganizedUtterances()
+        val nowMillis = clock.nowMillis()
+        val readyFrom = { from: Int ->
+            splitIntoChunks(sorted.subList(from, sorted.size), config, timeZone, labels)
+                .withoutOngoing(nowMillis, config)
+        }
+        var chunks = readyFrom(0)
+        val total = chunks.size
         val pass = Pass(labels)
-        onProgress(OrganizeProgress(0, chunks.size))
-        val stoppedBy = chunks.withIndex().firstNotNullOfOrNull { (index, chunk) ->
-            if (shouldContinue()) {
-                process(chunk, pass).also { stopped ->
-                    if (stopped == null) onProgress(OrganizeProgress(index + 1, chunks.size))
-                }
-            } else {
-                OrganizeOutcome.STOPPED
+        onProgress(OrganizeProgress(0, total))
+        var completed = 0
+        var stoppedBy: OrganizeOutcome? = null
+        while (stoppedBy == null && chunks.isNotEmpty()) {
+            val step = if (shouldContinue()) processChunk(chunks.first(), pass) else Step(OrganizeOutcome.STOPPED)
+            stoppedBy = step.stoppedBy
+            if (stoppedBy == null) {
+                // 回した話題からまとまりを作り直す。作り直すと数が変わるので、進み具合は残りの数から出す
+                chunks = step.carried?.let { carried -> readyFrom(sorted.indexOfFirst { it.id == carried.id }) }
+                    ?: chunks.drop(1)
+                completed = (total - chunks.size).coerceIn(completed, total)
+                onProgress(OrganizeProgress(completed, total))
             }
         }
         // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
         val finished = if (pass.suspects.isEmpty()) OrganizeOutcome.COMPLETED else OrganizeOutcome.LLM_FAILED
         return OrganizeResult(stoppedBy ?: finished, pass.memoCount, pass.todoCount, pass.unreadableCount)
+    }
+
+    /** まとまりを1つ処理した結果。[carried] は、次のまとまりの頭に回した話題の最初の発話。 */
+    private class Step(
+        val stoppedBy: OrganizeOutcome?,
+        val carried: Utterance? = null,
+    )
+
+    /**
+     * まとまりを話題に分け、話題ごとにメモにする。
+     * 文字数の上限で切ったまとまりの最後の話題は記録せず、次のまとまりの頭に回す。続きと一緒に1件のメモにするため。
+     * 話題が1つだけなら回さない。回しても同じところで切れて進まないため。
+     */
+    private suspend fun processChunk(chunk: UtteranceChunk, pass: Pass): Step {
+        val topics = topicsOf(chunk, pass.labels)
+        val carried = topics.last().takeIf { chunk.continues && topics.size > 1 }
+        for (topic in if (carried == null) topics else topics.dropLast(1)) {
+            process(topic, pass)?.let { return Step(it) }
+        }
+        return Step(null, carried?.utterances?.first())
+    }
+
+    /**
+     * 話題の切れ目を LLM に頼む。読めないか失敗したら、まとまり全体を1つの話題にする。
+     * 実行基盤の失敗は、続く要約の依頼でも起きて、そこで数える。
+     */
+    // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
+    @Suppress("TooGenericExceptionCaught", "SwallowedException")
+    private suspend fun topicsOf(chunk: UtteranceChunk, labels: SpeakerLabels): List<UtteranceChunk> {
+        val lines = chunk.transcriptLines(timeZone, labels)
+        val key = chunk.utterances.first().id
+        val attempted = attempts.count(key)
+        if (lines.size < 2 || attempted >= config.maxChunkAttempts) return listOf(chunk)
+        // 要約と同じく、クラッシュで後の処理が動かなくても回数が残るように、始める前に数える
+        attempts.set(key, attempted + 1)
+        val starts = try {
+            parseTopicStarts(llm.generate(OrganizePrompts.topics(lines)), lines.size)
+        } catch (e: Exception) {
+            ensureNotCancelled(key, attempted)
+            null
+        }
+        if (attempted == 0) attempts.clear(key) else attempts.set(key, attempted)
+        return starts?.let(chunk::splitAtLines) ?: listOf(chunk)
     }
 
     private class Pass(
@@ -75,7 +129,7 @@ class OrganizeJob(
         data object Failed : Draft
     }
 
-    /** まとまりを1つ記録する。続けられないときは止まった理由を返す。 */
+    /** 話題を1つ記録する。続けられないときは止まった理由を返す。 */
     private suspend fun process(chunk: UtteranceChunk, pass: Pass): OrganizeOutcome? = when {
         chunk.isBlank -> {
             memos.markOrganized(chunk.utterances.map { it.id }, clock.nowMillis())

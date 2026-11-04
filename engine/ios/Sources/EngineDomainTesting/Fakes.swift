@@ -574,15 +574,20 @@ public final class FakeLlm: Llm {
         return try await respond(index, request)
     }
 
-    /// 要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。
+    /**
+     * 話題の切れ目、要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。
+     * 話題の切れ目は、既定では1つの話題と答える。
+     */
     public static func organizing(
         summary: String = "- 要約",
         todos: String = #"{"items": []}"#,
         title: String? = nil,
+        topics: String = "1",
         todoTitle: @escaping @Sendable (String) -> String = { $0 }
     ) -> FakeLlm {
         let title = title ?? summary
         return FakeLlm { _, request in
+            if request.isTopicRequest { return topics }
             if request.isTodoRequest { return todos }
             if request.isTodoTitleRequest { return todoTitle(request.user.substringAfter("ToDo:\n")) }
             if request.isTitleRequest { return title }
@@ -592,6 +597,8 @@ public final class FakeLlm: Llm {
 }
 
 extension LlmRequest {
+    public var isTopicRequest: Bool { user.utf16Contains("話題ごとに分けて") }
+
     public var isTodoRequest: Bool { user.utf16Contains("JSON だけを出力") }
 
     public var isTitleRequest: Bool { user.utf16Contains("タイトルだけを") }

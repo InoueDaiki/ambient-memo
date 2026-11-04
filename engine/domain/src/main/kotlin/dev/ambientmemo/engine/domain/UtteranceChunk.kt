@@ -3,9 +3,14 @@ package dev.ambientmemo.engine.domain
 import java.util.Locale
 import java.util.TimeZone
 
-/** メモ1件になる発話のまとまり。発話は開始時刻の順に並ぶ。 */
+/**
+ * LLM に一度に渡す発話のまとまり。発話は開始時刻の順に並ぶ。話題ごとに分けて、メモにする。
+ *
+ * [continues] は、無音ではなく文字数の上限で切ったこと。最後の話題が次のまとまりへ続いているかもしれない。
+ */
 internal class UtteranceChunk(
     val utterances: List<Utterance>,
+    val continues: Boolean = false,
 ) {
     val startedAtMillis: Long = utterances.first().startedAtMillis
     val endedAtMillis: Long = utterances.maxOf { it.endedAtMillis }
@@ -34,7 +39,30 @@ internal fun Utterance.toTranscriptLine(timeZone: TimeZone, labels: SpeakerLabel
 }
 
 internal fun UtteranceChunk.toTranscript(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String =
-    utterances.filter { it.text.isNotBlank() }.joinToString("\n") { it.toTranscriptLine(timeZone, labels) }
+    transcriptLines(timeZone, labels).joinToString("\n")
+
+/** 本文のある発話の行。行の番号は話題の切れ目に使う。 */
+internal fun UtteranceChunk.transcriptLines(
+    timeZone: TimeZone,
+    labels: SpeakerLabels = SpeakerLabels.NONE,
+): List<String> = utterances.filter { it.text.isNotBlank() }.map { it.toTranscriptLine(timeZone, labels) }
+
+/**
+ * [starts] の行(1 から数える [transcriptLines] の番号)で話題に分ける。
+ * 本文が空の発話は、前の行と同じ話題にする。最初の行より前なら最初の話題にする。
+ */
+internal fun UtteranceChunk.splitAtLines(starts: List<Int>): List<UtteranceChunk> {
+    val topics = mutableListOf(mutableListOf<Utterance>())
+    var line = 0
+    for (utterance in utterances) {
+        if (utterance.text.isNotBlank()) {
+            line++
+            if (line > 1 && line in starts) topics += mutableListOf<Utterance>()
+        }
+        topics.last() += utterance
+    }
+    return topics.map { UtteranceChunk(it) }
+}
 
 /**
  * [sorted] を、無音の長さと文字数の上限でまとまりに分ける。[sorted] は開始時刻、id の順に並んでいること。
@@ -55,7 +83,7 @@ internal fun splitIntoChunks(
         val chars = utterance.toTranscriptLine(timeZone, labels).length + 1
         val isSilent = utterance.startedAtMillis - currentEndedAt >= config.minSilenceGapMillis
         if (current.isNotEmpty() && (isSilent || currentChars + chars > config.maxChunkChars)) {
-            chunks += UtteranceChunk(current)
+            chunks += UtteranceChunk(current, continues = !isSilent)
             current = mutableListOf()
             currentChars = 0
             currentEndedAt = Long.MIN_VALUE
