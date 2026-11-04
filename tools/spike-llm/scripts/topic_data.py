@@ -12,8 +12,12 @@
 つないだ所で話者のラベルが変わると、話者の違いだけで切れ目が分かってしまうため。
 1 つの例は、アプリのまとまりの上限(1,800 字、行ごとに改行の 1 字を足す)に収める。
 
-使い方: .venv/bin/python scripts/topic_data.py
+評価用(eval.jsonl)と、プロンプトの調整用(dev.jsonl)を作る。調整用は別の乱数の種で作り、
+評価用に使った対話を除く。調整は調整用だけで行い、評価用は決めた後に確かめるためだけに流す。
+
+使い方: .venv/bin/python scripts/topic_data.py [--dev]
 """
+import argparse
 import hashlib
 import json
 import pathlib
@@ -25,7 +29,9 @@ import zipfile
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 CACHE = ROOT / "data" / "cache" / "topics"
 OUT = CACHE / "eval.jsonl"
+DEV_OUT = CACHE / "dev.jsonl"
 SEED = 20261104
+DEV_SEED = 20261105
 MAX_CHUNK_CHARS = 1800
 
 SOURCES = {
@@ -85,7 +91,7 @@ def timed(rng: random.Random, turns: list[tuple[str, str]]) -> list[str]:
     return out
 
 
-def concat_examples(rng: random.Random) -> list[dict]:
+def concat_examples(rng: random.Random, excluded: set) -> list[dict]:
     with zipfile.ZipFile(fetch("rpc")) as z:
         names = sorted(n for n in z.namelist() if "/dialogues/" in n and n.endswith(".json"))
         dialogues = [json.loads(z.read(n)) for n in names]
@@ -93,7 +99,7 @@ def concat_examples(rng: random.Random) -> list[dict]:
     usable = []
     for d in dialogues:
         utterances = [u for u in d["utterances"] if u["text"].strip()]
-        if len(utterances) >= SKIP_HEAD + SKIP_TAIL + SEGMENT_MAX:
+        if len(utterances) >= SKIP_HEAD + SKIP_TAIL + SEGMENT_MAX and ("rpc", d["dialogue_id"]) not in excluded:
             usable.append((d["dialogue_id"], utterances))
     rng.shuffle(usable)
     pool = iter(usable)
@@ -151,12 +157,14 @@ def domains_of(turns: list[dict]) -> list[str | None]:
     return [d if d is not None else first for d in out]
 
 
-def natural_examples(rng: random.Random) -> list[dict]:
+def natural_examples(rng: random.Random, excluded: set) -> list[dict]:
     with zipfile.ZipFile(fetch("jmw")) as z:
         dialogues = json.loads(z.read("JMultiWOZ_1.0/dialogues.json"))
     multi, single = [], []
     for key in sorted(dialogues):
         d = dialogues[key]
+        if ("jmw", d["dialogue_id"]) in excluded:
+            continue
         turns = [t for t in d["turns"] if t["utterance"].strip()]
         domains = domains_of(turns)
         if domains[0] is None:
@@ -191,11 +199,28 @@ def natural_examples(rng: random.Random) -> list[dict]:
     return examples
 
 
+def used_dialogues(path: pathlib.Path) -> set:
+    used = set()
+    for row in path.read_text(encoding="utf-8").splitlines():
+        e = json.loads(row)
+        for s in e["source"]:
+            used.add(("rpc" if e["set"] == "concat" else "jmw", s["dialogue_id"]))
+    return used
+
+
 def main() -> None:
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--dev", action="store_true", help="調整用を作る。先に評価用を作っておく")
+    args = ap.parse_args()
     CACHE.mkdir(parents=True, exist_ok=True)
-    rng = random.Random(SEED)
-    examples = concat_examples(rng) + natural_examples(rng)
-    with OUT.open("w", encoding="utf-8") as f:
+    if args.dev:
+        if not OUT.exists():
+            sys.exit("先に評価用を作る")
+        rng, excluded, out = random.Random(DEV_SEED), used_dialogues(OUT), DEV_OUT
+    else:
+        rng, excluded, out = random.Random(SEED), set(), OUT
+    examples = concat_examples(rng, excluded) + natural_examples(rng, excluded)
+    with out.open("w", encoding="utf-8") as f:
         for e in examples:
             f.write(json.dumps(e, ensure_ascii=False) + "\n")
     by_set: dict[str, list[dict]] = {}
@@ -206,7 +231,7 @@ def main() -> None:
         boundaries = sum(len(e["starts"]) - 1 for e in items)
         print(name, len(items), "例", lines, "行", boundaries, "切れ目",
               "平均", round(sum(chars(e["lines"]) for e in items) / len(items)), "字")
-    print("書き出し", OUT)
+    print("書き出し", out)
 
 
 if __name__ == "__main__":

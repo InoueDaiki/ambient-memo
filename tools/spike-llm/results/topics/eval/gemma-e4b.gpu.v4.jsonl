@@ -1,0 +1,240 @@
+{"id": "concat-1-00", "set": "concat", "lines": 6, "gold": [1], "pred": [1], "wall": 4.96, "prompt_tokens": 420, "output": "1"}
+{"id": "concat-1-01", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 5.2, "prompt_tokens": 517, "output": "1"}
+{"id": "concat-1-02", "set": "concat", "lines": 10, "gold": [1], "pred": [1], "wall": 4.17, "prompt_tokens": 609, "output": "1"}
+{"id": "concat-1-03", "set": "concat", "lines": 5, "gold": [1], "pred": [1], "wall": 2.17, "prompt_tokens": 416, "output": "1"}
+{"id": "concat-1-04", "set": "concat", "lines": 10, "gold": [1], "pred": [1, 5, 10], "wall": 4.98, "prompt_tokens": 583, "output": "1, 5, 10"}
+{"id": "concat-1-05", "set": "concat", "lines": 7, "gold": [1], "pred": [1], "wall": 2.01, "prompt_tokens": 507, "output": "1"}
+{"id": "concat-1-06", "set": "concat", "lines": 10, "gold": [1], "pred": [1], "wall": 3.84, "prompt_tokens": 555, "output": "1"}
+{"id": "concat-1-07", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 1.7, "prompt_tokens": 450, "output": "1"}
+{"id": "concat-1-08", "set": "concat", "lines": 7, "gold": [1], "pred": [1], "wall": 2.46, "prompt_tokens": 475, "output": "1"}
+{"id": "concat-1-09", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 1.78, "prompt_tokens": 507, "output": "1"}
+{"id": "concat-1-10", "set": "concat", "lines": 6, "gold": [1], "pred": [1, 4], "wall": 1.92, "prompt_tokens": 459, "output": "1, 4"}
+{"id": "concat-1-11", "set": "concat", "lines": 6, "gold": [1], "pred": [1, 6], "wall": 1.64, "prompt_tokens": 425, "output": "1, 6"}
+{"id": "concat-1-12", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 3.47, "prompt_tokens": 603, "output": "1"}
+{"id": "concat-1-13", "set": "concat", "lines": 8, "gold": [1], "pred": [1, 4], "wall": 2.02, "prompt_tokens": 485, "output": "1, 4"}
+{"id": "concat-1-14", "set": "concat", "lines": 7, "gold": [1], "pred": [1], "wall": 2.51, "prompt_tokens": 461, "output": "1"}
+{"id": "concat-1-15", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 2.09, "prompt_tokens": 510, "output": "1"}
+{"id": "concat-1-16", "set": "concat", "lines": 5, "gold": [1], "pred": [1], "wall": 2.08, "prompt_tokens": 420, "output": "1"}
+{"id": "concat-1-17", "set": "concat", "lines": 9, "gold": [1], "pred": [1, 9], "wall": 4.38, "prompt_tokens": 532, "output": "1, 9"}
+{"id": "concat-1-18", "set": "concat", "lines": 4, "gold": [1], "pred": [1], "wall": 1.62, "prompt_tokens": 418, "output": "1"}
+{"id": "concat-1-19", "set": "concat", "lines": 5, "gold": [1], "pred": [1], "wall": 1.42, "prompt_tokens": 415, "output": "1"}
+{"id": "concat-1-20", "set": "concat", "lines": 9, "gold": [1], "pred": [1], "wall": 3.31, "prompt_tokens": 547, "output": "1"}
+{"id": "concat-1-21", "set": "concat", "lines": 10, "gold": [1], "pred": [1, 7, 8], "wall": 3.61, "prompt_tokens": 588, "output": "1, 7, 8"}
+{"id": "concat-1-22", "set": "concat", "lines": 7, "gold": [1], "pred": [1], "wall": 1.62, "prompt_tokens": 459, "output": "1"}
+{"id": "concat-1-23", "set": "concat", "lines": 5, "gold": [1], "pred": [1], "wall": 1.65, "prompt_tokens": 433, "output": "1"}
+{"id": "concat-1-24", "set": "concat", "lines": 6, "gold": [1], "pred": [1], "wall": 1.72, "prompt_tokens": 426, "output": "1"}
+{"id": "concat-2-00", "set": "concat", "lines": 17, "gold": [1, 8], "pred": [1, 10], "wall": 4.0, "prompt_tokens": 760, "output": "1, 10"}
+{"id": "concat-2-01", "set": "concat", "lines": 15, "gold": [1, 9], "pred": [1], "wall": 3.56, "prompt_tokens": 681, "output": "1"}
+{"id": "concat-2-02", "set": "concat", "lines": 17, "gold": [1, 8], "pred": [1, 9], "wall": 3.56, "prompt_tokens": 679, "output": "1, 9"}
+{"id": "concat-2-03", "set": "concat", "lines": 16, "gold": [1, 11], "pred": [1, 10], "wall": 3.52, "prompt_tokens": 668, "output": "1, 10"}
+{"id": "concat-2-04", "set": "concat", "lines": 14, "gold": [1, 8], "pred": [1, 8, 11], "wall": 3.75, "prompt_tokens": 769, "output": "1, 8, 11"}
+{"id": "concat-2-05", "set": "concat", "lines": 10, "gold": [1, 7], "pred": [1, 7], "wall": 3.49, "prompt_tokens": 558, "output": "1, 7"}
+{"id": "concat-2-06", "set": "concat", "lines": 12, "gold": [1, 6], "pred": [1, 5], "wall": 3.45, "prompt_tokens": 594, "output": "1, 5"}
+{"id": "concat-2-07", "set": "concat", "lines": 13, "gold": [1, 6], "pred": [1, 10], "wall": 3.45, "prompt_tokens": 573, "output": "1, 10"}
+{"id": "concat-2-08", "set": "concat", "lines": 15, "gold": [1, 10], "pred": [1, 11], "wall": 3.65, "prompt_tokens": 701, "output": "1, 11"}
+{"id": "concat-2-09", "set": "concat", "lines": 14, "gold": [1, 6], "pred": [1, 6], "wall": 3.55, "prompt_tokens": 626, "output": "1, 6"}
+{"id": "concat-2-10", "set": "concat", "lines": 13, "gold": [1, 5], "pred": [1, 13], "wall": 3.92, "prompt_tokens": 589, "output": "1, 13"}
+{"id": "concat-2-11", "set": "concat", "lines": 12, "gold": [1, 8], "pred": [1, 8], "wall": 3.05, "prompt_tokens": 613, "output": "1, 8"}
+{"id": "concat-2-12", "set": "concat", "lines": 12, "gold": [1, 5], "pred": [1, 4, 11], "wall": 3.25, "prompt_tokens": 569, "output": "1, 4, 11"}
+{"id": "concat-2-13", "set": "concat", "lines": 13, "gold": [1, 7], "pred": [1, 7], "wall": 3.43, "prompt_tokens": 639, "output": "1, 7"}
+{"id": "concat-2-14", "set": "concat", "lines": 11, "gold": [1, 6], "pred": [1, 7], "wall": 2.97, "prompt_tokens": 575, "output": "1, 7"}
+{"id": "concat-2-15", "set": "concat", "lines": 15, "gold": [1, 7], "pred": [1, 9], "wall": 3.09, "prompt_tokens": 706, "output": "1, 9"}
+{"id": "concat-2-16", "set": "concat", "lines": 14, "gold": [1, 11], "pred": [1, 11], "wall": 3.08, "prompt_tokens": 687, "output": "1, 11"}
+{"id": "concat-2-17", "set": "concat", "lines": 8, "gold": [1, 5], "pred": [1], "wall": 2.94, "prompt_tokens": 520, "output": "1"}
+{"id": "concat-2-18", "set": "concat", "lines": 12, "gold": [1, 8], "pred": [1, 8], "wall": 3.01, "prompt_tokens": 594, "output": "1, 8"}
+{"id": "concat-2-19", "set": "concat", "lines": 11, "gold": [1, 6], "pred": [1, 8], "wall": 3.18, "prompt_tokens": 586, "output": "1, 8"}
+{"id": "concat-2-20", "set": "concat", "lines": 20, "gold": [1, 11], "pred": [1, 10, 15], "wall": 3.54, "prompt_tokens": 805, "output": "1, 10, 15"}
+{"id": "concat-2-21", "set": "concat", "lines": 14, "gold": [1, 7], "pred": [1, 10], "wall": 3.58, "prompt_tokens": 712, "output": "1, 10"}
+{"id": "concat-2-22", "set": "concat", "lines": 14, "gold": [1, 10], "pred": [1, 10], "wall": 3.46, "prompt_tokens": 620, "output": "1, 10"}
+{"id": "concat-2-23", "set": "concat", "lines": 15, "gold": [1, 7], "pred": [1, 8], "wall": 3.58, "prompt_tokens": 684, "output": "1, 8"}
+{"id": "concat-2-24", "set": "concat", "lines": 13, "gold": [1, 7], "pred": [1, 7], "wall": 3.34, "prompt_tokens": 679, "output": "1, 7"}
+{"id": "concat-2-25", "set": "concat", "lines": 17, "gold": [1, 10], "pred": [1, 13], "wall": 3.37, "prompt_tokens": 742, "output": "1, 13"}
+{"id": "concat-2-26", "set": "concat", "lines": 16, "gold": [1, 9], "pred": [1, 10], "wall": 3.46, "prompt_tokens": 699, "output": "1, 10"}
+{"id": "concat-2-27", "set": "concat", "lines": 11, "gold": [1, 5], "pred": [1, 5, 10], "wall": 3.8, "prompt_tokens": 578, "output": "1, 5, 10"}
+{"id": "concat-2-28", "set": "concat", "lines": 16, "gold": [1, 7], "pred": [1, 14], "wall": 4.04, "prompt_tokens": 720, "output": "1, 14"}
+{"id": "concat-2-29", "set": "concat", "lines": 17, "gold": [1, 9], "pred": [1, 9], "wall": 3.86, "prompt_tokens": 799, "output": "1, 9"}
+{"id": "concat-2-30", "set": "concat", "lines": 14, "gold": [1, 9], "pred": [1, 10], "wall": 3.95, "prompt_tokens": 681, "output": "1, 10"}
+{"id": "concat-2-31", "set": "concat", "lines": 14, "gold": [1, 5], "pred": [1, 5], "wall": 3.92, "prompt_tokens": 680, "output": "1, 5"}
+{"id": "concat-2-32", "set": "concat", "lines": 14, "gold": [1, 6], "pred": [1, 6, 12, 14], "wall": 4.61, "prompt_tokens": 651, "output": "1, 6, 12, 14"}
+{"id": "concat-2-33", "set": "concat", "lines": 15, "gold": [1, 9], "pred": [1, 9], "wall": 3.99, "prompt_tokens": 794, "output": "1, 9"}
+{"id": "concat-2-34", "set": "concat", "lines": 15, "gold": [1, 7], "pred": [1, 7], "wall": 3.66, "prompt_tokens": 751, "output": "1, 7"}
+{"id": "concat-3-00", "set": "concat", "lines": 18, "gold": [1, 5, 13], "pred": [1, 13], "wall": 3.64, "prompt_tokens": 741, "output": "1, 13"}
+{"id": "concat-3-01", "set": "concat", "lines": 21, "gold": [1, 10, 14], "pred": [1, 10, 16], "wall": 3.94, "prompt_tokens": 862, "output": "1, 10, 16"}
+{"id": "concat-3-02", "set": "concat", "lines": 20, "gold": [1, 5, 14], "pred": [1, 14, 20], "wall": 4.51, "prompt_tokens": 796, "output": "1, 14, 20"}
+{"id": "concat-3-03", "set": "concat", "lines": 20, "gold": [1, 7, 17], "pred": [1, 7, 17], "wall": 4.68, "prompt_tokens": 837, "output": "1, 7, 17"}
+{"id": "concat-3-04", "set": "concat", "lines": 25, "gold": [1, 8, 16], "pred": [1, 8, 23], "wall": 4.87, "prompt_tokens": 989, "output": "1, 8, 23"}
+{"id": "concat-3-05", "set": "concat", "lines": 22, "gold": [1, 10, 19], "pred": [1, 12, 19], "wall": 4.67, "prompt_tokens": 926, "output": "1, 12, 19"}
+{"id": "concat-3-06", "set": "concat", "lines": 19, "gold": [1, 7, 14], "pred": [1, 7, 10, 14, 15, 17, 19], "wall": 4.64, "prompt_tokens": 800, "output": "1, 7, 10, 14, 15, 17, 19"}
+{"id": "concat-3-07", "set": "concat", "lines": 19, "gold": [1, 6, 15], "pred": [1, 8, 15], "wall": 3.8, "prompt_tokens": 811, "output": "1, 8, 15"}
+{"id": "concat-3-08", "set": "concat", "lines": 26, "gold": [1, 8, 17], "pred": [1, 9, 18], "wall": 3.55, "prompt_tokens": 983, "output": "1, 9, 18"}
+{"id": "concat-3-09", "set": "concat", "lines": 23, "gold": [1, 10, 17], "pred": [1, 10, 17], "wall": 3.73, "prompt_tokens": 921, "output": "1, 10, 17"}
+{"id": "concat-3-10", "set": "concat", "lines": 23, "gold": [1, 9, 19], "pred": [1, 9, 20], "wall": 3.84, "prompt_tokens": 965, "output": "1, 9, 20"}
+{"id": "concat-3-11", "set": "concat", "lines": 26, "gold": [1, 10, 20], "pred": [1, 10, 20], "wall": 4.62, "prompt_tokens": 982, "output": "1, 10, 20"}
+{"id": "concat-3-12", "set": "concat", "lines": 24, "gold": [1, 7, 16], "pred": [1, 7, 16], "wall": 4.39, "prompt_tokens": 982, "output": "1, 7, 16"}
+{"id": "concat-3-13", "set": "concat", "lines": 15, "gold": [1, 7, 11], "pred": [1, 7, 11], "wall": 3.94, "prompt_tokens": 756, "output": "1, 7, 11"}
+{"id": "concat-3-14", "set": "concat", "lines": 25, "gold": [1, 11, 19], "pred": [1, 14], "wall": 3.81, "prompt_tokens": 975, "output": "1, 14"}
+{"id": "concat-3-15", "set": "concat", "lines": 23, "gold": [1, 9, 17], "pred": [1, 9, 17], "wall": 4.85, "prompt_tokens": 907, "output": "1, 9, 17"}
+{"id": "concat-3-16", "set": "concat", "lines": 23, "gold": [1, 10, 20], "pred": [1, 6, 14, 20], "wall": 4.43, "prompt_tokens": 916, "output": "1, 6, 14, 20"}
+{"id": "concat-3-17", "set": "concat", "lines": 21, "gold": [1, 9, 13], "pred": [1, 10], "wall": 3.3, "prompt_tokens": 837, "output": "1, 10"}
+{"id": "concat-3-18", "set": "concat", "lines": 20, "gold": [1, 5, 11], "pred": [1, 5, 13, 14], "wall": 3.82, "prompt_tokens": 874, "output": "1, 5, 13, 14"}
+{"id": "concat-3-19", "set": "concat", "lines": 17, "gold": [1, 5, 10], "pred": [1, 10], "wall": 3.37, "prompt_tokens": 778, "output": "1, 10"}
+{"id": "concat-3-20", "set": "concat", "lines": 25, "gold": [1, 11, 16], "pred": [1, 11, 16], "wall": 3.28, "prompt_tokens": 1009, "output": "1, 11, 16"}
+{"id": "concat-3-21", "set": "concat", "lines": 19, "gold": [1, 5, 10], "pred": [1, 10, 14], "wall": 3.39, "prompt_tokens": 824, "output": "1, 10, 14"}
+{"id": "concat-3-22", "set": "concat", "lines": 19, "gold": [1, 8, 15], "pred": [1, 9, 18], "wall": 3.17, "prompt_tokens": 829, "output": "1, 9, 18"}
+{"id": "concat-3-23", "set": "concat", "lines": 23, "gold": [1, 10, 15], "pred": [1, 10], "wall": 2.94, "prompt_tokens": 838, "output": "1, 10"}
+{"id": "concat-3-24", "set": "concat", "lines": 28, "gold": [1, 10, 20], "pred": [1, 6, 14, 17, 23, 26], "wall": 3.42, "prompt_tokens": 975, "output": "1, 6, 14, 17, 23, 26"}
+{"id": "concat-3-25", "set": "concat", "lines": 13, "gold": [1, 6, 10], "pred": [1, 9], "wall": 2.87, "prompt_tokens": 632, "output": "1, 9"}
+{"id": "concat-3-26", "set": "concat", "lines": 23, "gold": [1, 10, 17], "pred": [1, 10, 17], "wall": 3.12, "prompt_tokens": 795, "output": "1, 10, 17"}
+{"id": "concat-3-27", "set": "concat", "lines": 23, "gold": [1, 11, 15], "pred": [1, 11, 15, 21], "wall": 3.54, "prompt_tokens": 966, "output": "1, 11, 15, 21"}
+{"id": "concat-3-28", "set": "concat", "lines": 21, "gold": [1, 6, 12], "pred": [1, 6, 12], "wall": 3.21, "prompt_tokens": 934, "output": "1, 6, 12"}
+{"id": "concat-3-29", "set": "concat", "lines": 22, "gold": [1, 9, 15], "pred": [1, 15], "wall": 2.85, "prompt_tokens": 851, "output": "1, 15"}
+{"id": "concat-3-30", "set": "concat", "lines": 19, "gold": [1, 6, 10], "pred": [1, 9, 11], "wall": 2.93, "prompt_tokens": 820, "output": "1, 9, 11"}
+{"id": "concat-3-31", "set": "concat", "lines": 26, "gold": [1, 10, 20], "pred": [1, 10], "wall": 3.08, "prompt_tokens": 946, "output": "1, 10"}
+{"id": "concat-3-32", "set": "concat", "lines": 20, "gold": [1, 8, 17], "pred": [1, 10], "wall": 3.02, "prompt_tokens": 814, "output": "1, 10"}
+{"id": "concat-3-33", "set": "concat", "lines": 24, "gold": [1, 10, 17], "pred": [1, 11, 18], "wall": 3.08, "prompt_tokens": 971, "output": "1, 11, 18"}
+{"id": "concat-3-34", "set": "concat", "lines": 20, "gold": [1, 9, 13], "pred": [1, 7, 13], "wall": 3.21, "prompt_tokens": 822, "output": "1, 7, 13"}
+{"id": "concat-4-00", "set": "concat", "lines": 31, "gold": [1, 10, 19, 27], "pred": [1, 10, 19, 25, 27], "wall": 3.89, "prompt_tokens": 1120, "output": "1, 10, 19, 25, 27"}
+{"id": "concat-4-01", "set": "concat", "lines": 36, "gold": [1, 10, 19, 27], "pred": [1, 10, 27], "wall": 4.11, "prompt_tokens": 1379, "output": "1, 10, 27"}
+{"id": "concat-4-02", "set": "concat", "lines": 28, "gold": [1, 9, 19, 25], "pred": [1, 9, 10, 25], "wall": 3.9, "prompt_tokens": 1173, "output": "1, 9, 10, 25"}
+{"id": "concat-4-03", "set": "concat", "lines": 33, "gold": [1, 11, 19, 29], "pred": [1, 13, 19], "wall": 3.49, "prompt_tokens": 1092, "output": "1, 13, 19"}
+{"id": "concat-4-04", "set": "concat", "lines": 26, "gold": [1, 5, 12, 22], "pred": [1, 10, 22], "wall": 3.03, "prompt_tokens": 961, "output": "1, 10, 22"}
+{"id": "concat-4-05", "set": "concat", "lines": 30, "gold": [1, 10, 20, 24], "pred": [1, 10, 20], "wall": 3.51, "prompt_tokens": 1198, "output": "1, 10, 20"}
+{"id": "concat-4-06", "set": "concat", "lines": 32, "gold": [1, 11, 16, 23], "pred": [1, 16, 23], "wall": 3.52, "prompt_tokens": 1101, "output": "1, 16, 23"}
+{"id": "concat-4-07", "set": "concat", "lines": 30, "gold": [1, 10, 20, 27], "pred": [1, 10, 21, 27], "wall": 3.41, "prompt_tokens": 1081, "output": "1, 10, 21, 27"}
+{"id": "concat-4-08", "set": "concat", "lines": 29, "gold": [1, 8, 17, 22], "pred": [1, 9, 16], "wall": 2.92, "prompt_tokens": 1010, "output": "1, 9, 16"}
+{"id": "concat-4-09", "set": "concat", "lines": 29, "gold": [1, 7, 14, 21], "pred": [1, 7, 13, 18, 22], "wall": 3.76, "prompt_tokens": 1087, "output": "1, 7, 13, 18, 22"}
+{"id": "concat-4-10", "set": "concat", "lines": 27, "gold": [1, 8, 13, 22], "pred": [1, 8, 13, 20], "wall": 3.3, "prompt_tokens": 917, "output": "1, 8, 13, 20"}
+{"id": "concat-4-11", "set": "concat", "lines": 28, "gold": [1, 10, 17, 25], "pred": [1, 10, 19], "wall": 2.95, "prompt_tokens": 1004, "output": "1, 10, 19"}
+{"id": "concat-4-12", "set": "concat", "lines": 24, "gold": [1, 7, 13, 17], "pred": [1, 7, 12, 17], "wall": 3.38, "prompt_tokens": 942, "output": "1, 7, 12, 17"}
+{"id": "concat-4-13", "set": "concat", "lines": 32, "gold": [1, 8, 18, 26], "pred": [1, 8, 18, 28], "wall": 3.29, "prompt_tokens": 1150, "output": "1, 8, 18, 28"}
+{"id": "concat-4-14", "set": "concat", "lines": 27, "gold": [1, 8, 12, 18], "pred": [1, 8, 10, 18], "wall": 3.42, "prompt_tokens": 1003, "output": "1, 8, 10, 18"}
+{"id": "concat-4-15", "set": "concat", "lines": 24, "gold": [1, 10, 17, 21], "pred": [1, 10, 17], "wall": 3.28, "prompt_tokens": 952, "output": "1, 10, 17"}
+{"id": "concat-4-16", "set": "concat", "lines": 27, "gold": [1, 6, 15, 23], "pred": [1, 6, 12, 15, 18, 22, 23, 26, 27], "wall": 4.26, "prompt_tokens": 980, "output": "1, 6, 12, 15, 18, 22, 23, 26, 27"}
+{"id": "concat-4-17", "set": "concat", "lines": 22, "gold": [1, 5, 13, 18], "pred": [1, 5, 18, 22], "wall": 3.45, "prompt_tokens": 866, "output": "1, 5, 18, 22"}
+{"id": "concat-4-18", "set": "concat", "lines": 26, "gold": [1, 8, 18, 23], "pred": [1, 8, 18, 23, 26], "wall": 3.29, "prompt_tokens": 952, "output": "1, 8, 18, 23, 26"}
+{"id": "concat-4-19", "set": "concat", "lines": 30, "gold": [1, 6, 16, 25], "pred": [1, 6, 15], "wall": 3.84, "prompt_tokens": 1154, "output": "1, 6, 15"}
+{"id": "concat-4-20", "set": "concat", "lines": 25, "gold": [1, 10, 16, 21], "pred": [1, 7, 10, 16, 19, 20, 21, 22], "wall": 3.76, "prompt_tokens": 970, "output": "1, 7, 10, 16, 19, 20, 21, 22"}
+{"id": "concat-4-21", "set": "concat", "lines": 33, "gold": [1, 10, 15, 25], "pred": [1, 10, 15, 25], "wall": 3.62, "prompt_tokens": 1270, "output": "1, 10, 15, 25"}
+{"id": "concat-4-22", "set": "concat", "lines": 27, "gold": [1, 10, 16, 21], "pred": [1, 10, 16, 22], "wall": 3.08, "prompt_tokens": 972, "output": "1, 10, 16, 22"}
+{"id": "concat-4-23", "set": "concat", "lines": 30, "gold": [1, 7, 12, 21], "pred": [1, 7, 13, 21], "wall": 3.31, "prompt_tokens": 1136, "output": "1, 7, 13, 21"}
+{"id": "concat-4-24", "set": "concat", "lines": 23, "gold": [1, 5, 11, 16], "pred": [1, 5, 11, 16], "wall": 2.94, "prompt_tokens": 880, "output": "1, 5, 11, 16"}
+{"id": "natural-multi-00", "set": "natural", "lines": 12, "gold": [1, 5], "pred": [1, 5], "wall": 2.65, "prompt_tokens": 653, "output": "1, 5"}
+{"id": "natural-multi-01", "set": "natural", "lines": 20, "gold": [1, 5, 9], "pred": [1, 5, 9], "wall": 2.66, "prompt_tokens": 899, "output": "1, 5, 9"}
+{"id": "natural-multi-02", "set": "natural", "lines": 10, "gold": [1, 7], "pred": [1, 7], "wall": 2.56, "prompt_tokens": 600, "output": "1, 7"}
+{"id": "natural-multi-03", "set": "natural", "lines": 20, "gold": [1, 5, 9], "pred": [1, 5, 9], "wall": 2.64, "prompt_tokens": 898, "output": "1, 5, 9"}
+{"id": "natural-multi-04", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7, 11], "wall": 2.99, "prompt_tokens": 737, "output": "1, 7, 11"}
+{"id": "natural-multi-05", "set": "natural", "lines": 14, "gold": [1, 9], "pred": [1, 9], "wall": 2.84, "prompt_tokens": 728, "output": "1, 9"}
+{"id": "natural-multi-06", "set": "natural", "lines": 14, "gold": [1, 11], "pred": [1, 11], "wall": 2.82, "prompt_tokens": 667, "output": "1, 11"}
+{"id": "natural-multi-07", "set": "natural", "lines": 14, "gold": [1, 9], "pred": [1, 9], "wall": 2.66, "prompt_tokens": 704, "output": "1, 9"}
+{"id": "natural-multi-08", "set": "natural", "lines": 20, "gold": [1, 13], "pred": [1, 13], "wall": 2.92, "prompt_tokens": 881, "output": "1, 13"}
+{"id": "natural-multi-09", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7, 11], "wall": 2.98, "prompt_tokens": 820, "output": "1, 7, 11"}
+{"id": "natural-multi-10", "set": "natural", "lines": 11, "gold": [1, 7], "pred": [1, 7], "wall": 2.85, "prompt_tokens": 649, "output": "1, 7"}
+{"id": "natural-multi-11", "set": "natural", "lines": 7, "gold": [1, 5], "pred": [1, 5], "wall": 3.05, "prompt_tokens": 564, "output": "1, 5"}
+{"id": "natural-multi-12", "set": "natural", "lines": 17, "gold": [1, 5, 11], "pred": [1, 5, 11, 15], "wall": 3.23, "prompt_tokens": 808, "output": "1, 5, 11, 15"}
+{"id": "natural-multi-13", "set": "natural", "lines": 28, "gold": [1, 9, 15], "pred": [1, 9, 15], "wall": 3.56, "prompt_tokens": 1071, "output": "1, 9, 15"}
+{"id": "natural-multi-14", "set": "natural", "lines": 20, "gold": [1, 11], "pred": [1, 11], "wall": 3.42, "prompt_tokens": 864, "output": "1, 11"}
+{"id": "natural-multi-15", "set": "natural", "lines": 14, "gold": [1, 7, 11], "pred": [1, 11], "wall": 3.54, "prompt_tokens": 750, "output": "1, 11"}
+{"id": "natural-multi-16", "set": "natural", "lines": 13, "gold": [1, 9], "pred": [1, 9], "wall": 3.63, "prompt_tokens": 734, "output": "1, 9"}
+{"id": "natural-multi-17", "set": "natural", "lines": 12, "gold": [1, 7, 11], "pred": [1, 7, 11], "wall": 3.62, "prompt_tokens": 690, "output": "1, 7, 11"}
+{"id": "natural-multi-18", "set": "natural", "lines": 11, "gold": [1, 7], "pred": [1, 7], "wall": 3.42, "prompt_tokens": 696, "output": "1, 7"}
+{"id": "natural-multi-19", "set": "natural", "lines": 16, "gold": [1, 11], "pred": [1, 11], "wall": 3.63, "prompt_tokens": 737, "output": "1, 11"}
+{"id": "natural-multi-20", "set": "natural", "lines": 15, "gold": [1, 3, 5, 11], "pred": [1, 5, 11], "wall": 3.85, "prompt_tokens": 754, "output": "1, 5, 11"}
+{"id": "natural-multi-21", "set": "natural", "lines": 11, "gold": [1, 3, 7], "pred": [1, 7, 9], "wall": 3.71, "prompt_tokens": 694, "output": "1, 7, 9"}
+{"id": "natural-multi-22", "set": "natural", "lines": 13, "gold": [1, 7], "pred": [1, 7], "wall": 3.77, "prompt_tokens": 704, "output": "1, 7"}
+{"id": "natural-multi-23", "set": "natural", "lines": 19, "gold": [1, 9], "pred": [1, 9, 13], "wall": 4.25, "prompt_tokens": 837, "output": "1, 9, 13"}
+{"id": "natural-multi-24", "set": "natural", "lines": 18, "gold": [1, 5], "pred": [1, 5, 9], "wall": 3.93, "prompt_tokens": 854, "output": "1, 5, 9"}
+{"id": "natural-multi-25", "set": "natural", "lines": 20, "gold": [1, 7, 15], "pred": [1, 7, 15], "wall": 4.08, "prompt_tokens": 915, "output": "1, 7, 15"}
+{"id": "natural-multi-26", "set": "natural", "lines": 17, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.52, "prompt_tokens": 820, "output": "1, 7, 13"}
+{"id": "natural-multi-27", "set": "natural", "lines": 10, "gold": [1, 5], "pred": [1], "wall": 2.94, "prompt_tokens": 583, "output": "1"}
+{"id": "natural-multi-28", "set": "natural", "lines": 20, "gold": [1, 7, 9], "pred": [1, 7, 9], "wall": 3.4, "prompt_tokens": 1033, "output": "1, 7, 9"}
+{"id": "natural-multi-29", "set": "natural", "lines": 16, "gold": [1, 7], "pred": [1, 7], "wall": 3.41, "prompt_tokens": 757, "output": "1, 7"}
+{"id": "natural-multi-30", "set": "natural", "lines": 20, "gold": [1, 9, 13], "pred": [1, 9, 13], "wall": 3.49, "prompt_tokens": 857, "output": "1, 9, 13"}
+{"id": "natural-multi-31", "set": "natural", "lines": 15, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.39, "prompt_tokens": 781, "output": "1, 7, 13"}
+{"id": "natural-multi-32", "set": "natural", "lines": 20, "gold": [1, 9, 13], "pred": [1, 9, 13], "wall": 3.8, "prompt_tokens": 1023, "output": "1, 9, 13"}
+{"id": "natural-multi-33", "set": "natural", "lines": 12, "gold": [1, 9], "pred": [1, 9], "wall": 3.87, "prompt_tokens": 621, "output": "1, 9"}
+{"id": "natural-multi-34", "set": "natural", "lines": 14, "gold": [1, 9], "pred": [1, 9], "wall": 3.48, "prompt_tokens": 708, "output": "1, 9"}
+{"id": "natural-multi-35", "set": "natural", "lines": 18, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.53, "prompt_tokens": 820, "output": "1, 7, 13"}
+{"id": "natural-multi-36", "set": "natural", "lines": 18, "gold": [1, 5, 13], "pred": [1, 13], "wall": 2.87, "prompt_tokens": 856, "output": "1, 13"}
+{"id": "natural-multi-37", "set": "natural", "lines": 21, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.19, "prompt_tokens": 1000, "output": "1, 7, 13"}
+{"id": "natural-multi-38", "set": "natural", "lines": 19, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.32, "prompt_tokens": 835, "output": "1, 7, 13"}
+{"id": "natural-multi-39", "set": "natural", "lines": 19, "gold": [1, 9, 15], "pred": [1, 9, 15], "wall": 3.36, "prompt_tokens": 897, "output": "1, 9, 15"}
+{"id": "natural-multi-40", "set": "natural", "lines": 10, "gold": [1, 3], "pred": [1, 7], "wall": 3.0, "prompt_tokens": 645, "output": "1, 7"}
+{"id": "natural-multi-41", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7], "wall": 2.9, "prompt_tokens": 682, "output": "1, 7"}
+{"id": "natural-multi-42", "set": "natural", "lines": 18, "gold": [1, 9], "pred": [1, 9], "wall": 2.96, "prompt_tokens": 775, "output": "1, 9"}
+{"id": "natural-multi-43", "set": "natural", "lines": 17, "gold": [1, 7], "pred": [1, 7, 11], "wall": 3.1, "prompt_tokens": 735, "output": "1, 7, 11"}
+{"id": "natural-multi-44", "set": "natural", "lines": 20, "gold": [1, 7, 15], "pred": [1, 7, 15], "wall": 3.03, "prompt_tokens": 895, "output": "1, 7, 15"}
+{"id": "natural-multi-45", "set": "natural", "lines": 16, "gold": [1, 9, 11], "pred": [1, 9, 11], "wall": 3.02, "prompt_tokens": 810, "output": "1, 9, 11"}
+{"id": "natural-multi-46", "set": "natural", "lines": 11, "gold": [1, 9], "pred": [1, 9], "wall": 2.98, "prompt_tokens": 683, "output": "1, 9"}
+{"id": "natural-multi-47", "set": "natural", "lines": 16, "gold": [1, 11, 13], "pred": [1, 11, 13], "wall": 3.03, "prompt_tokens": 864, "output": "1, 11, 13"}
+{"id": "natural-multi-48", "set": "natural", "lines": 20, "gold": [1, 11, 17], "pred": [1, 11, 17], "wall": 3.09, "prompt_tokens": 915, "output": "1, 11, 17"}
+{"id": "natural-multi-49", "set": "natural", "lines": 10, "gold": [1, 5], "pred": [1, 5], "wall": 2.58, "prompt_tokens": 599, "output": "1, 5"}
+{"id": "natural-multi-50", "set": "natural", "lines": 16, "gold": [1, 7], "pred": [1, 7], "wall": 2.64, "prompt_tokens": 787, "output": "1, 7"}
+{"id": "natural-multi-51", "set": "natural", "lines": 12, "gold": [1, 9], "pred": [1, 9], "wall": 2.59, "prompt_tokens": 636, "output": "1, 9"}
+{"id": "natural-multi-52", "set": "natural", "lines": 8, "gold": [1, 3], "pred": [1], "wall": 2.44, "prompt_tokens": 585, "output": "1"}
+{"id": "natural-multi-53", "set": "natural", "lines": 16, "gold": [1, 7, 11], "pred": [1, 7, 11, 13], "wall": 2.89, "prompt_tokens": 850, "output": "1, 7, 11, 13"}
+{"id": "natural-multi-54", "set": "natural", "lines": 20, "gold": [1, 5, 9], "pred": [1, 5, 9], "wall": 2.74, "prompt_tokens": 1003, "output": "1, 5, 9"}
+{"id": "natural-multi-55", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7, 10], "wall": 2.76, "prompt_tokens": 725, "output": "1, 7, 10"}
+{"id": "natural-multi-56", "set": "natural", "lines": 26, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 2.83, "prompt_tokens": 963, "output": "1, 7, 13"}
+{"id": "natural-multi-57", "set": "natural", "lines": 16, "gold": [1, 9, 15], "pred": [1, 9, 15], "wall": 2.92, "prompt_tokens": 805, "output": "1, 9, 15"}
+{"id": "natural-multi-58", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7, 11], "wall": 2.83, "prompt_tokens": 788, "output": "1, 7, 11"}
+{"id": "natural-multi-59", "set": "natural", "lines": 18, "gold": [1, 11, 13], "pred": [1, 11, 13], "wall": 3.06, "prompt_tokens": 842, "output": "1, 11, 13"}
+{"id": "natural-multi-60", "set": "natural", "lines": 28, "gold": [1, 13, 21], "pred": [1, 13, 21], "wall": 3.32, "prompt_tokens": 1118, "output": "1, 13, 21"}
+{"id": "natural-multi-61", "set": "natural", "lines": 15, "gold": [1, 7, 13], "pred": [1, 7, 13], "wall": 3.13, "prompt_tokens": 769, "output": "1, 7, 13"}
+{"id": "natural-multi-62", "set": "natural", "lines": 14, "gold": [1, 5, 9], "pred": [1, 5, 9], "wall": 2.77, "prompt_tokens": 785, "output": "1, 5, 9"}
+{"id": "natural-multi-63", "set": "natural", "lines": 14, "gold": [1, 5], "pred": [1, 5], "wall": 3.08, "prompt_tokens": 790, "output": "1, 5"}
+{"id": "natural-multi-64", "set": "natural", "lines": 11, "gold": [1, 7], "pred": [1, 7], "wall": 2.77, "prompt_tokens": 583, "output": "1, 7"}
+{"id": "natural-multi-65", "set": "natural", "lines": 22, "gold": [1, 5, 9], "pred": [1, 5, 9], "wall": 3.12, "prompt_tokens": 885, "output": "1, 5, 9"}
+{"id": "natural-multi-66", "set": "natural", "lines": 12, "gold": [1, 7], "pred": [1, 7], "wall": 2.84, "prompt_tokens": 679, "output": "1, 7"}
+{"id": "natural-multi-67", "set": "natural", "lines": 20, "gold": [1, 5, 11], "pred": [1, 11], "wall": 3.09, "prompt_tokens": 775, "output": "1, 11"}
+{"id": "natural-multi-68", "set": "natural", "lines": 20, "gold": [1, 11], "pred": [1, 11], "wall": 2.83, "prompt_tokens": 933, "output": "1, 11"}
+{"id": "natural-multi-69", "set": "natural", "lines": 15, "gold": [1, 5], "pred": [1, 5], "wall": 2.85, "prompt_tokens": 705, "output": "1, 5"}
+{"id": "natural-multi-70", "set": "natural", "lines": 20, "gold": [1, 13], "pred": [1, 13], "wall": 2.95, "prompt_tokens": 954, "output": "1, 13"}
+{"id": "natural-multi-71", "set": "natural", "lines": 18, "gold": [1, 11], "pred": [1, 11], "wall": 2.93, "prompt_tokens": 808, "output": "1, 11"}
+{"id": "natural-multi-72", "set": "natural", "lines": 12, "gold": [1, 9], "pred": [1, 9], "wall": 2.7, "prompt_tokens": 666, "output": "1, 9"}
+{"id": "natural-multi-73", "set": "natural", "lines": 12, "gold": [1, 3], "pred": [1], "wall": 2.77, "prompt_tokens": 679, "output": "1"}
+{"id": "natural-multi-74", "set": "natural", "lines": 24, "gold": [1, 15, 19], "pred": [1, 13, 19], "wall": 2.76, "prompt_tokens": 877, "output": "1, 13, 19"}
+{"id": "natural-multi-75", "set": "natural", "lines": 22, "gold": [1, 11, 15], "pred": [1, 11, 15], "wall": 3.54, "prompt_tokens": 1035, "output": "1, 11, 15"}
+{"id": "natural-multi-76", "set": "natural", "lines": 24, "gold": [1, 7, 17], "pred": [1, 7, 17], "wall": 3.55, "prompt_tokens": 1058, "output": "1, 7, 17"}
+{"id": "natural-multi-77", "set": "natural", "lines": 14, "gold": [1, 9], "pred": [1, 9], "wall": 2.72, "prompt_tokens": 770, "output": "1, 9"}
+{"id": "natural-multi-78", "set": "natural", "lines": 14, "gold": [1, 7], "pred": [1, 7, 11], "wall": 3.47, "prompt_tokens": 699, "output": "1, 7, 11"}
+{"id": "natural-multi-79", "set": "natural", "lines": 24, "gold": [1, 9, 15], "pred": [1, 9, 15], "wall": 3.64, "prompt_tokens": 1047, "output": "1, 9, 15"}
+{"id": "natural-multi-80", "set": "natural", "lines": 14, "gold": [1, 9], "pred": [1, 9], "wall": 3.82, "prompt_tokens": 745, "output": "1, 9"}
+{"id": "natural-multi-81", "set": "natural", "lines": 13, "gold": [1, 5, 11], "pred": [1, 5, 11], "wall": 3.73, "prompt_tokens": 735, "output": "1, 5, 11"}
+{"id": "natural-multi-82", "set": "natural", "lines": 18, "gold": [1, 7, 11], "pred": [1, 7, 11], "wall": 4.72, "prompt_tokens": 830, "output": "1, 7, 11"}
+{"id": "natural-multi-83", "set": "natural", "lines": 15, "gold": [1, 9], "pred": [1, 9, 11], "wall": 4.41, "prompt_tokens": 829, "output": "1, 9, 11"}
+{"id": "natural-multi-84", "set": "natural", "lines": 14, "gold": [1, 5, 11], "pred": [1, 11], "wall": 3.76, "prompt_tokens": 699, "output": "1, 11"}
+{"id": "natural-multi-85", "set": "natural", "lines": 19, "gold": [1, 13], "pred": [1, 13], "wall": 4.33, "prompt_tokens": 919, "output": "1, 13"}
+{"id": "natural-multi-86", "set": "natural", "lines": 13, "gold": [1, 5, 11], "pred": [1, 5, 11], "wall": 4.75, "prompt_tokens": 722, "output": "1, 5, 11"}
+{"id": "natural-multi-87", "set": "natural", "lines": 16, "gold": [1, 7], "pred": [1, 7, 13], "wall": 4.86, "prompt_tokens": 763, "output": "1, 7, 13"}
+{"id": "natural-multi-88", "set": "natural", "lines": 17, "gold": [1, 5, 15], "pred": [1, 5, 15], "wall": 4.87, "prompt_tokens": 856, "output": "1, 5, 15"}
+{"id": "natural-multi-89", "set": "natural", "lines": 18, "gold": [1, 9, 13], "pred": [1, 9, 13], "wall": 5.14, "prompt_tokens": 852, "output": "1, 9, 13"}
+{"id": "natural-single-00", "set": "natural", "lines": 12, "gold": [1], "pred": [1], "wall": 3.64, "prompt_tokens": 629, "output": "1"}
+{"id": "natural-single-01", "set": "natural", "lines": 6, "gold": [1], "pred": [1], "wall": 1.9, "prompt_tokens": 468, "output": "1"}
+{"id": "natural-single-02", "set": "natural", "lines": 11, "gold": [1], "pred": [1], "wall": 4.3, "prompt_tokens": 661, "output": "1"}
+{"id": "natural-single-03", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 3.38, "prompt_tokens": 567, "output": "1"}
+{"id": "natural-single-04", "set": "natural", "lines": 8, "gold": [1], "pred": [1, 5], "wall": 3.72, "prompt_tokens": 547, "output": "1, 5"}
+{"id": "natural-single-05", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 1.89, "prompt_tokens": 502, "output": "1"}
+{"id": "natural-single-06", "set": "natural", "lines": 7, "gold": [1], "pred": [1], "wall": 1.31, "prompt_tokens": 511, "output": "1"}
+{"id": "natural-single-07", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 4.12, "prompt_tokens": 532, "output": "1"}
+{"id": "natural-single-08", "set": "natural", "lines": 9, "gold": [1], "pred": [1], "wall": 3.67, "prompt_tokens": 558, "output": "1"}
+{"id": "natural-single-09", "set": "natural", "lines": 9, "gold": [1], "pred": [1], "wall": 3.44, "prompt_tokens": 564, "output": "1"}
+{"id": "natural-single-10", "set": "natural", "lines": 14, "gold": [1], "pred": [1, 11], "wall": 3.69, "prompt_tokens": 682, "output": "1, 11"}
+{"id": "natural-single-11", "set": "natural", "lines": 16, "gold": [1], "pred": [1, 10], "wall": 3.97, "prompt_tokens": 724, "output": "1, 10"}
+{"id": "natural-single-12", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 2.11, "prompt_tokens": 504, "output": "1"}
+{"id": "natural-single-13", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 4.19, "prompt_tokens": 693, "output": "1"}
+{"id": "natural-single-14", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 3.84, "prompt_tokens": 518, "output": "1"}
+{"id": "natural-single-15", "set": "natural", "lines": 6, "gold": [1], "pred": [1], "wall": 1.9, "prompt_tokens": 497, "output": "1"}
+{"id": "natural-single-16", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 4.15, "prompt_tokens": 571, "output": "1"}
+{"id": "natural-single-17", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 4.32, "prompt_tokens": 585, "output": "1"}
+{"id": "natural-single-18", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 3.7, "prompt_tokens": 533, "output": "1"}
+{"id": "natural-single-19", "set": "natural", "lines": 10, "gold": [1], "pred": [1, 5], "wall": 3.46, "prompt_tokens": 623, "output": "1, 5"}
+{"id": "natural-single-20", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 2.94, "prompt_tokens": 565, "output": "1"}
+{"id": "natural-single-21", "set": "natural", "lines": 6, "gold": [1], "pred": [1], "wall": 1.3, "prompt_tokens": 487, "output": "1"}
+{"id": "natural-single-22", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 2.86, "prompt_tokens": 545, "output": "1"}
+{"id": "natural-single-23", "set": "natural", "lines": 11, "gold": [1], "pred": [1], "wall": 3.15, "prompt_tokens": 602, "output": "1"}
+{"id": "natural-single-24", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 2.65, "prompt_tokens": 556, "output": "1"}
+{"id": "natural-single-25", "set": "natural", "lines": 12, "gold": [1], "pred": [1], "wall": 2.63, "prompt_tokens": 618, "output": "1"}
+{"id": "natural-single-26", "set": "natural", "lines": 10, "gold": [1], "pred": [1], "wall": 2.79, "prompt_tokens": 559, "output": "1"}
+{"id": "natural-single-27", "set": "natural", "lines": 9, "gold": [1], "pred": [1], "wall": 2.56, "prompt_tokens": 557, "output": "1"}
+{"id": "natural-single-28", "set": "natural", "lines": 8, "gold": [1], "pred": [1], "wall": 1.11, "prompt_tokens": 501, "output": "1"}
+{"id": "natural-single-29", "set": "natural", "lines": 5, "gold": [1], "pred": [1], "wall": 1.08, "prompt_tokens": 508, "output": "1"}
