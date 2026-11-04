@@ -1,0 +1,1117 @@
+{
+  "area": "self-enrollment",
+  "description": "自分の声を聞き取り、複数の発話の特徴量の平均を自分として記録する SelfEnrollment。短い発話は使わず、長さが minSampleMillis の半分以上なら読み直しを知らせる。必要な数が揃うか、使える発話のないまま maxListeningMillis 聞いたら読み取りを止める。例外では何も記録しない。キャンセルは Kotlin のテストに残す",
+  "inputSchema": "captureConfig: capture-pipeline と同じ。enrollmentConfig: {requiredSamples, minSampleMillis, maxListeningMillis}(書かない項目は既定値 3、3000、45000)。clockMillis: Fake の時計。audio: capture-pipeline と同じ形か、{endless: {frameMillis}}(frameMillis の無音のフレームを止められるまで流し続ける)。vad: capture-pipeline と同じ。embedder: speaker-identifier と同じ(省略するといつも [1, 0, 0])。setup: speaker-identifier の操作を登録の前に流す",
+  "expectedSchema": "outcome: \"ENROLLED\"、\"NOT_ENOUGH_SPEECH\"、例外なら null。failure: 例外の種類(\"embed-failed\")か null。progress: 知らせた順に [{acceptedSamples, isRejected}]。framesRead: 音声から読んだフレームの数(読み取りを止めたフレームを含む)。speakers、embeddings、embedderCalls: speaker-identifier の snapshot と同じ",
+  "cases": [
+    {
+      "name": "複数の発話の平均を自分として記録する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "embedder": {
+          "responses": [
+            [
+              3,
+              0
+            ],
+            [
+              0,
+              4
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 130,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 2,
+              "values": {
+                "0": 0.70710677,
+                "1": 0.70710677
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話が揃ったらそこで読み取りを止める",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ],
+          [
+            1400,
+            1900
+          ],
+          [
+            2100,
+            2600
+          ],
+          [
+            2800,
+            3300
+          ],
+          [
+            3500,
+            4000
+          ],
+          [
+            4200,
+            4700
+          ],
+          [
+            4900,
+            5400
+          ],
+          [
+            5600,
+            6100
+          ],
+          [
+            6300,
+            6800
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 130,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 3,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "音声はすべて解放し、使えた発話を 1 つずつ知らせる",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 130,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 3,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話が足りなければ何も記録しない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "NOT_ENOUGH_SPEECH",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 70,
+        "speakers": [],
+        "embeddings": [],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話が足りなければ前の登録を残す",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ]
+        ],
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              0,
+              1
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "NOT_ENOUGH_SPEECH",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 70,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 2,
+              "values": {
+                "1": 1.0
+              }
+            },
+            "sampleCount": 3,
+            "voicedMillis": 0,
+            "updatedAtMillis": 0
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "短すぎる発話は読み直しを知らせ、ごく短い音は知らせない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 100
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 300
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            100
+          ],
+          [
+            300,
+            600
+          ],
+          [
+            800,
+            1300
+          ],
+          [
+            1500,
+            2000
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 0,
+            "isRejected": true
+          },
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 210,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 3,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 800,
+            "endedAtMillis": 1300,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 1500,
+            "endedAtMillis": 2000,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "短い発話は登録に使わない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 300
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            300
+          ],
+          [
+            500,
+            800
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "NOT_ENOUGH_SPEECH",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 0,
+            "isRejected": true
+          },
+          {
+            "acceptedSamples": 0,
+            "isRejected": true
+          }
+        ],
+        "framesRead": 100,
+        "speakers": [],
+        "embeddings": [],
+        "embedderCalls": []
+      }
+    },
+    {
+      "name": "特徴量を作れなかった発話は数えない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ],
+          [
+            1400,
+            1900
+          ]
+        ],
+        "embedder": {
+          "responses": [
+            null,
+            [
+              0,
+              0
+            ],
+            [
+              1,
+              0
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "outcome": "NOT_ENOUGH_SPEECH",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 0,
+            "isRejected": true
+          },
+          {
+            "acceptedSamples": 0,
+            "isRejected": true
+          },
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 210,
+        "speakers": [],
+        "embeddings": [],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 1400,
+            "endedAtMillis": 1900,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "時間の上限で諦める",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "endless": {
+            "frameMillis": 100
+          }
+        },
+        "vad": []
+      },
+      "expected": {
+        "outcome": "NOT_ENOUGH_SPEECH",
+        "failure": null,
+        "progress": [],
+        "framesRead": 50,
+        "speakers": [],
+        "embeddings": [],
+        "embedderCalls": []
+      }
+    },
+    {
+      "name": "途中で切れた音声の最後の発話も使う",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ]
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 120,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 3,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "特徴量の失敗は例外にして、音声を解放し、何も記録しない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "embedder": {
+          "responses": [
+            "fail"
+          ],
+          "cycle": true
+        }
+      },
+      "expected": {
+        "outcome": null,
+        "failure": "embed-failed",
+        "progress": [],
+        "framesRead": 60,
+        "speakers": [],
+        "embeddings": [],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "登録し直すと前の登録を置き換える",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "enrollmentConfig": {
+          "requiredSamples": 2,
+          "minSampleMillis": 400,
+          "maxListeningMillis": 5000
+        },
+        "clockMillis": 9000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "embedder": {
+          "responses": [
+            [
+              1,
+              0
+            ]
+          ],
+          "cycle": true
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              0,
+              1
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ]
+      },
+      "expected": {
+        "outcome": "ENROLLED",
+        "failure": null,
+        "progress": [
+          {
+            "acceptedSamples": 1,
+            "isRejected": false
+          },
+          {
+            "acceptedSamples": 2,
+            "isRejected": false
+          }
+        ],
+        "framesRead": 130,
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 2,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 0,
+            "updatedAtMillis": 9000
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    }
+  ]
+}

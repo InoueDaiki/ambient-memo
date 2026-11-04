@@ -43,3 +43,7 @@ local.properties
 # 署名鍵
 *.jks
 *.keystore
+
+# Swift Package
+engine/ios/.build/
+engine/ios/.swiftpm/

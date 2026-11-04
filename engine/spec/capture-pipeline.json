@@ -1,0 +1,1374 @@
+{
+  "area": "capture-pipeline",
+  "description": "音声から発話を切り出し、文字起こしを保存する CapturePipeline。失敗した発話は欠落にして次へ進み、保存しないと判定した発話は欠落にしない。音声のバッファはどの経路でも解放する。追いつかないときの捨て方、キャンセル、内側のタイムアウト、処理中の読み取りは、処理の進み方に依るので Kotlin のテストに残す",
+  "inputSchema": "captureConfig: {maxUtteranceMillis, minSilenceMillis, preRollMillis, minSpeechMillis, maxBacklogMillis, discontinuityToleranceMillis}(書かない項目は既定値)。clockMillis: Fake の時計の時刻。進まない。audio: 16 kHz、モノラルの合成音。pieces を順につなぐ。{tone: ミリ秒} は標本 i が trunc(sin(2π·440·i/16000)·8000) の音、{silence: ミリ秒} は 0。160 標本(10 ms)ずつのフレームで流し、最後のフレームは残りの標本だけ。フレームの開始時刻は startMillis(省略すると 0)+ 位置の標本数 × 1000 / 16000 に、fromSample ≤ 位置 の jumps の offsetMillis の和を足したもの。failAtEnd が true なら、最後のフレームの後に読み取りの例外を投げる。vad: 発話の時間帯 [開始, 終わり) の配列。フレームの開始 + 標本数 × 1000 / 16000 / 2(整数の割り算)がどれかの時間帯に入れば発話。transcriber.responses: 文字起こしの n 回目の応答(0 から)。{text, confidence, tokens} か {fail: true}(例外を投げる)。ない回や項目は、text が「発話{n+1}」、confidence が null。tokens は [文字, 区間の先頭からのミリ秒] の配列か \"none\"(時刻なし)。省略すると本文の i 文字目を i × 区間の長さ / 文字数 に置く。filter: 保存するかの判定。{type: \"all\"}(省略時、すべて保存)、{type: \"none\"}、{type: \"rejectTexts\", texts}、{type: \"onlyTexts\", texts}、{type: \"noise\", longDurationMillis}(noise-text-filter と同じ)。speakers: 話者を判定するときだけ書く。speaker-identifier と同じ speakerConfig、embedder、setup を持ち、setup を流してから聞き取りを始める。failures: {utteranceInsertAll: [失敗させる insertAll の回の番号], gapInsert: true なら欠落の保存がいつも失敗する}。runs: 同じパイプラインを続けて動かす回数(省略すると 1)。include: 結果に入れる項目の名前",
+  "expectedSchema": "failure: run が投げた例外の種類か null。\"source-failed\"(読み取りの失敗)、\"gap-insert-failed\"(欠落の保存の失敗)。ほかに include に書いた項目だけを入れる。utterances: 保存した発話を開始時刻、id の順に [{id, startedAtMillis, endedAtMillis, text, confidence, createdAtMillis, speakerId, speakerConfidence}]。id は 1 から。gaps: 保存した欠落を開始時刻の順に [{startedAtMillis, endedAtMillis, reason}]。transcriberCalls: 文字起こしに渡った区間を渡った順に [{startedAtMillis, endedAtMillis, sampleCount, released(最後に解放済みか), hadSound(渡ったときに 0 でない標本があったか)}]。allTranscriberReleased: 文字起こしに渡った区間がすべて解放済みなら true。処理の進み方で渡る数が変わるケースに使う。embedderCalls: 特徴量に渡った区間を [{startedAtMillis, endedAtMillis, sampleCount, released}]。vadResets: VAD の reset の回数。segments: 区間ごとの処理の記録 [{segmentMillis, waitMillis(時計 − 区間の終わり), textLength(本文の UTF-16 の長さ), turns(保存した行の数), outcome: \"SAVED\"|\"BLANK\"|\"FILTERED\"|\"FAILED\"}]。処理の時間は比べない。speakers、embeddings、adaptation、diagnostics: speaker-identifier の snapshot と同じ",
+  "cases": [
+    {
+      "name": "処理した発話ごとに結果を記録し、本文は渡さない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ],
+          [
+            1400,
+            1900
+          ],
+          [
+            2100,
+            2600
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "保存する"
+            },
+            {
+              "text": "雑音"
+            },
+            {
+              "text": " "
+            },
+            {
+              "fail": true
+            }
+          ]
+        },
+        "filter": {
+          "type": "rejectTexts",
+          "texts": [
+            "雑音"
+          ]
+        },
+        "include": [
+          "segments",
+          "utterances"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "text": "保存する",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "segments": [
+          {
+            "segmentMillis": 500,
+            "waitMillis": 49500,
+            "textLength": 4,
+            "turns": 1,
+            "outcome": "SAVED"
+          },
+          {
+            "segmentMillis": 500,
+            "waitMillis": 48800,
+            "textLength": 2,
+            "turns": 0,
+            "outcome": "FILTERED"
+          },
+          {
+            "segmentMillis": 500,
+            "waitMillis": 48100,
+            "textLength": 1,
+            "turns": 0,
+            "outcome": "BLANK"
+          },
+          {
+            "segmentMillis": 500,
+            "waitMillis": 47400,
+            "textLength": 0,
+            "turns": 0,
+            "outcome": "FAILED"
+          }
+        ]
+      }
+    },
+    {
+      "name": "保存しないと判定した発話は欠落にせず、バッファを解放する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "filter": {
+          "type": "onlyTexts",
+          "texts": [
+            "発話2"
+          ]
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "話者を判定して発話と一緒に保存し、バッファを解放する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ]
+        ],
+        "speakers": {
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ]
+        },
+        "include": [
+          "utterances",
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 1.0
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "特徴量の失敗では文字起こしを失わず、話者を不明にして次へ進む",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "speakers": {
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              "fail",
+              [
+                1,
+                0,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 1.0
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true
+          }
+        ],
+        "gaps": []
+      }
+    },
+    {
+      "name": "保存しない発話の特徴量は作らない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ]
+        ],
+        "speakers": {
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ]
+        },
+        "filter": {
+          "type": "none"
+        },
+        "include": [
+          "utterances",
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [],
+        "embedderCalls": []
+      }
+    },
+    {
+      "name": "文字起こしには音声が渡る",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            300
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "本文",
+              "confidence": 0.5
+            }
+          ]
+        },
+        "include": [
+          "utterances",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "本文",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "sampleCount": 4800,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "保存の時刻は時計から取る",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            300
+          ]
+        ],
+        "include": [
+          "utterances"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "長い発話は分割して順番に保存する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 2500
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            2500
+          ]
+        ],
+        "include": [
+          "utterances"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 1000,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 1000,
+            "endedAtMillis": 2000,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 2000,
+            "endedAtMillis": 2500,
+            "text": "発話3",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "音声の途中で終わっても開いている発話を保存する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            1000
+          ]
+        ],
+        "include": [
+          "utterances",
+          "gaps"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": []
+      }
+    },
+    {
+      "name": "空の文字起こしは保存せず、欠落にもしない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            300
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "  "
+            }
+          ]
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "transcriberCalls",
+          "segments"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [],
+        "gaps": [],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "sampleCount": 4800,
+            "released": true,
+            "hadSound": true
+          }
+        ],
+        "segments": [
+          {
+            "segmentMillis": 300,
+            "waitMillis": 49700,
+            "textLength": 2,
+            "turns": 0,
+            "outcome": "BLANK"
+          }
+        ]
+      }
+    },
+    {
+      "name": "文字起こしに失敗しても欠落を記録して次の発話へ進み、バッファを解放する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "fail": true
+            },
+            {
+              "text": "次の発話"
+            }
+          ]
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "text": "次の発話",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "reason": "PROCESSING_FAILED"
+          }
+        ],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "保存に失敗しても欠落を記録して続ける",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "failures": {
+          "utteranceInsertAll": [
+            0
+          ]
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "reason": "PROCESSING_FAILED"
+          }
+        ],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 500,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          },
+          {
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "sampleCount": 8000,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "欠落も保存できなければ例外で止まり、バッファは解放する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ],
+          [
+            1400,
+            1900
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "fail": true
+            },
+            {
+              "fail": true
+            },
+            {
+              "fail": true
+            }
+          ]
+        },
+        "failures": {
+          "gapInsert": true
+        },
+        "include": [
+          "utterances",
+          "allTranscriberReleased"
+        ]
+      },
+      "expected": {
+        "failure": "gap-insert-failed",
+        "utterances": [],
+        "allTranscriberReleased": true
+      }
+    },
+    {
+      "name": "読み取りに失敗すると溜まった発話を処理してから例外を投げる",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ],
+          "failAtEnd": true
+        },
+        "vad": [
+          [
+            0,
+            1000
+          ]
+        ],
+        "include": [
+          "utterances",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": "source-failed",
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "sampleCount": 4800,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "フレームの時刻が飛ぶと発話を区切って欠落を記録する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 400
+            }
+          ],
+          "jumps": [
+            {
+              "fromSample": 3200,
+              "offsetMillis": 5000
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            10000
+          ]
+        ],
+        "include": [
+          "utterances",
+          "gaps",
+          "vadResets"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 200,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 5200,
+            "endedAtMillis": 5400,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [
+          {
+            "startedAtMillis": 200,
+            "endedAtMillis": 5200,
+            "reason": "SOURCE_DISCONTINUITY"
+          }
+        ],
+        "vadResets": 2
+      }
+    },
+    {
+      "name": "時刻が戻ったときは発話を区切るが欠落にはしない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 400
+            }
+          ],
+          "startMillis": 10000,
+          "jumps": [
+            {
+              "fromSample": 3200,
+              "offsetMillis": -5000
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            20000
+          ]
+        ],
+        "include": [
+          "utterances",
+          "gaps",
+          "vadResets"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 2,
+            "startedAtMillis": 5200,
+            "endedAtMillis": 5400,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 1,
+            "startedAtMillis": 10000,
+            "endedAtMillis": 10200,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [],
+        "vadResets": 2
+      }
+    },
+    {
+      "name": "小さな時刻のずれでは発話を区切らない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 400
+            }
+          ],
+          "jumps": [
+            {
+              "fromSample": 3200,
+              "offsetMillis": 50
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            10000
+          ]
+        ],
+        "include": [
+          "utterances",
+          "gaps",
+          "vadResets"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 400,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [],
+        "vadResets": 1
+      }
+    },
+    {
+      "name": "同じパイプラインをもう一度動かせる",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 300
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            300
+          ]
+        ],
+        "runs": 2,
+        "include": [
+          "utterances",
+          "vadResets"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "発話1",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 0,
+            "endedAtMillis": 300,
+            "text": "発話2",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "vadResets": 2
+      }
+    },
+    {
+      "name": "雑音の文字の判定をつなげられる",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0,
+          "maxBacklogMillis": 2000
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            },
+            {
+              "tone": 500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            500
+          ],
+          [
+            700,
+            1200
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "え"
+            },
+            {
+              "text": "そうだね"
+            }
+          ]
+        },
+        "filter": {
+          "type": "noise"
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "segments"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 700,
+            "endedAtMillis": 1200,
+            "text": "そうだね",
+            "confidence": null,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "gaps": [],
+        "segments": [
+          {
+            "segmentMillis": 500,
+            "waitMillis": 49500,
+            "textLength": 1,
+            "turns": 0,
+            "outcome": "FILTERED"
+          },
+          {
+            "segmentMillis": 500,
+            "waitMillis": 48800,
+            "textLength": 4,
+            "turns": 1,
+            "outcome": "SAVED"
+          }
+        ]
+      }
+    }
+  ]
+}

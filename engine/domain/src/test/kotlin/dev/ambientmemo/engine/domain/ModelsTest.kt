@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 
+/** バッファの解放は言語のメモリの扱いに依るので、ここに残す。値の検査は engine/spec/model-validation.json にある。 */
 class ModelsTest {
     @Test
     fun `解放すると音声を 0 で塗りつぶし、読めなくなる`() {
@@ -28,29 +29,5 @@ class ModelsTest {
         segment.close()
 
         assertTrue(segment.isReleased)
-    }
-
-    @Test
-    fun `時刻が逆転した発話と欠落は作れない`() {
-        assertThrows(IllegalArgumentException::class.java) { NewUtterance(10, 9, "本文", null, 10) }
-        assertThrows(IllegalArgumentException::class.java) {
-            CaptureGap(10, 9, CaptureGapReason.PROCESSING_FAILED)
-        }
-    }
-
-    @Test
-    fun `範囲外の信頼度は受け付けない`() {
-        assertThrows(IllegalArgumentException::class.java) { Transcription("本文", 1.5) }
-        assertThrows(IllegalArgumentException::class.java) { NewUtterance(0, 1, "本文", -0.1, 1) }
-    }
-
-    @Test
-    fun `矛盾する設定は受け付けない`() {
-        assertThrows(IllegalArgumentException::class.java) {
-            CaptureConfig(maxUtteranceMillis = 500, minSilenceMillis = 500)
-        }
-        assertThrows(IllegalArgumentException::class.java) {
-            CaptureConfig(maxUtteranceMillis = 30_000, maxBacklogMillis = 29_999)
-        }
     }
 }

@@ -1,0 +1,163 @@
+{
+  "area": "assessed-due",
+  "description": "LLM が出した ToDo の期限を確かめる assessDue。期限なしの表現は期限のない確定にし、読めない期限は日付を捨てて候補にする。日付が読めたときは、会話の日以後、日付の表の範囲内(会話の日を含めて 22 日)、文字起こしに日付の手がかりがある、まとまりが日付をまたがない、のすべてを満たすときだけ確度が高い",
+  "inputSchema": "rawDue: LLM の due の文字列か null。前後の空白を除き、大文字小文字を区別せずに \"\"、\"null\"、\"none\"、\"なし\"、\"不明\" なら期限なし。spokenOn: 会話の日、endedOn: まとまりの最後の発話の日(どちらも \"YYYY-MM-DD\")。transcript: プロンプトに渡した文字起こし。日付の手がかりは、今日、本日、きょう、明日、あした、あす、明後日、あさって、しあさって、昨日、今週、来週、再来週、週末、今月、来月、再来月、月末、今年、来年、曜、数字(半角、全角、漢数字の一〜十)のあとに空白を挟んでもよい「月」か「日」、半角か全角の数字を / か / で区切ったもの",
+  "expectedSchema": "date: 読めた日付の \"YYYY-MM-DD\"、読めないか期限なしなら null。isConfident: 確度が高ければ true",
+  "cases": [
+    {
+      "name": "表の範囲内で手がかりのある日付は確度が高い",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "表の先頭は範囲内",
+      "input": { "rawDue": "2026-11-02", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-02", "isConfident": true }
+    },
+    {
+      "name": "表の最後は範囲内",
+      "input": { "rawDue": "2026-11-23", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-23", "isConfident": true }
+    },
+    {
+      "name": "表の次の日は範囲外",
+      "input": { "rawDue": "2026-11-24", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-24", "isConfident": false }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(空)",
+      "input": { "rawDue": "", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(空白)",
+      "input": { "rawDue": " ", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(null の文字列)",
+      "input": { "rawDue": "null", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(大文字の NULL)",
+      "input": { "rawDue": "NULL", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(None)",
+      "input": { "rawDue": "None", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(なし)",
+      "input": { "rawDue": "なし", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "期限なしの表現は期限のない確定にする(不明)",
+      "input": { "rawDue": "不明", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "null は期限のない確定にする",
+      "input": { "rawDue": null, "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": true }
+    },
+    {
+      "name": "読めない期限は日付を捨てて候補にする(来週)",
+      "input": { "rawDue": "来週", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": false }
+    },
+    {
+      "name": "読めない期限は日付を捨てて候補にする(存在しない日付)",
+      "input": { "rawDue": "2026-02-30", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": false }
+    },
+    {
+      "name": "読めない期限は日付を捨てて候補にする(月日の表記)",
+      "input": { "rawDue": "11月4日", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": false }
+    },
+    {
+      "name": "読めない期限は日付を捨てて候補にする(時刻付き)",
+      "input": { "rawDue": "2026-11-04 10:00", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": null, "isConfident": false }
+    },
+    {
+      "name": "前後の空白は除いて読む",
+      "input": { "rawDue": " 2026-11-04 ", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "会話の日より前は候補にする",
+      "input": { "rawDue": "2026-11-01", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-01", "isConfident": false }
+    },
+    {
+      "name": "年をまたぐ遠い日付は候補にする",
+      "input": { "rawDue": "2027-01-15", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2027-01-15", "isConfident": false }
+    },
+    {
+      "name": "文字起こしに日付の手がかりがなければ候補にする",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "[18:02] 牛乳が切れてる" },
+      "expected": { "date": "2026-11-04", "isConfident": false }
+    },
+    {
+      "name": "日付の手がかりを見つける(明日までに)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "明日までに" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(金曜に)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "金曜に" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(半角の月日)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "11月5日" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(漢数字の月日)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "十一月五日" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(斜線の月日)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "11/5" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(来週)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "来週" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(月末まで)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "月末まで" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(三日に)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "三日に" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "日付の手がかりを見つける(全角の斜線)",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "11/5" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "数字と月の間の空白は手がかりを妨げない",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-02", "transcript": "11 月の会議" },
+      "expected": { "date": "2026-11-04", "isConfident": true }
+    },
+    {
+      "name": "まとまりが日付をまたぐと候補にする",
+      "input": { "rawDue": "2026-11-04", "spokenOn": "2026-11-02", "endedOn": "2026-11-03", "transcript": "[18:02] 歯医者の予約、あさっての十時に取れた" },
+      "expected": { "date": "2026-11-04", "isConfident": false }
+    }
+  ]
+}

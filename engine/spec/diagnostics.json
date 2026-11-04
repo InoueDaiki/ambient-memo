@@ -1,0 +1,270 @@
+{
+  "area": "diagnostics",
+  "description": "実機の確認のために残す動作の記録。端末の外へ持ち出す値なので、数値と列挙だけを持ち、本文を含めない。1 件を 1 行の JSON にする encodeDiagnostic と、記録を足す TimedLlm、RecordingCaptureGaps",
+  "inputSchema": "op で選ぶ。\"encode\": atMillis、process(\"MAIN\" か \"ORGANIZE\")、event を 1 行にする。event は type と、その出来事の項目を Kotlin の名前で持つ。type と項目: \"segment\"(segmentMillis, waitMillis, transcribeMillis, saveMillis, textLength, turns, outcome: \"SAVED\"|\"BLANK\"|\"FILTERED\"|\"FAILED\")、\"gap\"(reason: CaptureGapReason, gapMillis)、\"capture\"(isListening, isInterrupted)、\"llm_backend\"(backend: \"GPU\"|\"CPU\")、\"llm_load\"(loadMillis, isLoaded)、\"llm_generate\"(inputChars, maxOutputTokens, outputChars, generateMillis, isFailed)、\"organize\"(outcome: \"COMPLETED\"|\"STOPPED\"|\"LLM_FAILED\", memoCount, todoCount, unreadableCount, totalMillis)、\"device\"(batteryPercent, chargeMicroAmpereHours, temperatureDeciCelsius, isCharging, thermalStatus, isScreenOn, isDeviceIdle, isPowerSave, elapsedMillis, uptimeMillis, processCpuMillis, rssKilobytes, peakRssKilobytes)、\"audio_level\"(frames, skippedFrames, histogram: [[帯, 数], ...])。\"timed-llm\": system、user、maxOutputTokens の依頼を、reply を返す Fake の LLM(reply が null なら例外を投げる)に TimedLlm を挟んで 1 回生成する。\"recording-gaps\": gap({startedAtMillis, endedAtMillis, reason})をメモリの欠落の保存先に RecordingCaptureGaps を挟んで保存する",
+  "expectedSchema": "\"encode\": line に 1 行の JSON の文字列。キーの順と書式を一字一句比べる(at、process、event の後に出来事の項目。項目の名前は Kotlin の名前と違うものがある)。\"timed-llm\": output に生成の結果(例外なら null)、rethrown に Fake の例外がそのまま投げられたら true、events に記録された LlmGenerated の {inputChars(system と user の文字数の和), maxOutputTokens, outputChars(失敗なら 0), isFailed}。生成の時間は比べない。\"recording-gaps\": saved に保存先にある欠落、events に記録された {reason, gapMillis}",
+  "cases": [
+    {
+      "name": "生成の記録は長さだけを持ち、本文を含めない",
+      "input": {
+        "op": "timed-llm",
+        "system": "架空のシステム文",
+        "user": "架空の文字起こし",
+        "maxOutputTokens": 48,
+        "reply": "架空の出力"
+      },
+      "expected": {
+        "output": "架空の出力",
+        "rethrown": false,
+        "events": [
+          {
+            "inputChars": 16,
+            "maxOutputTokens": 48,
+            "outputChars": 5,
+            "isFailed": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "生成に失敗しても時間を記録して例外をそのまま投げる",
+      "input": {
+        "op": "timed-llm",
+        "system": "架空のシステム文",
+        "user": "架空の文字起こし",
+        "maxOutputTokens": 48,
+        "reply": null
+      },
+      "expected": {
+        "output": null,
+        "rethrown": true,
+        "events": [
+          {
+            "inputChars": 16,
+            "maxOutputTokens": 48,
+            "outputChars": 0,
+            "isFailed": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "1 行の JSON に本文を含めない",
+      "input": {
+        "op": "encode",
+        "atMillis": 1000,
+        "process": "ORGANIZE",
+        "event": {
+          "type": "llm_generate",
+          "inputChars": 15,
+          "maxOutputTokens": 48,
+          "outputChars": 5,
+          "generateMillis": 120,
+          "isFailed": false
+        }
+      },
+      "expected": {
+        "line": "{\"at\":1000,\"process\":\"ORGANIZE\",\"event\":\"llm_generate\",\"inputChars\":15,\"maxOutputTokens\":48,\"outputChars\":5,\"generateMs\":120,\"failed\":false}"
+      }
+    },
+    {
+      "name": "欠落を保存してから長さを記録する",
+      "input": {
+        "op": "recording-gaps",
+        "gap": {
+          "startedAtMillis": 100,
+          "endedAtMillis": 350,
+          "reason": "PROCESSING_BACKLOG"
+        }
+      },
+      "expected": {
+        "saved": [
+          {
+            "startedAtMillis": 100,
+            "endedAtMillis": 350,
+            "reason": "PROCESSING_BACKLOG"
+          }
+        ],
+        "events": [
+          {
+            "reason": "PROCESSING_BACKLOG",
+            "gapMillis": 250
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話の処理の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 5,
+        "process": "MAIN",
+        "event": {
+          "type": "segment",
+          "segmentMillis": 500,
+          "waitMillis": 10,
+          "transcribeMillis": 200,
+          "saveMillis": 3,
+          "textLength": 4,
+          "turns": 1,
+          "outcome": "SAVED"
+        }
+      },
+      "expected": {
+        "line": "{\"at\":5,\"process\":\"MAIN\",\"event\":\"segment\",\"segmentMs\":500,\"waitMs\":10,\"transcribeMs\":200,\"saveMs\":3,\"textLength\":4,\"turns\":1,\"outcome\":\"SAVED\"}"
+      }
+    },
+    {
+      "name": "欠落の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 6,
+        "process": "MAIN",
+        "event": {
+          "type": "gap",
+          "reason": "SOURCE_DISCONTINUITY",
+          "gapMillis": 5000
+        }
+      },
+      "expected": {
+        "line": "{\"at\":6,\"process\":\"MAIN\",\"event\":\"gap\",\"reason\":\"SOURCE_DISCONTINUITY\",\"gapMs\":5000}"
+      }
+    },
+    {
+      "name": "聞き取りの状態の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 7,
+        "process": "MAIN",
+        "event": {
+          "type": "capture",
+          "isListening": true,
+          "isInterrupted": false
+        }
+      },
+      "expected": {
+        "line": "{\"at\":7,\"process\":\"MAIN\",\"event\":\"capture\",\"listening\":true,\"interrupted\":false}"
+      }
+    },
+    {
+      "name": "LLM の実行先の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 8,
+        "process": "ORGANIZE",
+        "event": {
+          "type": "llm_backend",
+          "backend": "GPU"
+        }
+      },
+      "expected": {
+        "line": "{\"at\":8,\"process\":\"ORGANIZE\",\"event\":\"llm_backend\",\"backend\":\"GPU\"}"
+      }
+    },
+    {
+      "name": "LLM の読み込みの記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 9,
+        "process": "ORGANIZE",
+        "event": {
+          "type": "llm_load",
+          "loadMillis": 4200,
+          "isLoaded": false
+        }
+      },
+      "expected": {
+        "line": "{\"at\":9,\"process\":\"ORGANIZE\",\"event\":\"llm_load\",\"loadMs\":4200,\"loaded\":false}"
+      }
+    },
+    {
+      "name": "整理の結果の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 10,
+        "process": "ORGANIZE",
+        "event": {
+          "type": "organize",
+          "outcome": "STOPPED",
+          "memoCount": 2,
+          "todoCount": 3,
+          "unreadableCount": 1,
+          "totalMillis": 90000
+        }
+      },
+      "expected": {
+        "line": "{\"at\":10,\"process\":\"ORGANIZE\",\"event\":\"organize\",\"outcome\":\"STOPPED\",\"memos\":2,\"todos\":3,\"unreadable\":1,\"totalMs\":90000}"
+      }
+    },
+    {
+      "name": "端末の状態の記録の書式",
+      "input": {
+        "op": "encode",
+        "atMillis": 11,
+        "process": "MAIN",
+        "event": {
+          "type": "device",
+          "batteryPercent": 80,
+          "chargeMicroAmpereHours": -1,
+          "temperatureDeciCelsius": 312,
+          "isCharging": true,
+          "thermalStatus": 0,
+          "isScreenOn": false,
+          "isDeviceIdle": true,
+          "isPowerSave": false,
+          "elapsedMillis": 123456,
+          "uptimeMillis": 100000,
+          "processCpuMillis": 4567,
+          "rssKilobytes": 200000,
+          "peakRssKilobytes": 250000
+        }
+      },
+      "expected": {
+        "line": "{\"at\":11,\"process\":\"MAIN\",\"event\":\"device\",\"batteryPercent\":80,\"chargeMicroAh\":-1,\"temperatureDeciC\":312,\"charging\":true,\"thermalStatus\":0,\"screenOn\":false,\"deviceIdle\":true,\"powerSave\":false,\"elapsedMs\":123456,\"uptimeMs\":100000,\"processCpuMs\":4567,\"rssKb\":200000,\"peakRssKb\":250000}"
+      }
+    },
+    {
+      "name": "大きさの分布の記録は帯と数を空白で区切る",
+      "input": {
+        "op": "encode",
+        "atMillis": 12,
+        "process": "MAIN",
+        "event": {
+          "type": "audio_level",
+          "frames": 3,
+          "skippedFrames": 2,
+          "histogram": [
+            [
+              -65,
+              2
+            ],
+            [
+              -35,
+              1
+            ]
+          ]
+        }
+      },
+      "expected": {
+        "line": "{\"at\":12,\"process\":\"MAIN\",\"event\":\"audio_level\",\"frames\":3,\"skippedFrames\":2,\"histogram\":\"-65:2 -35:1\"}"
+      }
+    },
+    {
+      "name": "分布が空なら空の文字列にする",
+      "input": {
+        "op": "encode",
+        "atMillis": 13,
+        "process": "MAIN",
+        "event": {
+          "type": "audio_level",
+          "frames": 0,
+          "skippedFrames": 0,
+          "histogram": []
+        }
+      },
+      "expected": {
+        "line": "{\"at\":13,\"process\":\"MAIN\",\"event\":\"audio_level\",\"frames\":0,\"skippedFrames\":0,\"histogram\":\"\"}"
+      }
+    }
+  ]
+}

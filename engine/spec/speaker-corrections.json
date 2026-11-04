@@ -1,0 +1,1419 @@
+{
+  "area": "speaker-corrections",
+  "description": "話者を手で直す SpeakerCorrections と、最近の声を覚える RecentVoices。直した発話の声がメモリにあれば、直した先の重心(自分なら育てた声)へ 1 度だけ足す。登録の特徴量は変えない。自分は統合元にできない",
+  "inputSchema": "話者の記録をメモリに持つ世界を作り、setup(結果を見ない)と steps(結果を比べる)を順に流す。modelVersion: 特徴量のモデルの版(省略すると \"fake-1\")。clockMillis: Fake の時計の時刻(advanceClock でだけ進む)。speakerConfig: SpeakerConfig の項目を Kotlin の名前で書き、書かない項目は既定値。recentVoicesCapacity: 覚える声の数の上限(省略すると 256)。embedder: 特徴量の Fake。{modelVersion, responses, cycle}。n 回目(0 から)の呼び出しは responses[n](cycle が true なら responses[n % 個数])を返す。要素は特徴量、null(作れない)、\"fail\"(例外を投げる)。embedder を省略するといつも [1, 0, 0]。特徴量は数の配列か {size, values: {添字: 値}, normalize} で書く。書かない要素は 0、normalize が true なら長さ 1 にする(各要素を Double にして 2 乗和の平方根を取り、Float にしてから各要素を Float のまま割る)。数でない値は文字列 \"NaN\"。値は Float として読む。話者と発話の id は、それぞれ 1 から作った順に振る。setup と steps の操作。どれも結果を返す。{op: \"enrollSelf\", vector, sampleCount, nowMillis, modelVersion}: 自分の特徴量を記録する。自分がいなければ「自分」(nameSource \"SELF\")を作り、いれば特徴量を置き換え、どのモデルの版の育てた声も消す → {speakerId}。{op: \"createProvisional\", vector, nowMillis, voicedMillis}: 仮の話者を作る。名前は、どの話者の表示名にも使われていない最小の番号の「話者N」→ {speakerId}。{op: \"setManualName\" | \"setInferredName\", speakerId, name} → {ok}。推定の名前は、自分以外で名前が仮か推定の話者にだけ付く。{op: \"saveSelfAdaptation\", vector, voicedMillis, nowMillis, modelVersion}: 育てた自分の声を置き換える → {}。{op: \"insertUtterance\", startedAtMillis, endedAtMillis, text, confidence, createdAtMillis, speakerId, speakerConfidence}: 発話を保存する。省略すると 0、1、\"本文\"、null、1、null、0.5 → {utteranceId}。{op: \"advanceClock\", millis} → {}。{op: \"rememberVoice\", utteranceId, vector, voicedMillis}: 最近の声として覚える → {}。{op: \"takeVoice\", utteranceId}: 覚えた声を取り出す(1 度だけ)→ {voice: {vector, voicedMillis} か null}。{op: \"identify\", startedAtMillis, millis, samples, text, confidence, tokens, repeat, save}: 音声が 0 の区間(16 kHz、標本は samples 個。省略すると millis 分)と文字起こし(text は省略すると \"本文\"、tokens は [文字, ミリ秒] の配列で省略すると時刻なし)で SpeakerIdentifier.identify を呼ぶ。save が true なら、聞き取りと同じく行を保存し(createdAtMillis は時計)、行の声を覚える。結果は {turns: [{startedAtMillis, endedAtMillis, text, speakerId, confidence, voice: {vector, voicedMillis} か null}]}。repeat を書くと repeat 回呼び、どの回も 1 行だけ返ることを前提に {speakerIds: [各回の speakerId]} を返す。{op: \"consolidate\"}: SpeakerConsolidation を動かす → {merged}。{op: \"reassign\", utteranceId, target}: SpeakerCorrections.reassign。target は \"self\"、\"unknown\"、\"newOther\"、{existing: 話者の id} → {ok}。{op: \"merge\", fromId, intoId} → {ok}。{op: \"rename\", speakerId, name} → {ok}。{op: \"snapshot\", include: [...]}: include に書いた項目だけを持つオブジェクトを返す。",
+  "expectedSchema": "steps に操作ごとの結果。特徴量は 0 でない要素だけを {size, values: {添字: 値}} で書く。snapshot の項目。speakers: 作った順に [{id, displayName, nameSource, isSelf}]。embeddings: modelVersion の特徴量を、自分を先に、更新の時刻の新しい順、id の大きい順に最大 100 件 [{speakerId, isSelf, vector, sampleCount, voicedMillis, updatedAtMillis}]。adaptation: modelVersion の育てた自分の声 {vector, voicedMillis} か null。utterances: capture-pipeline と同じ。embedderCalls: capture-pipeline と同じ。diagnostics: SpeakerDiagnosticsReader の 7 日分の集計 {days, selfRuns, otherRuns, unknownRuns, selfMillis, otherMillis, unknownMillis, histogram: [{floor, selfRuns, otherRuns, unknownRuns}], provisionalSpeakers, hasAdaptedVoice}。",
+  "cases": [
+    {
+      "name": "他人の行を自分に直すと、声を育てた声へ足し、登録は変えない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 2
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 1,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "self"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances",
+              "embeddings",
+              "adaptation"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 1.0
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1
+              }
+            ],
+            "adaptation": {
+              "vector": {
+                "size": 3,
+                "values": {
+                  "0": 0.9994449,
+                  "2": 0.03331483
+                }
+              },
+              "voicedMillis": 4000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分の行を他の話者に直すと、声をその話者の重心へ足す",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 1
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 1,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": {
+              "existing": 2
+            }
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 0.70710677,
+                    "2": 0.70710677
+                  }
+                },
+                "sampleCount": 2,
+                "voicedMillis": 8000,
+                "updatedAtMillis": 1000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "同じ発話を何度直しても、声は 1 度だけ足す",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 1,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": {
+              "existing": 2
+            }
+          },
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "unknown"
+          },
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": {
+              "existing": 2
+            }
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "ok": true
+          },
+          {
+            "ok": true
+          },
+          {
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 0.70710677,
+                    "2": 0.70710677
+                  }
+                },
+                "sampleCount": 2,
+                "voicedMillis": 8000,
+                "updatedAtMillis": 1000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "声が残っていない古い発話は話者だけを直す",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": {
+              "existing": 2
+            }
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 1.0
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "新しい他の話者に直すと、声があればその声で作る",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 1,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 3000
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "newOther"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "utterances",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "2": 1.0
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 3000,
+                "updatedAtMillis": 1000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "新しい他の話者に直すと、声がなければ特徴量なしで作る",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "newOther"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "utterances",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "仮の話者が上限なら新しい他の話者には直せない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "newOther"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": false
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": null,
+                "speakerConfidence": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "ない発話やない話者には直せない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 2,
+            "target": "self"
+          },
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": {
+              "existing": 99
+            }
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": false
+          },
+          {
+            "ok": false
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": null,
+                "speakerConfidence": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "登録の前は自分に直せない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "self"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": false
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": null,
+                "speakerConfidence": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "不明に直すと話者の信頼度も消す",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 1
+          }
+        ],
+        "steps": [
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "unknown"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": null,
+                "speakerConfidence": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "手の統合は発話と重心をまとめ、統合元を消す",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 3000
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 1000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 3
+          }
+        ],
+        "steps": [
+          {
+            "op": "merge",
+            "fromId": 3,
+            "intoId": 2
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "utterances",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 0.9486833,
+                    "2": 0.31622776
+                  }
+                },
+                "sampleCount": 2,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分へ統合すると発話は自分になり、登録は変えない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 2
+          }
+        ],
+        "steps": [
+          {
+            "op": "merge",
+            "fromId": 2,
+            "intoId": 1
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances",
+              "embeddings",
+              "adaptation"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              }
+            ],
+            "adaptation": {
+              "vector": {
+                "size": 3,
+                "values": {
+                  "0": 0.9994449,
+                  "2": 0.03331483
+                }
+              },
+              "voicedMillis": 4000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分は統合元にできない",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "merge",
+            "fromId": 1,
+            "intoId": 2
+          },
+          {
+            "op": "merge",
+            "fromId": 2,
+            "intoId": 2
+          },
+          {
+            "op": "merge",
+            "fromId": 2,
+            "intoId": 9
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": false
+          },
+          {
+            "ok": false
+          },
+          {
+            "ok": false
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "名前を手で付けると、まとめ直しの対象から外れる",
+      "input": {
+        "clockMillis": 1000,
+        "setup": [
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "rename",
+            "speakerId": 1,
+            "name": "  母 "
+          },
+          {
+            "op": "rename",
+            "speakerId": 1,
+            "name": "  "
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "ok": true
+          },
+          {
+            "ok": false
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "母",
+                "nameSource": "MANUAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "保存した発話の声を覚え、手で直すと次の判定に効く",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "windowMillis": 60000
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              0,
+              1
+            ]
+          ],
+          "cycle": true
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 6000,
+            "samples": 16,
+            "save": true
+          },
+          {
+            "op": "reassign",
+            "utteranceId": 1,
+            "target": "self"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances",
+              "adaptation"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 6000,
+                "text": "本文",
+                "speakerId": 2,
+                "confidence": null,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "2": 1.0
+                    }
+                  },
+                  "voicedMillis": 5200
+                }
+              }
+            ]
+          },
+          {
+            "ok": true
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 6000,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1000,
+                "speakerId": 1,
+                "speakerConfidence": null
+              }
+            ],
+            "adaptation": {
+              "vector": {
+                "size": 3,
+                "values": {
+                  "0": 0.9990624,
+                  "2": 0.043292705
+                }
+              },
+              "voicedMillis": 5200
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "覚える声の数には上限がある",
+      "input": {
+        "clockMillis": 1000,
+        "recentVoicesCapacity": 2,
+        "setup": [
+          {
+            "op": "rememberVoice",
+            "utteranceId": 1,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 1
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 2,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 1
+          },
+          {
+            "op": "rememberVoice",
+            "utteranceId": 3,
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "voicedMillis": 1
+          }
+        ],
+        "steps": [
+          {
+            "op": "takeVoice",
+            "utteranceId": 1
+          },
+          {
+            "op": "takeVoice",
+            "utteranceId": 3
+          },
+          {
+            "op": "takeVoice",
+            "utteranceId": 3
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "voice": null
+          },
+          {
+            "voice": {
+              "vector": {
+                "size": 3,
+                "values": {
+                  "2": 1.0
+                }
+              },
+              "voicedMillis": 1
+            }
+          },
+          {
+            "voice": null
+          }
+        ]
+      }
+    }
+  ]
+}

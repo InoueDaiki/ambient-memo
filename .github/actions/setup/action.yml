@@ -1,7 +1,10 @@
 name: セットアップ
-description: mise.toml の版でツールを入れ、JS の依存関係、Gradle のキャッシュ、Android SDK を用意する
+description: mise.toml の版でツールを入れ、JS の依存関係、Gradle のキャッシュ、Android SDK を用意する(Android は iOS のジョブでは外せる)
 
 inputs:
+  android:
+    description: Android SDK と Gradle を用意するか。iOS のジョブでは false にする
+    default: "true"
   android-packages:
     description: sdkmanager で入れるもの(空白区切り)
     default: platforms;android-37.0 build-tools;37.0.0
@@ -36,11 +39,13 @@ runs:
       run: pnpm install --frozen-lockfile
 
     # Java は mise が入れたものを使う
-    - uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
+    - if: inputs.android == 'true'
+      uses: android-actions/setup-android@be39fa834029ff78f1a44aa3bb0819b8fc2bd8fd # v4.0.4
       with:
         packages: ${{ inputs.android-packages }}
 
     # キャッシュの保存は既定のブランチだけで行われる
-    - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+    - if: inputs.android == 'true'
+      uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
       with:
         cache-disabled: ${{ inputs.cache != 'true' }}

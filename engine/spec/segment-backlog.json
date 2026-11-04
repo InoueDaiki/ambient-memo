@@ -1,0 +1,381 @@
+{
+  "area": "segment-backlog",
+  "description": "文字起こし待ちの発話の置き場所 SegmentBacklog。音声の標本の数の合計に上限を持ち、あふれたら古い発話から解放して欠落にする。待つ処理(awaitWork が発話の届くまで待つこと)は Kotlin のテストに残す",
+  "inputSchema": "maxSamples: 標本の数の合計の上限。steps を順に流す。{op: \"offer\", id, startedAtMillis, samples}: 標本化周波数 1000 Hz で値が 1 の標本を samples 個持つ発話(終わりは startedAtMillis + samples)を置く。id は結果で発話を指すための番号。{op: \"poll\"}: 1 つ取り出す。{op: \"drainGaps\"}: 溜まった欠落を引き取る。{op: \"addGap\", gap: {startedAtMillis, endedAtMillis, reason}}: 欠落を足す。{op: \"abandonAll\", reason}: 残りをすべて解放して欠落にする。{op: \"close\"}: これ以上置かない。{op: \"awaitWork\"}: 待たずに返るときだけ使う。待つなら実行役の失敗にする",
+  "expectedSchema": "steps に step ごとの結果。offer、addGap、abandonAll、close は {}。poll は {id}(なければ null)。drainGaps は {gaps: [{startedAtMillis, endedAtMillis, reason}]}。awaitWork は {result}(溜まった発話か欠落があれば true、閉じて空なら false)。released に、最後に解放済みだった発話の id を小さい順に",
+  "cases": [
+    {
+      "name": "上限までは順番に取り出せる",
+      "input": {
+        "maxSamples": 20,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "offer",
+            "id": 2,
+            "startedAtMillis": 10,
+            "samples": 10
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "drainGaps"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {
+            "id": 1
+          },
+          {
+            "id": 2
+          },
+          {
+            "id": null
+          },
+          {
+            "gaps": []
+          }
+        ],
+        "released": []
+      }
+    },
+    {
+      "name": "あふれると古い発話を解放して欠落にする",
+      "input": {
+        "maxSamples": 20,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "offer",
+            "id": 2,
+            "startedAtMillis": 10,
+            "samples": 10
+          },
+          {
+            "op": "offer",
+            "id": 3,
+            "startedAtMillis": 20,
+            "samples": 15
+          },
+          {
+            "op": "drainGaps"
+          },
+          {
+            "op": "poll"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {},
+          {
+            "gaps": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 10,
+                "reason": "PROCESSING_BACKLOG"
+              },
+              {
+                "startedAtMillis": 10,
+                "endedAtMillis": 20,
+                "reason": "PROCESSING_BACKLOG"
+              }
+            ]
+          },
+          {
+            "id": 3
+          }
+        ],
+        "released": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "取り出した分は上限の計算から外れる",
+      "input": {
+        "maxSamples": 10,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "offer",
+            "id": 2,
+            "startedAtMillis": 10,
+            "samples": 10
+          },
+          {
+            "op": "drainGaps"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {
+            "id": 1
+          },
+          {},
+          {
+            "gaps": []
+          }
+        ],
+        "released": []
+      }
+    },
+    {
+      "name": "ちょうど上限なら捨てない",
+      "input": {
+        "maxSamples": 20,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "offer",
+            "id": 2,
+            "startedAtMillis": 10,
+            "samples": 10
+          },
+          {
+            "op": "drainGaps"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {
+            "gaps": []
+          }
+        ],
+        "released": []
+      }
+    },
+    {
+      "name": "drainGaps は同じ欠落を二度返さない",
+      "input": {
+        "maxSamples": 10,
+        "steps": [
+          {
+            "op": "addGap",
+            "gap": {
+              "startedAtMillis": 0,
+              "endedAtMillis": 1,
+              "reason": "SOURCE_DISCONTINUITY"
+            }
+          },
+          {
+            "op": "drainGaps"
+          },
+          {
+            "op": "drainGaps"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {
+            "gaps": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "reason": "SOURCE_DISCONTINUITY"
+              }
+            ]
+          },
+          {
+            "gaps": []
+          }
+        ],
+        "released": []
+      }
+    },
+    {
+      "name": "abandonAll は残りをすべて解放して欠落にする",
+      "input": {
+        "maxSamples": 20,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "offer",
+            "id": 2,
+            "startedAtMillis": 10,
+            "samples": 10
+          },
+          {
+            "op": "abandonAll",
+            "reason": "PIPELINE_STOPPED"
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "drainGaps"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {},
+          {
+            "id": null
+          },
+          {
+            "gaps": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 10,
+                "reason": "PIPELINE_STOPPED"
+              },
+              {
+                "startedAtMillis": 10,
+                "endedAtMillis": 20,
+                "reason": "PIPELINE_STOPPED"
+              }
+            ]
+          }
+        ],
+        "released": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "awaitWork は閉じても溜まった発話があれば続け、空になると終わる",
+      "input": {
+        "maxSamples": 10,
+        "steps": [
+          {
+            "op": "offer",
+            "id": 1,
+            "startedAtMillis": 0,
+            "samples": 10
+          },
+          {
+            "op": "close"
+          },
+          {
+            "op": "awaitWork"
+          },
+          {
+            "op": "poll"
+          },
+          {
+            "op": "awaitWork"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {
+            "result": true
+          },
+          {
+            "id": 1
+          },
+          {
+            "result": false
+          }
+        ],
+        "released": []
+      }
+    },
+    {
+      "name": "awaitWork は欠落だけでも続ける",
+      "input": {
+        "maxSamples": 10,
+        "steps": [
+          {
+            "op": "addGap",
+            "gap": {
+              "startedAtMillis": 0,
+              "endedAtMillis": 1,
+              "reason": "PROCESSING_FAILED"
+            }
+          },
+          {
+            "op": "close"
+          },
+          {
+            "op": "awaitWork"
+          },
+          {
+            "op": "drainGaps"
+          },
+          {
+            "op": "awaitWork"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {},
+          {},
+          {
+            "result": true
+          },
+          {
+            "gaps": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "reason": "PROCESSING_FAILED"
+              }
+            ]
+          },
+          {
+            "result": false
+          }
+        ],
+        "released": []
+      }
+    }
+  ]
+}

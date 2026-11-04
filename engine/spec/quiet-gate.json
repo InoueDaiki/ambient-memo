@@ -1,0 +1,367 @@
+{
+  "area": "quiet-gate",
+  "description": "静かな間は VAD を動かさない QuietGatedVoiceActivityDetector と、フレームの大きさ。VAD が発話と判定している間は静かなフレームも渡し、静かなフレームを飛ばしたあとは VAD を reset してから次のフレームを渡す",
+  "inputSchema": "op で選ぶ。\"level\": amplitude(16 ビットの値)を samples 個(省略すると 160)並べたフレームの大きさを測る。大きさは RMS を 32768 で割った値の 20 log10 の dBFS で、空か RMS が 0 なら -120。\"gate\": quietDbfs(しきい値。省略すると既定の -55)のゲートを、フレームと reset を数える Fake の VAD につなぎ、大きさを数える AudioLevelCounter も渡して steps を順に流す。step は {op: \"frame\", amplitude, delegateSpeech}(amplitude を 160 個並べたフレームを渡す。Fake の VAD はフレームを渡されたらそのとき delegateSpeech を返す)、{op: \"reset\"}(ゲートを reset する)、{op: \"drain\"}(AudioLevelCounter から取り出す)",
+  "expectedSchema": "\"level\": dbfs に dBFS の数。\"gate\": steps に step ごとの結果(frame は {isSpeech}、reset は {}、drain は {summary}。summary は {frames, skippedFrames, histogram} か、何も数えていなければ null。histogram は [帯の下端の dBFS(5 dB 刻みで切り捨て), フレームの数] の組を下端の小さい順に並べる)。delegateFrames に Fake の VAD に渡ったフレームの数、delegateResets に Fake の VAD の reset の回数",
+  "cases": [
+    {
+      "name": "フレームの大きさを dBFS で測る(最大の振幅は 0)",
+      "input": {
+        "op": "level",
+        "amplitude": -32768
+      },
+      "expected": {
+        "dbfs": 0.0
+      }
+    },
+    {
+      "name": "フレームの大きさを dBFS で測る(振幅 3277 はおよそ -20)",
+      "input": {
+        "op": "level",
+        "amplitude": 3277
+      },
+      "expected": {
+        "dbfs": -19.999469871546843
+      }
+    },
+    {
+      "name": "無音のフレームはどの帯よりも下に置く",
+      "input": {
+        "op": "level",
+        "amplitude": 0
+      },
+      "expected": {
+        "dbfs": -120.0
+      }
+    },
+    {
+      "name": "空のフレームは無音と同じ大きさ",
+      "input": {
+        "op": "level",
+        "amplitude": 1000,
+        "samples": 0
+      },
+      "expected": {
+        "dbfs": -120.0
+      }
+    },
+    {
+      "name": "静かなフレームは VAD に渡さず、無音と答える",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          }
+        ],
+        "delegateFrames": 0,
+        "delegateResets": 0
+      }
+    },
+    {
+      "name": "大きな音は VAD に渡し、その判定を返す",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": true
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": true
+          }
+        ],
+        "delegateFrames": 1,
+        "delegateResets": 0
+      }
+    },
+    {
+      "name": "大きな音でも VAD が無音と判定すれば無音",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": false
+          }
+        ],
+        "delegateFrames": 1,
+        "delegateResets": 0
+      }
+    },
+    {
+      "name": "VAD が発話と判定している間は、静かなフレームも渡す",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": true
+          },
+          {
+            "isSpeech": true
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          }
+        ],
+        "delegateFrames": 3,
+        "delegateResets": 0
+      }
+    },
+    {
+      "name": "飛ばしたあとは、VAD の状態を捨ててから渡す",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          }
+        ],
+        "delegateFrames": 3,
+        "delegateResets": 1
+      }
+    },
+    {
+      "name": "reset は VAD の状態も捨て、静かなフレームをまた飛ばす",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": true
+          },
+          {
+            "op": "reset"
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": true
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": true
+          },
+          {},
+          {
+            "isSpeech": false
+          }
+        ],
+        "delegateFrames": 1,
+        "delegateResets": 1
+      }
+    },
+    {
+      "name": "しきい値を変えられる",
+      "input": {
+        "op": "gate",
+        "quietDbfs": -20.0,
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": true
+          },
+          {
+            "op": "frame",
+            "amplitude": 4000,
+            "delegateSpeech": true
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": true
+          }
+        ],
+        "delegateFrames": 1,
+        "delegateResets": 1
+      }
+    },
+    {
+      "name": "大きさの分布と飛ばした数を数え、取り出すと 0 に戻る",
+      "input": {
+        "op": "gate",
+        "steps": [
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 30,
+            "delegateSpeech": false
+          },
+          {
+            "op": "frame",
+            "amplitude": 1000,
+            "delegateSpeech": false
+          },
+          {
+            "op": "drain"
+          },
+          {
+            "op": "drain"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "isSpeech": false
+          },
+          {
+            "summary": {
+              "frames": 3,
+              "skippedFrames": 2,
+              "histogram": [
+                [
+                  -65,
+                  2
+                ],
+                [
+                  -35,
+                  1
+                ]
+              ]
+            }
+          },
+          {
+            "summary": null
+          }
+        ],
+        "delegateFrames": 1,
+        "delegateResets": 1
+      }
+    }
+  ]
+}

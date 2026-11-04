@@ -1,0 +1,3452 @@
+{
+  "area": "speaker-turns",
+  "description": "音声から保存までを通して、区間の中の話者の判定と行の分割を確かめる。区間を窓に分けて自分との類似度を取り、ヒステリシスで自分かそれ以外に分け、話者の交代で本文をトークンの時刻で分ける。窓と区間の音声の解放のうち、キャンセルと、窓の配列が 0 で塗りつぶされることは Kotlin のテストに残す",
+  "inputSchema": "capture-pipeline と同じ形。どのケースも、自分を [1, 0, 0] で登録してから、1 つの区間(tone の後に 200 ms の無音)を流す",
+  "expectedSchema": "capture-pipeline と同じ形",
+  "cases": [
+    {
+      "name": "話者が変わると行を分け、時刻を分割点に合わせて、本文をトークンの時刻で分ける",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2625,
+            "text": "あいうえおか",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.800000011920929
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 2625,
+            "endedAtMillis": 6800,
+            "text": "きくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "話者が変わらなければ 1 行のまま、区間全体の時刻になる",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "後ろの区切りの無音は窓に入れず、窓の音声を発話から切り出す",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ],
+            "cycle": true
+          }
+        },
+        "include": [
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 1500,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 750,
+            "endedAtMillis": 2250,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 1500,
+            "endedAtMillis": 3000,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 2250,
+            "endedAtMillis": 3750,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 3000,
+            "endedAtMillis": 4500,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 3750,
+            "endedAtMillis": 5250,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 4500,
+            "endedAtMillis": 6000,
+            "sampleCount": 24000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "最後の窓は発話の終わりに揃える",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 3500
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            3500
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかき",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ],
+            "cycle": true
+          }
+        },
+        "include": [
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 1500,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 750,
+            "endedAtMillis": 2250,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 1200,
+            "endedAtMillis": 2700,
+            "sampleCount": 24000,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話が窓より短ければ全体で 1 つの窓にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 2000
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            2000
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえ",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "embedderCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2000,
+            "text": "あいうえ",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 1200,
+            "sampleCount": 19200,
+            "released": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "入るしきい値に届かない間は自分にならない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ],
+              [
+                0.59,
+                0.80740327,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分に入ると出るしきい値以上の間は自分のまま続く",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0.55,
+                0.83516467,
+                0
+              ],
+              [
+                0.55,
+                0.83516467,
+                0
+              ],
+              [
+                0.55,
+                0.83516467,
+                0
+              ],
+              [
+                0.8,
+                0.59999996,
+                0
+              ],
+              [
+                0.8,
+                0.59999996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.6928571462631226
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "出るしきい値を下回ると自分から出て、次に入るまで戻らない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.1,
+                0.9949874,
+                0
+              ],
+              [
+                0.3,
+                0.9539392,
+                0
+              ],
+              [
+                0.3,
+                0.9539392,
+                0
+              ],
+              [
+                0.3,
+                0.9539392,
+                0
+              ],
+              [
+                0.3,
+                0.9539392,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 1875,
+            "text": "あいうえ",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 1875,
+            "endedAtMillis": 6800,
+            "text": "おかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "まとまりの平均が不明の帯にあれば、自分の窓が続いても不明にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.62,
+                0.7846018,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ],
+              [
+                0.56,
+                0.8284926,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "他人のまとまりの平均が不明の帯にあれば、仮の話者を作らず不明にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.5,
+                0.8660254,
+                0
+              ],
+              [
+                0.5,
+                0.8660254,
+                0
+              ],
+              [
+                0.5,
+                0.8660254,
+                0
+              ],
+              [
+                0.5,
+                0.8660254,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2625,
+            "text": "あいうえおか",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 2625,
+            "endedAtMillis": 6800,
+            "text": "きくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "不明の帯の下端より低ければ他人にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ],
+              [
+                0.44,
+                0.8979978,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "短い区間は他人でも仮の話者を作らない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 2300
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            2300
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえ",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2300,
+            "text": "あいうえ",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "長い区間でも短いまとまりでは仮の話者を作らない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2625,
+            "text": "あいうえおか",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 2625,
+            "endedAtMillis": 3375,
+            "text": "き",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 3375,
+            "endedAtMillis": 6800,
+            "text": "くけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "同じ区間の前のまとまりで作った話者に合流する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers",
+          "embeddings"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 1875,
+            "text": "あいうえ",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 1875,
+            "endedAtMillis": 4125,
+            "text": "おかきくけ",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 4125,
+            "endedAtMillis": 6800,
+            "text": "こさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": 1.0
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ],
+        "embeddings": [
+          {
+            "speakerId": 1,
+            "isSelf": true,
+            "vector": {
+              "size": 3,
+              "values": {
+                "0": 1.0
+              }
+            },
+            "sampleCount": 3,
+            "voicedMillis": 0,
+            "updatedAtMillis": 0
+          },
+          {
+            "speakerId": 2,
+            "isSelf": false,
+            "vector": {
+              "size": 3,
+              "values": {
+                "1": 1.0
+              }
+            },
+            "sampleCount": 2,
+            "voicedMillis": 3750,
+            "updatedAtMillis": 50000
+          }
+        ]
+      }
+    },
+    {
+      "name": "他人どうしの交代は分けない",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                0,
+                1
+              ],
+              [
+                0,
+                0,
+                1
+              ],
+              [
+                0,
+                0,
+                1
+              ],
+              [
+                0,
+                0,
+                1
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "文字のないまとまりは行にせず、仮の話者も作らず、前後の同じ話者を 1 行にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  0
+                ],
+                [
+                  "い",
+                  100
+                ],
+                [
+                  "う",
+                  200
+                ],
+                [
+                  "え",
+                  300
+                ],
+                [
+                  "お",
+                  400
+                ],
+                [
+                  "か",
+                  500
+                ],
+                [
+                  "き",
+                  600
+                ],
+                [
+                  "く",
+                  4900
+                ],
+                [
+                  "け",
+                  5000
+                ],
+                [
+                  "こ",
+                  5100
+                ],
+                [
+                  "さ",
+                  5200
+                ],
+                [
+                  "し",
+                  5300
+                ],
+                [
+                  "す",
+                  5400
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "時刻がなければ本文を文字数で比例配分する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": "none"
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ],
+              [
+                0,
+                1,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 2625,
+            "text": "あいうえおか",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 2625,
+            "endedAtMillis": 6800,
+            "text": "きくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 2,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "特徴量が途中で失敗すると、窓の音声を消して、本文は不明の 1 行で残す",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              "fail"
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "gaps",
+          "embedderCalls",
+          "transcriberCalls"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "embedderCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 1500,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 750,
+            "endedAtMillis": 2250,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 1500,
+            "endedAtMillis": 3000,
+            "sampleCount": 24000,
+            "released": true
+          },
+          {
+            "startedAtMillis": 2250,
+            "endedAtMillis": 3750,
+            "sampleCount": 24000,
+            "released": true
+          }
+        ],
+        "gaps": [],
+        "transcriberCalls": [
+          {
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "sampleCount": 108800,
+            "released": true,
+            "hadSound": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "一部の窓の特徴量を作れなくても、残りの窓で判定する",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              null,
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0,
+                0,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ],
+              [
+                0.9,
+                0.43588996,
+                0
+              ]
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": 1,
+            "speakerConfidence": 0.8999999761581421
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "どの窓も特徴量を作れなければ不明の 1 行にする",
+      "input": {
+        "captureConfig": {
+          "maxUtteranceMillis": 30000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 0,
+          "minSpeechMillis": 0
+        },
+        "clockMillis": 50000,
+        "audio": {
+          "pieces": [
+            {
+              "tone": 6800
+            },
+            {
+              "silence": 200
+            }
+          ]
+        },
+        "vad": [
+          [
+            0,
+            6800
+          ]
+        ],
+        "transcriber": {
+          "responses": [
+            {
+              "text": "あいうえおかきくけこさしす",
+              "confidence": 0.5,
+              "tokens": [
+                [
+                  "あ",
+                  100
+                ],
+                [
+                  "い",
+                  600
+                ],
+                [
+                  "う",
+                  1100
+                ],
+                [
+                  "え",
+                  1600
+                ],
+                [
+                  "お",
+                  2100
+                ],
+                [
+                  "か",
+                  2600
+                ],
+                [
+                  "き",
+                  3100
+                ],
+                [
+                  "く",
+                  3600
+                ],
+                [
+                  "け",
+                  4100
+                ],
+                [
+                  "こ",
+                  4600
+                ],
+                [
+                  "さ",
+                  5100
+                ],
+                [
+                  "し",
+                  5600
+                ],
+                [
+                  "す",
+                  6100
+                ]
+              ]
+            }
+          ]
+        },
+        "speakers": {
+          "speakerConfig": {
+            "selfThreshold": 0.6,
+            "selfExitThreshold": 0.55,
+            "unknownFloor": 0.45,
+            "provisionalThreshold": 0.6,
+            "minNewSpeakerRunMillis": 1000,
+            "maxProvisionalSpeakers": 64
+          },
+          "setup": [
+            {
+              "op": "enrollSelf",
+              "vector": [
+                1,
+                0,
+                0
+              ],
+              "sampleCount": 3,
+              "nowMillis": 0
+            }
+          ],
+          "embedder": {
+            "responses": [
+              null,
+              null,
+              null,
+              null,
+              null,
+              null,
+              null
+            ]
+          }
+        },
+        "include": [
+          "utterances",
+          "speakers"
+        ]
+      },
+      "expected": {
+        "failure": null,
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 6800,
+            "text": "あいうえおかきくけこさしす",
+            "confidence": 0.5,
+            "createdAtMillis": 50000,
+            "speakerId": null,
+            "speakerConfidence": null
+          }
+        ],
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ]
+      }
+    }
+  ]
+}

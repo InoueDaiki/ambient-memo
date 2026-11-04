@@ -1,6 +1,10 @@
 {
-  "platforms": ["android"],
+  "platforms": ["android", "ios"],
   "android": {
     "modules": ["dev.ambientmemo.bridge.EngineBridgeModule"]
+  },
+  "ios": {
+    "modules": ["EngineBridgeModule"],
+    "appDelegateSubscribers": ["EngineAppDelegateSubscriber"]
   }
 }

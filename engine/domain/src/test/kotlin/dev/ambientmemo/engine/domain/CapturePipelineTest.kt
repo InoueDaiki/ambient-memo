@@ -24,7 +24,6 @@ import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.withTimeout
 import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.io.TempDir
@@ -32,6 +31,10 @@ import java.io.IOException
 import java.nio.file.Files
 import java.nio.file.Path
 
+/**
+ * キャンセル、内側のタイムアウト、処理の遅れ、WAV ファイルの読み取りに依るテストだけを残す。
+ * データで表せる流れは engine/spec/capture-pipeline.json と speaker-turns.json にある。
+ */
 @OptIn(ExperimentalCoroutinesApi::class)
 class CapturePipelineTest {
     private val config = CaptureConfig(
@@ -60,7 +63,6 @@ class CapturePipelineTest {
         source: AudioSource,
         speech: List<LongRange>,
         transcriber: Transcriber = FakeTranscriber(),
-        utterances: UtteranceRepository = this.utterances,
         captureGaps: CaptureGapRepository = gaps,
     ) = CapturePipeline(
         audioSource = source,
@@ -71,57 +73,6 @@ class CapturePipelineTest {
         clock = clock,
         config = config,
     )
-
-    @Test
-    fun `処理した発話ごとに結果を記録し、本文は渡さない`() = runTest {
-        val (audio, speech) = bursts(4)
-        val events = mutableListOf<DiagnosticEvent>()
-        val transcriber = FakeTranscriber { index, _ ->
-            check(index != 3) { "失敗" }
-            Transcription(listOf("保存する", "雑音", " ")[index])
-        }
-
-        CapturePipeline(
-            audioSource = FakeAudioSource(audio),
-            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
-            transcriber = transcriber,
-            utterances = utterances,
-            captureGaps = gaps,
-            clock = clock,
-            config = config,
-            transcriptionFilter = { text, _ -> text != "雑音" },
-            diagnostics = events::add,
-        ).run()
-
-        val segments = events.filterIsInstance<SegmentProcessed>()
-        assertEquals(
-            listOf(SegmentOutcome.SAVED, SegmentOutcome.FILTERED, SegmentOutcome.BLANK, SegmentOutcome.FAILED),
-            segments.map { it.outcome },
-        )
-        assertEquals(listOf(4, 2, 1, 0), segments.map { it.textLength })
-        assertEquals(listOf(1, 0, 0, 0), segments.map { it.turns })
-    }
-
-    @Test
-    fun `保存しないと判定した発話は欠落にせず、バッファを解放する`() = runTest {
-        val (audio, speech) = bursts(2)
-        val transcriber = FakeTranscriber()
-
-        CapturePipeline(
-            audioSource = FakeAudioSource(audio),
-            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
-            transcriber = transcriber,
-            utterances = utterances,
-            captureGaps = gaps,
-            clock = clock,
-            config = config,
-            transcriptionFilter = { text, _ -> text == "発話2" },
-        ).run()
-
-        assertEquals(listOf("発話2"), savedUtterances().map { it.text })
-        assertTrue(savedGaps().isEmpty())
-        assertTrue(transcriber.received.all { it.isReleased })
-    }
 
     private suspend fun savedUtterances() = utterances.listOverlapping(0, Long.MAX_VALUE)
 
@@ -147,34 +98,6 @@ class CapturePipelineTest {
         config = config,
         speakerIdentifier = identifier,
     )
-
-    @Test
-    fun `話者を判定して発話と一緒に保存し、バッファを解放する`() = runTest {
-        val (audio, speech) = bursts(1)
-        val embedder = FakeSpeakerEmbedder()
-
-        speakerPipeline(audio, speech, identifier(embedder)).run()
-
-        val saved = savedUtterances().single()
-        assertEquals(1L, saved.speakerId)
-        assertEquals(1.0, saved.speakerConfidence)
-        assertTrue(embedder.received.single().isReleased)
-    }
-
-    @Test
-    fun `特徴量の失敗では文字起こしを失わず、話者を不明にして次へ進む`() = runTest {
-        val (audio, speech) = bursts(2)
-        val embedder = FakeSpeakerEmbedder { index, _ ->
-            if (index == 0) throw IOException("失敗")
-            floatArrayOf(1f, 0f, 0f)
-        }
-
-        speakerPipeline(audio, speech, identifier(embedder)).run()
-
-        assertEquals(listOf(null, 1L), savedUtterances().map { it.speakerId })
-        assertTrue(savedGaps().isEmpty())
-        assertTrue(embedder.received.all { it.isReleased })
-    }
 
     @Test
     fun `内側のタイムアウトで特徴量が止まっても、処理全体を止めない`() = runTest {
@@ -209,26 +132,6 @@ class CapturePipelineTest {
     }
 
     @Test
-    fun `保存しない発話の特徴量は作らない`() = runTest {
-        val (audio, speech) = bursts(1)
-        val embedder = FakeSpeakerEmbedder()
-
-        CapturePipeline(
-            audioSource = FakeAudioSource(audio),
-            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
-            transcriber = FakeTranscriber(),
-            utterances = utterances,
-            captureGaps = gaps,
-            clock = clock,
-            config = config,
-            transcriptionFilter = { _, _ -> false },
-            speakerIdentifier = identifier(embedder),
-        ).run()
-
-        assertTrue(embedder.received.isEmpty())
-    }
-
-    @Test
     fun `WAV の発話を検知して文字起こしを保存し、バッファを解放する`(@TempDir dir: Path) = runTest {
         val path = dir.resolve("speech.wav")
         val (audio, _) = bursts(2)
@@ -245,52 +148,6 @@ class CapturePipelineTest {
         assertEquals(listOf(base + 500, base + 1_200), saved.map { it.endedAtMillis })
         assertTrue(transcriber.received.all { it.isReleased })
         assertTrue(savedGaps().isEmpty())
-    }
-
-    @Test
-    fun `文字起こしには音声が渡る`() = runTest {
-        var hadSound = false
-        val transcriber = FakeTranscriber { _, segment ->
-            hadSound = segment.samples.any { it != 0.toShort() }
-            Transcription("本文", 0.5)
-        }
-
-        pipeline(FakeAudioSource(SyntheticAudio.tone(300)), listOf(0L..<300L), transcriber).run()
-
-        assertTrue(hadSound)
-        assertEquals(0.5, savedUtterances().single().confidence)
-    }
-
-    @Test
-    fun `保存の時刻は時計から取る`() = runTest {
-        pipeline(FakeAudioSource(SyntheticAudio.tone(300)), listOf(0L..<300L)).run()
-
-        assertEquals(50_000, savedUtterances().single().createdAtMillis)
-    }
-
-    @Test
-    fun `長い発話は分割して順番に保存する`() = runTest {
-        pipeline(FakeAudioSource(SyntheticAudio.tone(2_500)), listOf(0L..<2_500L)).run()
-
-        assertEquals(listOf(0L, 1_000L, 2_000L), savedUtterances().map { it.startedAtMillis })
-    }
-
-    @Test
-    fun `音声の途中で終わっても開いている発話を保存する`() = runTest {
-        pipeline(FakeAudioSource(SyntheticAudio.tone(300)), listOf(0L..<1_000L)).run()
-
-        assertEquals(1, savedUtterances().size)
-    }
-
-    @Test
-    fun `空の文字起こしは保存せず、欠落にもしない`() = runTest {
-        val transcriber = FakeTranscriber { _, _ -> Transcription("  ") }
-
-        pipeline(FakeAudioSource(SyntheticAudio.tone(300)), listOf(0L..<300L), transcriber).run()
-
-        assertTrue(savedUtterances().isEmpty())
-        assertTrue(savedGaps().isEmpty())
-        assertTrue(transcriber.received.single().isReleased)
     }
 
     @Test
@@ -317,21 +174,6 @@ class CapturePipelineTest {
     }
 
     @Test
-    fun `文字起こしに失敗しても欠落を記録して次の発話へ進み、バッファを解放する`() = runTest {
-        val (audio, speech) = bursts(2)
-        val transcriber = FakeTranscriber { index, _ ->
-            if (index == 0) throw IOException("失敗")
-            Transcription("次の発話")
-        }
-
-        pipeline(FakeAudioSource(audio), speech, transcriber).run()
-
-        assertEquals(listOf("次の発話"), savedUtterances().map { it.text })
-        assertEquals(listOf(CaptureGap(0, 500, CaptureGapReason.PROCESSING_FAILED)), savedGaps())
-        assertTrue(transcriber.received.all { it.isReleased })
-    }
-
-    @Test
     fun `実装の内側のタイムアウトでは処理全体を止めない`() = runTest {
         val (audio, speech) = bursts(2)
         val transcriber = FakeTranscriber { index, _ ->
@@ -343,65 +185,6 @@ class CapturePipelineTest {
 
         assertEquals(listOf("次の発話"), savedUtterances().map { it.text })
         assertEquals(CaptureGapReason.PROCESSING_FAILED, savedGaps().single().reason)
-    }
-
-    @Test
-    fun `保存に失敗しても欠落を記録して続ける`() = runTest {
-        val (audio, speech) = bursts(2)
-        val failingOnce = object : UtteranceRepository by utterances {
-            private var failed = false
-
-            override suspend fun insertAll(utterances: List<NewUtterance>): List<Utterance> {
-                if (!failed) {
-                    failed = true
-                    throw IOException("書き込めない")
-                }
-                return this@CapturePipelineTest.utterances.insertAll(utterances)
-            }
-        }
-        val transcriber = FakeTranscriber()
-
-        pipeline(FakeAudioSource(audio), speech, transcriber, utterances = failingOnce).run()
-
-        assertEquals(1, savedUtterances().size)
-        assertEquals(CaptureGapReason.PROCESSING_FAILED, savedGaps().single().reason)
-        assertTrue(transcriber.received.all { it.isReleased })
-    }
-
-    @Test
-    fun `欠落も保存できなければ例外で止まり、バッファは解放する`() {
-        val (audio, speech) = bursts(3)
-        val transcriber = FakeTranscriber { _, _ -> throw IOException("失敗") }
-        val failingGaps = object : CaptureGapRepository by gaps {
-            override suspend fun insert(gap: CaptureGap) = error("DB が壊れた")
-        }
-
-        val thrown = assertThrows(IllegalStateException::class.java) {
-            runTest { pipeline(FakeAudioSource(audio), speech, transcriber, captureGaps = failingGaps).run() }
-        }
-
-        assertEquals("DB が壊れた", thrown.message)
-        assertTrue(transcriber.received.all { it.isReleased })
-    }
-
-    @Test
-    fun `読み取りに失敗すると溜まった発話を処理してから例外を投げる`() {
-        val transcriber = FakeTranscriber()
-        val failing = object : AudioSource {
-            override val sampleRateHz = TEST_SAMPLE_RATE_HZ
-
-            override fun frames(): Flow<AudioFrame> = flow {
-                emitAll(FakeAudioSource(SyntheticAudio.tone(300)).frames())
-                throw IOException("マイクが使えない")
-            }
-        }
-
-        assertThrows(IOException::class.java) {
-            runTest { pipeline(failing, listOf(0L..<1_000L), transcriber).run() }
-        }
-
-        assertEquals(1, transcriber.received.size)
-        assertTrue(transcriber.received.single().isReleased)
     }
 
     @Test
@@ -448,60 +231,6 @@ class CapturePipelineTest {
         job.cancelAndJoin()
 
         assertTrue(transcriber.received.single().isReleased)
-    }
-
-    @Test
-    fun `フレームの時刻が飛ぶと発話を区切って欠落を記録する`() = runTest {
-        val jumpPosition = 16 * 200
-        val source = FakeAudioSource(SyntheticAudio.tone(400), frameStartMillis = { position, default ->
-            if (position >= jumpPosition) default + 5_000 else default
-        })
-        val detector = ScriptedVoiceActivityDetector(listOf(0L..<10_000L))
-
-        CapturePipeline(source, detector, FakeTranscriber(), utterances, gaps, clock, config).run()
-
-        assertEquals(listOf(0L, 5_200L), savedUtterances().map { it.startedAtMillis })
-        assertEquals(listOf(200L, 5_400L), savedUtterances().map { it.endedAtMillis })
-        assertEquals(listOf(CaptureGap(200, 5_200, CaptureGapReason.SOURCE_DISCONTINUITY)), savedGaps())
-        assertEquals(2, detector.resetCount)
-    }
-
-    @Test
-    fun `時刻が戻ったときは発話を区切るが欠落にはしない`() = runTest {
-        val jumpPosition = 16 * 200
-        val source = FakeAudioSource(
-            SyntheticAudio.tone(400),
-            startMillis = 10_000,
-            frameStartMillis = { position, default -> if (position >= jumpPosition) default - 5_000 else default },
-        )
-
-        pipeline(source, listOf(0L..<20_000L)).run()
-
-        assertEquals(2, savedUtterances().size)
-        assertTrue(savedGaps().isEmpty())
-    }
-
-    @Test
-    fun `小さな時刻のずれでは発話を区切らない`() = runTest {
-        val jumpPosition = 16 * 200
-        val source = FakeAudioSource(SyntheticAudio.tone(400), frameStartMillis = { position, default ->
-            if (position >= jumpPosition) default + 50 else default
-        })
-
-        pipeline(source, listOf(0L..<10_000L)).run()
-
-        assertEquals(1, savedUtterances().size)
-        assertTrue(savedGaps().isEmpty())
-    }
-
-    @Test
-    fun `同じパイプラインをもう一度動かせる`() = runTest {
-        val pipeline = pipeline(FakeAudioSource(SyntheticAudio.tone(300)), listOf(0L..<300L))
-
-        pipeline.run()
-        pipeline.run()
-
-        assertEquals(2, savedUtterances().size)
     }
 
     @Test

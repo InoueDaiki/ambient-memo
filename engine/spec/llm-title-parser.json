@@ -1,0 +1,98 @@
+{
+  "area": "llm-title-parser",
+  "description": "LLM の自由形式の出力からメモや ToDo のタイトルを読む parseTitle。llm-output-parser と同じ前処理の後、各行から前後の空白、行頭の箇条書きの記号、「タイトル:」「題名:」(コロンは半角か全角、前後の空白も)を外し、さらに両端の 「」『』\"*# と半角、全角の空白を外す。最初の空でない行を使う",
+  "inputSchema": "text: LLM の出力",
+  "expectedSchema": "title: 読んだタイトル。空か、数字、空白、年月日曜火水木金土 / ( ) ( ) - だけでできた日付だけのタイトルなら null",
+  "cases": [
+    {
+      "name": "タイトルの飾りを外して最初の行を読む",
+      "input": {
+        "text": "タイトル: 「週末の買い物」\n説明です"
+      },
+      "expected": {
+        "title": "週末の買い物"
+      }
+    },
+    {
+      "name": "箇条書きの記号を外す",
+      "input": {
+        "text": "- 歯医者の予約"
+      },
+      "expected": {
+        "title": "歯医者の予約"
+      }
+    },
+    {
+      "name": "題名の見出しと全角のコロンも外す",
+      "input": {
+        "text": "題名:『引っ越しの準備』"
+      },
+      "expected": {
+        "title": "引っ越しの準備"
+      }
+    },
+    {
+      "name": "空の行を飛ばして最初の行を読む",
+      "input": {
+        "text": "\n\n  **図書館の本の返却**  \n次の行"
+      },
+      "expected": {
+        "title": "図書館の本の返却"
+      }
+    },
+    {
+      "name": "空や日付だけのタイトルは読まない(空)",
+      "input": {
+        "text": ""
+      },
+      "expected": {
+        "title": null
+      }
+    },
+    {
+      "name": "空や日付だけのタイトルは読まない(空白)",
+      "input": {
+        "text": "   "
+      },
+      "expected": {
+        "title": null
+      }
+    },
+    {
+      "name": "空や日付だけのタイトルは読まない(曜日付きの日付)",
+      "input": {
+        "text": "2026年11月1日(日曜日)"
+      },
+      "expected": {
+        "title": null
+      }
+    },
+    {
+      "name": "空や日付だけのタイトルは読まない(月日)",
+      "input": {
+        "text": "11月1日"
+      },
+      "expected": {
+        "title": null
+      }
+    },
+    {
+      "name": "空や日付だけのタイトルは読まない(ISO の日付)",
+      "input": {
+        "text": "2026-11-01"
+      },
+      "expected": {
+        "title": null
+      }
+    },
+    {
+      "name": "考えの区間は読まない",
+      "input": {
+        "text": "<think>考える</think>旅行の計画"
+      },
+      "expected": {
+        "title": "旅行の計画"
+      }
+    }
+  ]
+}

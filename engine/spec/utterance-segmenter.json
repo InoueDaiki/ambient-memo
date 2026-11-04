@@ -1,0 +1,787 @@
+{
+  "area": "utterance-segmenter",
+  "description": "発話か無音かの判定が付いたフレームから発話区間を切り出す UtteranceSegmenter。語頭の音声(preRoll)を前に足し、minSilence 続いた無音で区切って末尾の無音を除く。minSpeech より短い発話は捨てる。maxUtterance で分割し、分割の続きは短くても捨てない。区切りの無音は次の発話の語頭になる。配列が書き換えられても発話が変わらないことは、参照を共有する言語の性質なので Kotlin のテストに残す",
+  "inputSchema": "config: {maxUtteranceMillis, minSilenceMillis, preRollMillis, minSpeechMillis}。sampleRateHz: 標本化周波数。frameMillis: feed のフレームの長さ。probeStride: 結果の probes に出す標本の間隔(省略すると probes は空)。steps を順に流す。位置(ミリ秒)は 0 から始まる。{op: \"feed\", millis, isSpeech}: frameMillis のフレームを millis / frameMillis 個、位置を進めながら流す。各フレームの標本はすべて「位置 / frameMillis + 1」の値(何番目のフレームの音かを確かめるため)。{op: \"frame\", samples, isSpeech}: 標本 i の値が i を 16 ビットに切り詰めた値の、samples 個の 1 つのフレームを流し、位置を進める。{op: \"flush\"}: 開いている発話を閉じる。{op: \"discard\"}: 持っている音声をすべて消す。{op: \"seek\", positionMillis}: 位置を変える",
+  "expectedSchema": "steps に step ごとの結果。feed と frame は {segments: [区間]}、flush は {segment: 区間か null}、discard は {lost: {startedAtMillis, endedAtMillis} か null}(発話の途中で消した音声の時間)、seek は {}。区間は {startedAtMillis, endedAtMillis, sampleCount, first(最初の標本の値), last(最後の標本の値), probes(添字 0, probeStride, 2 probeStride, ... の標本の値)}",
+  "cases": [
+    {
+      "name": "無音だけなら発話を作らない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 500,
+            "isSpeech": false
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segment": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "語頭の音声を含め、末尾の無音を除いて発話を切り出す",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 200,
+            "isSpeech": false
+          },
+          {
+            "op": "feed",
+            "millis": 300,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 150,
+                "endedAtMillis": 500,
+                "sampleCount": 5600,
+                "first": 16,
+                "last": 50,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "語頭が溜まる前に発話が始まっても、音声の先頭から切り出す",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 20,
+            "isSpeech": false
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 120,
+                "sampleCount": 1920,
+                "first": 1,
+                "last": 12,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "語頭のバッファが一周した後でも古い順に並ぶ",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 730,
+            "isSpeech": false
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ],
+        "probeStride": 160
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 680,
+                "endedAtMillis": 830,
+                "sampleCount": 2400,
+                "first": 69,
+                "last": 83,
+                "probes": [
+                  69,
+                  70,
+                  71,
+                  72,
+                  73,
+                  74,
+                  75,
+                  76,
+                  77,
+                  78,
+                  79,
+                  80,
+                  81,
+                  82,
+                  83
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "短い無音では発話を区切らない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 90,
+            "isSpeech": false
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 290,
+                "sampleCount": 4640,
+                "first": 1,
+                "last": 29,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "短すぎる発話は捨てる",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 20,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "上限を超える発話は、時刻が連続するように分割する",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 2500,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1000,
+                "sampleCount": 16000,
+                "first": 1,
+                "last": 100,
+                "probes": []
+              },
+              {
+                "startedAtMillis": 1000,
+                "endedAtMillis": 2000,
+                "sampleCount": 16000,
+                "first": 101,
+                "last": 200,
+                "probes": []
+              }
+            ]
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 2000,
+                "endedAtMillis": 2500,
+                "sampleCount": 8000,
+                "first": 201,
+                "last": 250,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "上限より長いフレームも上限で分割する",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "frame",
+            "samples": 40000,
+            "isSpeech": true
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1000,
+                "sampleCount": 16000,
+                "first": 0,
+                "last": 15999,
+                "probes": []
+              },
+              {
+                "startedAtMillis": 1000,
+                "endedAtMillis": 2000,
+                "sampleCount": 16000,
+                "first": 16000,
+                "last": 31999,
+                "probes": []
+              }
+            ]
+          },
+          {
+            "segment": {
+              "startedAtMillis": 2000,
+              "endedAtMillis": 2500,
+              "sampleCount": 8000,
+              "first": 32000,
+              "last": -25537,
+              "probes": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "分割の続きは短くても捨てない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 1010,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1000,
+                "sampleCount": 16000,
+                "first": 1,
+                "last": 100,
+                "probes": []
+              }
+            ]
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 1000,
+                "endedAtMillis": 1010,
+                "sampleCount": 160,
+                "first": 101,
+                "last": 101,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "上限が無音の途中に来たら、末尾の無音を除いて区切り、続きを作らない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 960,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 960,
+                "sampleCount": 15360,
+                "first": 1,
+                "last": 96,
+                "probes": []
+              }
+            ]
+          },
+          {
+            "segment": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話の終わりの無音は次の発話の語頭になる",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 100,
+                "sampleCount": 1600,
+                "first": 1,
+                "last": 10,
+                "probes": []
+              }
+            ]
+          },
+          {
+            "segments": []
+          },
+          {
+            "segments": [
+              {
+                "startedAtMillis": 150,
+                "endedAtMillis": 300,
+                "sampleCount": 2400,
+                "first": 16,
+                "last": 30,
+                "probes": []
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "flush は開いている発話を閉じる",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "flush"
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segment": {
+              "startedAtMillis": 0,
+              "endedAtMillis": 100,
+              "sampleCount": 1600,
+              "first": 1,
+              "last": 10,
+              "probes": []
+            }
+          },
+          {
+            "segment": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "discard は発話の途中の音声を消し、失われた時間を返す",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "feed",
+            "millis": 50,
+            "isSpeech": false
+          },
+          {
+            "op": "discard"
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "segments": []
+          },
+          {
+            "lost": {
+              "startedAtMillis": 0,
+              "endedAtMillis": 100
+            }
+          },
+          {
+            "segment": null
+          }
+        ]
+      }
+    },
+    {
+      "name": "discard の後は語頭の音声も残らない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 200,
+            "isSpeech": false
+          },
+          {
+            "op": "discard"
+          },
+          {
+            "op": "seek",
+            "positionMillis": 1000
+          },
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": true
+          },
+          {
+            "op": "flush"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "lost": null
+          },
+          {},
+          {
+            "segments": []
+          },
+          {
+            "segment": {
+              "startedAtMillis": 1000,
+              "endedAtMillis": 1100,
+              "sampleCount": 1600,
+              "first": 101,
+              "last": 110,
+              "probes": []
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "発話していなければ discard は何も返さない",
+      "input": {
+        "config": {
+          "maxUtteranceMillis": 1000,
+          "minSilenceMillis": 100,
+          "preRollMillis": 50,
+          "minSpeechMillis": 30
+        },
+        "sampleRateHz": 16000,
+        "frameMillis": 10,
+        "steps": [
+          {
+            "op": "feed",
+            "millis": 100,
+            "isSpeech": false
+          },
+          {
+            "op": "discard"
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "segments": []
+          },
+          {
+            "lost": null
+          }
+        ]
+      }
+    }
+  ]
+}

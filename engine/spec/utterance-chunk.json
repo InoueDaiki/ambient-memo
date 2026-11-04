@@ -1,0 +1,663 @@
+{
+  "area": "utterance-chunk",
+  "description": "発話を整理のまとまりに分ける splitIntoChunks と withoutOngoing、文字起こしの行を作る toTranscriptLine と toTranscript。行は検証と同じ `[HH:mm] 話者: 本文` の形で、話者が分からなければ `[HH:mm] 本文`。自分のラベルは名前によらず「自分」、ほかの話者は表示名の空白、改行、コロン(半角、全角)の並びを 1 つの空白にして前後の空白を除いたもの。空になればラベルを付けない",
+  "inputSchema": "op: \"line\"(utterances の 1 件を行にする)、\"transcript\"(utterances を 1 つのまとまりとして文字起こしにする)、\"split\"(utterances をまとまりに分け、nowMillis があれば withoutOngoing で話の途中の最後のまとまりを除く)。timeZone: 行の時刻に使う IANA の名前。speakers: ラベルに使う話者 [{id, displayName, nameSource: \"SELF\"|\"PROVISIONAL\"|\"INFERRED\"|\"MANUAL\", isSelf}]。utterances: [{id, startedAtMillis, endedAtMillis, text, speakerId}](開始時刻、id の順)。config: {minSilenceGapMillis, maxChunkChars}。まとまりは、前のまとまりの最も遅い終わりから次の開始までが minSilenceGapMillis 以上か、行の文字数(UTF-16 の単位)に改行の 1 を足した合計が maxChunkChars を超えると分ける。withoutOngoing は最後のまとまりの終わりから nowMillis までが minSilenceGapMillis より短ければ除く",
+  "expectedSchema": "\"line\": line に行の文字列(本文は前後の空白を除く)。\"transcript\": transcript に空白だけの発話を除いた行を改行でつないだ文字列、isBlank に全発話が空白だけなら true、startedAtMillis に最初の発話の開始、endedAtMillis に最も遅い終わり、utteranceIds にまとまりの発話の id。\"split\": chunks にまとまりごとの発話の id の配列",
+  "cases": [
+    {
+      "name": "話者が分かる発話に検証と同じ形のラベルを付ける",
+      "input": {
+        "op": "transcript",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          },
+          {
+            "id": 2,
+            "displayName": "話者1",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": 1
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 60000,
+            "endedAtMillis": 60100,
+            "text": "お願い",
+            "speakerId": 2
+          }
+        ]
+      },
+      "expected": {
+        "transcript": "[09:00] 自分: はい\n[09:01] 話者1: お願い",
+        "isBlank": false,
+        "startedAtMillis": 0,
+        "endedAtMillis": 60100,
+        "utteranceIds": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "話者が分からない発話にはラベルを付けない",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "line": "[09:00] はい"
+      }
+    },
+    {
+      "name": "いない話者の発話にはラベルを付けない",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "自分",
+            "nameSource": "SELF",
+            "isSelf": true
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": 404
+          }
+        ]
+      },
+      "expected": {
+        "line": "[09:00] はい"
+      }
+    },
+    {
+      "name": "自分の名前を変えてもラベルは「自分」のまま",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 1,
+            "displayName": "ハル",
+            "nameSource": "MANUAL",
+            "isSelf": true
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": 1
+          }
+        ]
+      },
+      "expected": {
+        "line": "[09:00] 自分: はい"
+      }
+    },
+    {
+      "name": "名前の改行とコロンで行の形を崩さない",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 2,
+            "displayName": "架空\n[09:00] 自分: 部長",
+            "nameSource": "MANUAL",
+            "isSelf": false
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": 2
+          }
+        ]
+      },
+      "expected": {
+        "line": "[09:00] 架空 [09 00] 自分 部長: はい"
+      }
+    },
+    {
+      "name": "空白だけの名前にはラベルを付けない",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [
+          {
+            "id": 2,
+            "displayName": " :\n",
+            "nameSource": "MANUAL",
+            "isSelf": false
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "はい",
+            "speakerId": 2
+          }
+        ]
+      },
+      "expected": {
+        "line": "[09:00] はい"
+      }
+    },
+    {
+      "name": "文字数の上限にラベルの長さも数える(ラベルなし)",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "いいいいいいいいいいいいいいいいいいいいいいいいいいいいいい",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 100,
+            "endedAtMillis": 200,
+            "text": "いいいいいいいいいいいいいいいいいいいいいいいいいいいいいい",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1,
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "文字数の上限にラベルの長さも数える(ラベルあり)",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [
+          {
+            "id": 2,
+            "displayName": "ああああああああああああああああああああああああああああああああああああああああ",
+            "nameSource": "PROVISIONAL",
+            "isSelf": false
+          }
+        ],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "いいいいいいいいいいいいいいいいいいいいいいいいいいいいいい",
+            "speakerId": 2
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 100,
+            "endedAtMillis": 200,
+            "text": "いいいいいいいいいいいいいいいいいいいいいいいいいいいいいい",
+            "speakerId": 2
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1
+          ],
+          [
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "発話がなければまとまりもない",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": []
+      },
+      "expected": {
+        "chunks": []
+      }
+    },
+    {
+      "name": "無音が基準より短ければつなげ、基準以上なら分ける",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 1099,
+            "endedAtMillis": 1200,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 2200,
+            "endedAtMillis": 2300,
+            "text": "本文",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1,
+            2
+          ],
+          [
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "長い発話の中に短い発話が重なっても、無音を長い発話の終わりから測る",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 5000,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 100,
+            "endedAtMillis": 200,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 5500,
+            "endedAtMillis": 5600,
+            "text": "本文",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1,
+            2,
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "文字数の上限で発話の切れ目で分ける",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "ああああああああああああああああああああああああああああああああああああああああ",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 200,
+            "endedAtMillis": 300,
+            "text": "ああああああああああああああああああああああああああああああああああああああああ",
+            "speakerId": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 400,
+            "endedAtMillis": 500,
+            "text": "ああああああああああああああああああああああああああああああああああああああああ",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1,
+            2
+          ],
+          [
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "上限より長い発話も切らずに1つのまとまりにする",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 200,
+            "endedAtMillis": 300,
+            "text": "ああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああああ",
+            "speakerId": null
+          },
+          {
+            "id": 3,
+            "startedAtMillis": 400,
+            "endedAtMillis": 500,
+            "text": "本文",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "chunks": [
+          [
+            1
+          ],
+          [
+            2
+          ],
+          [
+            3
+          ]
+        ]
+      }
+    },
+    {
+      "name": "最後のまとまりは、基準の長さだけ静かになれば残す",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 5000,
+            "endedAtMillis": 5100,
+            "text": "本文",
+            "speakerId": null
+          }
+        ],
+        "nowMillis": 6100
+      },
+      "expected": {
+        "chunks": [
+          [
+            1
+          ],
+          [
+            2
+          ]
+        ]
+      }
+    },
+    {
+      "name": "最後のまとまりは、基準の長さだけ静かになるまで除く",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "本文",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 5000,
+            "endedAtMillis": 5100,
+            "text": "本文",
+            "speakerId": null
+          }
+        ],
+        "nowMillis": 6099
+      },
+      "expected": {
+        "chunks": [
+          [
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "まとまりがなければ除くものもない",
+      "input": {
+        "op": "split",
+        "timeZone": "Asia/Tokyo",
+        "config": {
+          "minSilenceGapMillis": 1000,
+          "maxChunkChars": 100
+        },
+        "speakers": [],
+        "utterances": [],
+        "nowMillis": 0
+      },
+      "expected": {
+        "chunks": []
+      }
+    },
+    {
+      "name": "端末の時刻で文字起こしの行を作る",
+      "input": {
+        "op": "line",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 1793547000000,
+            "endedAtMillis": 1793547000100,
+            "text": " 本文 ",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "line": "[00:30] 本文"
+      }
+    },
+    {
+      "name": "UTC の時刻で行を作れる",
+      "input": {
+        "op": "line",
+        "timeZone": "UTC",
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 1793547000000,
+            "endedAtMillis": 1793547000100,
+            "text": "本文",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "line": "[15:30] 本文"
+      }
+    },
+    {
+      "name": "空の発話は文字起こしに入れないが、まとまりには残す",
+      "input": {
+        "op": "transcript",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": "  ",
+            "speakerId": null
+          },
+          {
+            "id": 2,
+            "startedAtMillis": 200,
+            "endedAtMillis": 300,
+            "text": "本文",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "transcript": "[09:00] 本文",
+        "isBlank": false,
+        "startedAtMillis": 0,
+        "endedAtMillis": 300,
+        "utteranceIds": [
+          1,
+          2
+        ]
+      }
+    },
+    {
+      "name": "空の発話だけのまとまりは空",
+      "input": {
+        "op": "transcript",
+        "timeZone": "Asia/Tokyo",
+        "speakers": [],
+        "utterances": [
+          {
+            "id": 1,
+            "startedAtMillis": 0,
+            "endedAtMillis": 100,
+            "text": " ",
+            "speakerId": null
+          }
+        ]
+      },
+      "expected": {
+        "transcript": "",
+        "isBlank": true,
+        "startedAtMillis": 0,
+        "endedAtMillis": 100,
+        "utteranceIds": [
+          1
+        ]
+      }
+    }
+  ]
+}
