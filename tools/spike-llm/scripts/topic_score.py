@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""話題の切れ目の答えを採点する。results/topics/*.jsonl を読み、表と scores.json を書く。
+"""話題の切れ目の答えを採点する。results/topics/<data>/*.jsonl を読み、データごとに表と scores.json を書く。
 
 比べるもの
 - 切れ目の適合率、再現率、F1。ちょうど同じ行と、前後 1 行のずれを許したもの
@@ -10,7 +10,9 @@
 - 読めなかった答えの割合。読めないと、アプリはまとまり全体を1件のメモにする
 
 比べる基準として、分けない(今までのアプリ)を同じ表に載せる。
+調整用のデータでは、短い話題を前の話題に戻す規則(--min-lines)を、答えに後から当てた結果も載せる。
 """
+import argparse
 import json
 import pathlib
 
@@ -109,6 +111,21 @@ def baseline(records: list[dict]) -> list[dict]:
     return [{**r, "pred": [1], "output": "1"} for r in records]
 
 
+def merge_short(starts: list[int], n: int, min_lines: int) -> list[int]:
+    """[min_lines] 行より短い話題を、前の話題に戻す。最初の話題が短ければ次の話題とつなぐ。"""
+    kept = [1]
+    for b, end in zip(starts[1:], starts[2:] + [n + 1]):
+        if end - b >= min_lines:
+            kept.append(b)
+    if len(kept) > 1 and kept[1] - 1 < min_lines:
+        kept.pop(1)
+    return kept
+
+
+def with_min_lines(records: list[dict], min_lines: int) -> list[dict]:
+    return [{**r, "pred": r["pred"] and merge_short(r["pred"], r["lines"], min_lines)} for r in records]
+
+
 def table(rows: list[tuple[str, dict]]) -> str:
     head = "| 対象 | 例 | 読めない | 切れ目 F1(一致) | 適合率 / 再現率(±1 行) | 混ざったメモ | 割れた話題 | 1 話題の誤分割 | Pk |\n"
     head += "|---|---|---|---|---|---|---|---|---|\n"
@@ -124,21 +141,27 @@ def table(rows: list[tuple[str, dict]]) -> str:
 
 
 def main() -> None:
-    scores = {}
-    rows = []
-    for path in sorted(RESULTS.glob("*.jsonl")):
-        records = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
-        name = path.stem
-        for subset in ("concat", "natural", "all"):
-            sub = [r for r in records if subset == "all" or r["set"] == subset]
-            for label, rs in ((name, sub), ("分けない", baseline(sub))):
-                key = f"{label}/{subset}"
-                if key in scores:
-                    continue
-                scores[key] = score(rs)
-                rows.append((f"{label} / {subset}", scores[key]))
-    (RESULTS / "scores.json").write_text(json.dumps(scores, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
-    print(table(rows))
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--min-lines", default="2,3", help="調整用で試す、話題の最小の行数(カンマ区切り)")
+    args = ap.parse_args()
+    for data_dir in sorted(p for p in RESULTS.iterdir() if p.is_dir()):
+        scores = {}
+        rows = []
+        for path in sorted(data_dir.glob("*.jsonl")):
+            records = [json.loads(x) for x in path.read_text(encoding="utf-8").splitlines()]
+            runs = [(path.stem, records), ("分けない", baseline(records))]
+            if data_dir.name == "dev":
+                runs += [(f"{path.stem}+min{m}", with_min_lines(records, int(m))) for m in args.min_lines.split(",")]
+            for label, rs in runs:
+                for subset in ("concat", "natural", "all"):
+                    key = f"{label}/{subset}"
+                    if key in scores:
+                        continue
+                    scores[key] = score([r for r in rs if subset == "all" or r["set"] == subset])
+                    rows.append((f"{label} / {subset}", scores[key]))
+        (data_dir / "scores.json").write_text(json.dumps(scores, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+        print("##", data_dir.name)
+        print(table(rows))
 
 
 if __name__ == "__main__":
