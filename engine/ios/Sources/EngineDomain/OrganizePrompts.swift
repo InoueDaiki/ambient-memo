@@ -5,7 +5,8 @@ import Foundation
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
  * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
- * タイトルと話題の切れ目のプロンプトは評価していない。
+ * タイトルのプロンプトは評価していない。
+ * 話題の切れ目のプロンプトは `docs/検証-話題の切れ目.md` で評価した。変えるときは `tools/spike-llm/scripts/topic_eval.py` で測り直す。
  *
  * Kotlin の `trimMargin()` の文字列を、同じ文字列になる Swift の複数行の文字列で書いた。Kotlin と一字一句揃える。
  * 日付の計算が範囲外になると [IllegalArgumentException] を投げるので、Swift では `throws` にした。

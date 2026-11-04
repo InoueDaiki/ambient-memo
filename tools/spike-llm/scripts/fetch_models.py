@@ -45,9 +45,13 @@ def sha256(path: pathlib.Path) -> str:
 
 
 def main() -> None:
+    # 引数でファイル名を渡すと、そのモデルだけを取得する。一覧の manifest は全部を取得したときだけ書き直す
+    only = set(sys.argv[1:])
     MODELS.mkdir(exist_ok=True)
     manifest = []
     for repo, rev, name in FILES:
+        if only and name not in only:
+            continue
         want, size = expected(repo, rev, name)
         dest = MODELS / name
         if not (dest.exists() and dest.stat().st_size == size):
@@ -63,7 +67,8 @@ def main() -> None:
             sys.exit(f"SHA-256 不一致: {name}\n  期待 {want}\n  実際 {got}")
         print("OK", name, size, got, flush=True)
         manifest.append({"repo": repo, "revision": rev, "file": name, "bytes": size, "sha256": got})
-    (ROOT / "results" / "models.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    if not only:
+        (ROOT / "results" / "models.json").write_text(json.dumps(manifest, indent=2) + "\n")
 
 
 if __name__ == "__main__":
