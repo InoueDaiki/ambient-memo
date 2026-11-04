@@ -5,7 +5,8 @@ package dev.ambientmemo.engine.domain
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
  * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
- * タイトルと話題の切れ目のプロンプトは評価していない。
+ * タイトルのプロンプトは評価していない。
+ * 話題の切れ目のプロンプトは `docs/検証-話題の切れ目.md` で評価した。変えるときは `tools/spike-llm/scripts/topic_eval.py` で測り直す。
  */
 internal object OrganizePrompts {
     /** 日付の表の日数。今日を含む。 */
