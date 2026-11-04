@@ -1,0 +1,1690 @@
+{
+  "area": "speaker-consolidation",
+  "description": "増えすぎた仮の話者をまとめ直す SpeakerConsolidation。仮の話者が上限を超えていたら、最も近い 2 つを発話の長さで重み付けした平均で統合することを上限に収まるまで繰り返し、収まった後も consolidationThreshold 以上に近い組は統合する。残すのは id の小さい話者で、残った仮の話者の名前を id の順に振り直す。自分、手で名付けた話者、推定の名前の話者は対象にしない",
+  "inputSchema": "話者の記録をメモリに持つ世界を作り、setup(結果を見ない)と steps(結果を比べる)を順に流す。modelVersion: 特徴量のモデルの版(省略すると \"fake-1\")。clockMillis: Fake の時計の時刻(advanceClock でだけ進む)。speakerConfig: SpeakerConfig の項目を Kotlin の名前で書き、書かない項目は既定値。recentVoicesCapacity: 覚える声の数の上限(省略すると 256)。embedder: 特徴量の Fake。{modelVersion, responses, cycle}。n 回目(0 から)の呼び出しは responses[n](cycle が true なら responses[n % 個数])を返す。要素は特徴量、null(作れない)、\"fail\"(例外を投げる)。embedder を省略するといつも [1, 0, 0]。特徴量は数の配列か {size, values: {添字: 値}, normalize} で書く。書かない要素は 0、normalize が true なら長さ 1 にする(各要素を Double にして 2 乗和の平方根を取り、Float にしてから各要素を Float のまま割る)。数でない値は文字列 \"NaN\"。値は Float として読む。話者と発話の id は、それぞれ 1 から作った順に振る。setup と steps の操作。どれも結果を返す。{op: \"enrollSelf\", vector, sampleCount, nowMillis, modelVersion}: 自分の特徴量を記録する。自分がいなければ「自分」(nameSource \"SELF\")を作り、いれば特徴量を置き換え、どのモデルの版の育てた声も消す → {speakerId}。{op: \"createProvisional\", vector, nowMillis, voicedMillis}: 仮の話者を作る。名前は、どの話者の表示名にも使われていない最小の番号の「話者N」→ {speakerId}。{op: \"setManualName\" | \"setInferredName\", speakerId, name} → {ok}。推定の名前は、自分以外で名前が仮か推定の話者にだけ付く。{op: \"saveSelfAdaptation\", vector, voicedMillis, nowMillis, modelVersion}: 育てた自分の声を置き換える → {}。{op: \"insertUtterance\", startedAtMillis, endedAtMillis, text, confidence, createdAtMillis, speakerId, speakerConfidence}: 発話を保存する。省略すると 0、1、\"本文\"、null、1、null、0.5 → {utteranceId}。{op: \"advanceClock\", millis} → {}。{op: \"rememberVoice\", utteranceId, vector, voicedMillis}: 最近の声として覚える → {}。{op: \"takeVoice\", utteranceId}: 覚えた声を取り出す(1 度だけ)→ {voice: {vector, voicedMillis} か null}。{op: \"identify\", startedAtMillis, millis, samples, text, confidence, tokens, repeat, save}: 音声が 0 の区間(16 kHz、標本は samples 個。省略すると millis 分)と文字起こし(text は省略すると \"本文\"、tokens は [文字, ミリ秒] の配列で省略すると時刻なし)で SpeakerIdentifier.identify を呼ぶ。save が true なら、聞き取りと同じく行を保存し(createdAtMillis は時計)、行の声を覚える。結果は {turns: [{startedAtMillis, endedAtMillis, text, speakerId, confidence, voice: {vector, voicedMillis} か null}]}。repeat を書くと repeat 回呼び、どの回も 1 行だけ返ることを前提に {speakerIds: [各回の speakerId]} を返す。{op: \"consolidate\"}: SpeakerConsolidation を動かす → {merged}。{op: \"reassign\", utteranceId, target}: SpeakerCorrections.reassign。target は \"self\"、\"unknown\"、\"newOther\"、{existing: 話者の id} → {ok}。{op: \"merge\", fromId, intoId} → {ok}。{op: \"rename\", speakerId, name} → {ok}。{op: \"snapshot\", include: [...]}: include に書いた項目だけを持つオブジェクトを返す。",
+  "expectedSchema": "steps に操作ごとの結果。特徴量は 0 でない要素だけを {size, values: {添字: 値}} で書く。snapshot の項目。speakers: 作った順に [{id, displayName, nameSource, isSelf}]。embeddings: modelVersion の特徴量を、自分を先に、更新の時刻の新しい順、id の大きい順に最大 100 件 [{speakerId, isSelf, vector, sampleCount, voicedMillis, updatedAtMillis}]。adaptation: modelVersion の育てた自分の声 {vector, voicedMillis} か null。utterances: capture-pipeline と同じ。embedderCalls: capture-pipeline と同じ。diagnostics: SpeakerDiagnosticsReader の 7 日分の集計 {days, selfRuns, otherRuns, unknownRuns, selfMillis, otherMillis, unknownMillis, histogram: [{floor, selfRuns, otherRuns, unknownRuns}], provisionalSpeakers, hasAdaptedVoice}。",
+  "cases": [
+    {
+      "name": "増えた仮の話者を上限までまとめ、発話と特徴量を付け替え、番号を振り直す",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": {
+              "size": 32,
+              "values": {
+                "0": 1
+              },
+              "normalize": true
+            },
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "13": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "14": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "15": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "16": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "17": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "18": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "19": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "20": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "21": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "22": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "23": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "24": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "25": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "26": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "27": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "28": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 2
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 3
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 4
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 5
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 6
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 7
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 8
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 9
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 10
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 11
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 12
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 13
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 14
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 15
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 16
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 17
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 18
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 19
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 20
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 1
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": null
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "embeddings",
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 16
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 3,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 4,
+                "displayName": "話者3",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 4,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "3": 0.99668294,
+                    "12": 0.0327924,
+                    "15": 0.032920573,
+                    "18": 0.03308157,
+                    "21": 0.033297442,
+                    "24": 0.033622306,
+                    "27": 0.033622306
+                  }
+                },
+                "sampleCount": 6,
+                "voicedMillis": 24000,
+                "updatedAtMillis": 9000
+              },
+              {
+                "speakerId": 3,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "2": 0.99668294,
+                    "11": 0.0327924,
+                    "14": 0.032920573,
+                    "17": 0.03308157,
+                    "20": 0.033297442,
+                    "23": 0.033622306,
+                    "26": 0.033622306
+                  }
+                },
+                "sampleCount": 6,
+                "voicedMillis": 24000,
+                "updatedAtMillis": 9000
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.9971548,
+                    "10": 0.028094698,
+                    "13": 0.028186131,
+                    "16": 0.0282963,
+                    "19": 0.02843468,
+                    "22": 0.02862023,
+                    "25": 0.028899463,
+                    "28": 0.028899463
+                  }
+                },
+                "sampleCount": 7,
+                "voicedMillis": 28000,
+                "updatedAtMillis": 9000
+              }
+            ],
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 3,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 4,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 5,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": null
+              },
+              {
+                "id": 6,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": null
+              },
+              {
+                "id": 7,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 8,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": null
+              },
+              {
+                "id": 9,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": null
+              },
+              {
+                "id": 10,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 11,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": null
+              },
+              {
+                "id": 12,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": null
+              },
+              {
+                "id": 13,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 14,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": null
+              },
+              {
+                "id": 15,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": null
+              },
+              {
+                "id": 16,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 17,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 3,
+                "speakerConfidence": null
+              },
+              {
+                "id": 18,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 4,
+                "speakerConfidence": null
+              },
+              {
+                "id": 19,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 2,
+                "speakerConfidence": null
+              },
+              {
+                "id": 20,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 21,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": null,
+                "speakerConfidence": 0.5
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "同じ声のまとまりを近い順にまとめる",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "13": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "14": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "15": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "16": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "17": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "18": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "19": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 1
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 2
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 3
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 4
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 5
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 6
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 7
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 8
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 9
+          },
+          {
+            "op": "insertUtterance",
+            "speakerId": 10
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "utterances"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 8
+          },
+          {
+            "utterances": [
+              {
+                "id": 1,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 2,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              },
+              {
+                "id": 3,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              },
+              {
+                "id": 4,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              },
+              {
+                "id": 5,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 1,
+                "speakerConfidence": null
+              },
+              {
+                "id": 6,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 6,
+                "speakerConfidence": 0.5
+              },
+              {
+                "id": 7,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 6,
+                "speakerConfidence": null
+              },
+              {
+                "id": 8,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 6,
+                "speakerConfidence": null
+              },
+              {
+                "id": 9,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 6,
+                "speakerConfidence": null
+              },
+              {
+                "id": 10,
+                "startedAtMillis": 0,
+                "endedAtMillis": 1,
+                "text": "本文",
+                "confidence": null,
+                "createdAtMillis": 1,
+                "speakerId": 6,
+                "speakerConfidence": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "もう一度動かしても何も変わらない",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "13": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "14": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "15": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "16": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "17": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "embeddings"
+            ]
+          },
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 6
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 2,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "2": 0.99503696,
+                    "11": 0.049268812,
+                    "13": 0.04959032,
+                    "15": 0.050074134,
+                    "17": 0.050074134
+                  }
+                },
+                "sampleCount": 4,
+                "voicedMillis": 16000,
+                "updatedAtMillis": 9000
+              },
+              {
+                "speakerId": 1,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.99503696,
+                    "10": 0.049268812,
+                    "12": 0.04959032,
+                    "14": 0.050074134,
+                    "16": 0.050074134
+                  }
+                },
+                "sampleCount": 4,
+                "voicedMillis": 16000,
+                "updatedAtMillis": 9000
+              }
+            ]
+          },
+          {
+            "merged": 0
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 2,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "2": 0.99503696,
+                    "11": 0.049268812,
+                    "13": 0.04959032,
+                    "15": 0.050074134,
+                    "17": 0.050074134
+                  }
+                },
+                "sampleCount": 4,
+                "voicedMillis": 16000,
+                "updatedAtMillis": 9000
+              },
+              {
+                "speakerId": 1,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.99503696,
+                    "10": 0.049268812,
+                    "12": 0.04959032,
+                    "14": 0.050074134,
+                    "16": 0.050074134
+                  }
+                },
+                "sampleCount": 4,
+                "voicedMillis": 16000,
+                "updatedAtMillis": 9000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "上限以下なら何もしない",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 0
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 2,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 3,
+                "displayName": "話者3",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ],
+            "embeddings": [
+              {
+                "speakerId": 3,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.9805807,
+                    "12": 0.19611615
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.9805807,
+                    "11": 0.19611615
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1
+              },
+              {
+                "speakerId": 1,
+                "isSelf": false,
+                "vector": {
+                  "size": 32,
+                  "values": {
+                    "1": 0.9805807,
+                    "10": 0.19611615
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 4000,
+                "updatedAtMillis": 1
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "手で名付けた話者と自分は統合しない",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "setManualName",
+            "speakerId": 2,
+            "name": "母"
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "setInferredName",
+            "speakerId": 3,
+            "name": "架空の名前"
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "13": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "14": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "15": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "16": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "17": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "18": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 5
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "母",
+                "nameSource": "MANUAL",
+                "isSelf": false
+              },
+              {
+                "id": 3,
+                "displayName": "架空の名前",
+                "nameSource": "INFERRED",
+                "isSelf": false
+              },
+              {
+                "id": 4,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "手の名前と同じ番号は使わない",
+      "input": {
+        "clockMillis": 9000,
+        "setup": [
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "1": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "setManualName",
+            "speakerId": 1,
+            "name": "話者1"
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "2": 1,
+                "10": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "3": 1,
+                "11": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "4": 1,
+                "12": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "5": 1,
+                "13": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          },
+          {
+            "op": "createProvisional",
+            "vector": {
+              "size": 32,
+              "values": {
+                "6": 1,
+                "14": 0.2
+              },
+              "normalize": true
+            },
+            "nowMillis": 1,
+            "voicedMillis": 4000
+          }
+        ],
+        "steps": [
+          {
+            "op": "consolidate"
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "merged": 2
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "話者1",
+                "nameSource": "MANUAL",
+                "isSelf": false
+              },
+              {
+                "id": 2,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 3,
+                "displayName": "話者3",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 5,
+                "displayName": "話者4",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

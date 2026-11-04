@@ -1,0 +1,264 @@
+{
+  "area": "model-validation",
+  "description": "値の型が作るときに確かめる条件。発話と欠落の時刻の向き、信頼度の範囲、聞き取りの設定の矛盾を断る",
+  "inputSchema": "type: 作る型。\"Transcription\"(args: text, confidence)、\"NewUtterance\"(args: startedAtMillis, endedAtMillis, text, confidence, createdAtMillis, speakerId, speakerConfidence)、\"CaptureGap\"(args: startedAtMillis, endedAtMillis, reason: \"PROCESSING_BACKLOG\"|\"PROCESSING_FAILED\"|\"SOURCE_DISCONTINUITY\"|\"PIPELINE_STOPPED\")、\"CaptureConfig\"(args: maxUtteranceMillis, minSilenceMillis, preRollMillis, minSpeechMillis, maxBacklogMillis, discontinuityToleranceMillis。書かない項目は既定値 30000、700、300、200、120000、200)。信頼度は null か 0 以上 1 以下",
+  "expectedSchema": "作れたら {\"valid\": true}、条件で断られたら {\"error\": \"invalid-argument\"}",
+  "cases": [
+    {
+      "name": "時刻が逆転した発話は作れない",
+      "input": {
+        "type": "NewUtterance",
+        "args": {
+          "startedAtMillis": 10,
+          "endedAtMillis": 9,
+          "text": "本文",
+          "confidence": null,
+          "createdAtMillis": 10,
+          "speakerId": null,
+          "speakerConfidence": null
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "開始と終了が同じ発話は作れる",
+      "input": {
+        "type": "NewUtterance",
+        "args": {
+          "startedAtMillis": 10,
+          "endedAtMillis": 10,
+          "text": "本文",
+          "confidence": null,
+          "createdAtMillis": 1,
+          "speakerId": null,
+          "speakerConfidence": null
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "時刻が逆転した欠落は作れない",
+      "input": {
+        "type": "CaptureGap",
+        "args": {
+          "startedAtMillis": 10,
+          "endedAtMillis": 9,
+          "reason": "PROCESSING_FAILED"
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "開始と終了が同じ欠落は作れる",
+      "input": {
+        "type": "CaptureGap",
+        "args": {
+          "startedAtMillis": 10,
+          "endedAtMillis": 10,
+          "reason": "PIPELINE_STOPPED"
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "範囲外の文字起こしの信頼度は受け付けない",
+      "input": {
+        "type": "Transcription",
+        "args": {
+          "text": "本文",
+          "confidence": 1.5
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "文字起こしの信頼度の両端は受け付ける",
+      "input": {
+        "type": "Transcription",
+        "args": {
+          "text": "本文",
+          "confidence": 1.0
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "文字起こしの信頼度はなくてもよい",
+      "input": {
+        "type": "Transcription",
+        "args": {
+          "text": "本文",
+          "confidence": null
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "範囲外の発話の信頼度は受け付けない",
+      "input": {
+        "type": "NewUtterance",
+        "args": {
+          "startedAtMillis": 0,
+          "endedAtMillis": 1,
+          "text": "本文",
+          "confidence": -0.1,
+          "createdAtMillis": 1,
+          "speakerId": null,
+          "speakerConfidence": null
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "範囲外の話者の信頼度は受け付けない",
+      "input": {
+        "type": "NewUtterance",
+        "args": {
+          "startedAtMillis": 0,
+          "endedAtMillis": 1,
+          "text": "本文",
+          "confidence": null,
+          "createdAtMillis": 1,
+          "speakerId": null,
+          "speakerConfidence": 1.01
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "話者の信頼度の下端は受け付ける",
+      "input": {
+        "type": "NewUtterance",
+        "args": {
+          "startedAtMillis": 0,
+          "endedAtMillis": 1,
+          "text": "本文",
+          "confidence": null,
+          "createdAtMillis": 1,
+          "speakerId": 1,
+          "speakerConfidence": 0.0
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "発話の上限が無音の長さ以下の設定は受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "maxUtteranceMillis": 500,
+          "minSilenceMillis": 500
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "待ちの上限が発話の上限より短い設定は受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "maxUtteranceMillis": 30000,
+          "maxBacklogMillis": 29999
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "待ちの上限は発話の上限と同じでよい",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "maxUtteranceMillis": 30000,
+          "maxBacklogMillis": 30000
+        }
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "既定の設定は受け付ける",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {}
+      },
+      "expected": {
+        "valid": true
+      }
+    },
+    {
+      "name": "無音の長さが 0 の設定は受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "minSilenceMillis": 0
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "負の語頭の長さは受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "preRollMillis": -1
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "発話の上限が語頭の長さ以下の設定は受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "maxUtteranceMillis": 1000,
+          "preRollMillis": 1000,
+          "minSilenceMillis": 100
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    },
+    {
+      "name": "負の時刻のずれの許容は受け付けない",
+      "input": {
+        "type": "CaptureConfig",
+        "args": {
+          "discontinuityToleranceMillis": -1
+        }
+      },
+      "expected": {
+        "error": "invalid-argument"
+      }
+    }
+  ]
+}

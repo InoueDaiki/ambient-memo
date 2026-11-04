@@ -1,0 +1,43 @@
+{
+  "area": "organize-policy",
+  "description": "整理を続けられないときの理由を決める OrganizeTrigger.stopReason。止める依頼、熱、充電切れの順に見る",
+  "inputSchema": "trigger: 整理のきっかけ。\"SCHEDULED\"(充電中の定期実行)か \"MANUAL\"(今すぐ整理する)。stopRequested、isCharging、isTooHot: 端末の状態と止める依頼の真偽",
+  "expectedSchema": "stopReason: 止める理由。\"REQUESTED\"、\"TOO_HOT\"、\"NOT_CHARGING\" のどれか。続けてよければ null",
+  "cases": [
+    {
+      "name": "定期実行は充電が切れると止める",
+      "input": { "trigger": "SCHEDULED", "stopRequested": false, "isCharging": false, "isTooHot": false },
+      "expected": { "stopReason": "NOT_CHARGING" }
+    },
+    {
+      "name": "定期実行は充電中で熱くなければ続ける",
+      "input": { "trigger": "SCHEDULED", "stopRequested": false, "isCharging": true, "isTooHot": false },
+      "expected": { "stopReason": null }
+    },
+    {
+      "name": "手動の実行は充電が切れても続ける",
+      "input": { "trigger": "MANUAL", "stopRequested": false, "isCharging": false, "isTooHot": false },
+      "expected": { "stopReason": null }
+    },
+    {
+      "name": "手動の実行でも熱いと止める",
+      "input": { "trigger": "MANUAL", "stopRequested": false, "isCharging": false, "isTooHot": true },
+      "expected": { "stopReason": "TOO_HOT" }
+    },
+    {
+      "name": "定期実行も熱いと止める",
+      "input": { "trigger": "SCHEDULED", "stopRequested": false, "isCharging": true, "isTooHot": true },
+      "expected": { "stopReason": "TOO_HOT" }
+    },
+    {
+      "name": "止める依頼は手動の実行でも止め、理由は依頼になる",
+      "input": { "trigger": "MANUAL", "stopRequested": true, "isCharging": false, "isTooHot": true },
+      "expected": { "stopReason": "REQUESTED" }
+    },
+    {
+      "name": "止める依頼は定期実行でも止め、理由は依頼になる",
+      "input": { "trigger": "SCHEDULED", "stopRequested": true, "isCharging": false, "isTooHot": true },
+      "expected": { "stopReason": "REQUESTED" }
+    }
+  ]
+}

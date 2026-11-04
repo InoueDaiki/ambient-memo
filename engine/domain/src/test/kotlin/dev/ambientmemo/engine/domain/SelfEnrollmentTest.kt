@@ -9,212 +9,46 @@ import dev.ambientmemo.engine.domain.testing.SyntheticAudio
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.cancelAndJoin
-import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertArrayEquals
-import org.junit.jupiter.api.Assertions.assertEquals
-import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Assertions.assertTrue
 import org.junit.jupiter.api.Test
-import java.io.IOException
-import kotlin.math.sqrt
 
+/** キャンセルはコルーチンに依るので、ここに残す。登録の規則は engine/spec/self-enrollment.json にある。 */
 class SelfEnrollmentTest {
     private val model = "fake-1"
     private val speakers = InMemorySpeakerRepository()
-    private val captureConfig = CaptureConfig(
-        maxUtteranceMillis = 1_000,
-        minSilenceMillis = 100,
-        preRollMillis = 0,
-        minSpeechMillis = 0,
-    )
-    private val config = EnrollmentConfig(requiredSamples = 2, minSampleMillis = 400, maxListeningMillis = 5_000)
-
-    /** 500ms の発話と 200ms の無音を [count] 回くり返す。 */
-    private fun bursts(count: Int): Pair<ShortArray, List<LongRange>> {
-        var audio = ShortArray(0)
-        val ranges = (0 until count).map { index ->
-            audio += SyntheticAudio.tone(500) + SyntheticAudio.silence(200)
-            val start = index * 700L
-            start..<start + 500
-        }
-        return audio to ranges
-    }
-
-    private fun enrollment(
-        audio: ShortArray,
-        speech: List<LongRange>,
-        embedder: SpeakerEmbedder,
-        source: AudioSource = FakeAudioSource(audio),
-        onProgress: (EnrollmentProgress) -> Unit = {},
-    ) = SelfEnrollment(
-        audioSource = source,
-        voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
-        embedder = embedder,
-        speakers = speakers,
-        clock = FakeClock(9_000),
-        captureConfig = captureConfig,
-        config = config,
-        onProgress = onProgress,
-    )
-
-    @Test
-    fun `複数の発話の平均を自分として記録する`() = runTest {
-        val (audio, speech) = bursts(2)
-        val embedder = FakeSpeakerEmbedder(model) { index, _ ->
-            if (index == 0) floatArrayOf(3f, 0f) else floatArrayOf(0f, 4f)
-        }
-
-        val outcome = enrollment(audio, speech, embedder).run()
-
-        assertEquals(EnrollmentOutcome.ENROLLED, outcome)
-        val stored = speakers.listEmbeddings(model, 10).single()
-        val half = 1 / sqrt(2f)
-        assertTrue(stored.isSelf)
-        assertEquals(2, stored.sampleCount)
-        assertArrayEquals(floatArrayOf(half, half), stored.vector, 0.001f)
-    }
-
-    @Test
-    fun `発話が揃ったらそこで読み取りを止める`() = runTest {
-        val (audio, speech) = bursts(10)
-        val embedder = FakeSpeakerEmbedder(model)
-
-        enrollment(audio, speech, embedder).run()
-
-        assertEquals(2, embedder.received.size)
-    }
-
-    @Test
-    fun `音声はすべて解放する`() = runTest {
-        val (audio, speech) = bursts(2)
-        val embedder = FakeSpeakerEmbedder(model)
-
-        enrollment(audio, speech, embedder).run()
-
-        assertTrue(embedder.received.all { it.isReleased })
-    }
-
-    @Test
-    fun `発話が足りなければ何も記録しない`() = runTest {
-        val (audio, speech) = bursts(1)
-
-        val outcome = enrollment(audio, speech, FakeSpeakerEmbedder(model)).run()
-
-        assertEquals(EnrollmentOutcome.NOT_ENOUGH_SPEECH, outcome)
-        assertTrue(speakers.listSpeakers().isEmpty())
-    }
-
-    @Test
-    fun `使えた発話を 1 つずつ知らせる`() = runTest {
-        val (audio, speech) = bursts(2)
-        val progress = mutableListOf<EnrollmentProgress>()
-
-        enrollment(audio, speech, FakeSpeakerEmbedder(model), onProgress = progress::add).run()
-
-        assertEquals(listOf(EnrollmentProgress(1), EnrollmentProgress(2)), progress)
-    }
-
-    @Test
-    fun `短すぎる発話は読み直しを知らせ、ごく短い音は知らせない`() = runTest {
-        // 200ms と 300ms の発話のあとに、使える長さの発話を 2 つ
-        val audio = SyntheticAudio.tone(100) + SyntheticAudio.silence(200) +
-            SyntheticAudio.tone(300) + SyntheticAudio.silence(200) +
-            SyntheticAudio.tone(500) + SyntheticAudio.silence(200) +
-            SyntheticAudio.tone(500) + SyntheticAudio.silence(200)
-        val speech = listOf(0L..<100L, 300L..<600L, 800L..<1_300L, 1_500L..<2_000L)
-        val progress = mutableListOf<EnrollmentProgress>()
-
-        enrollment(audio, speech, FakeSpeakerEmbedder(model), onProgress = progress::add).run()
-
-        assertEquals(
-            listOf(EnrollmentProgress(0, isRejected = true), EnrollmentProgress(1), EnrollmentProgress(2)),
-            progress,
-        )
-    }
-
-    @Test
-    fun `短い発話は登録に使わない`() = runTest {
-        val audio = SyntheticAudio.tone(300) + SyntheticAudio.silence(200) + SyntheticAudio.tone(300) +
-            SyntheticAudio.silence(200)
-        val embedder = FakeSpeakerEmbedder(model)
-
-        val outcome = enrollment(audio, listOf(0L..<300, 500L..<800), embedder).run()
-
-        assertEquals(EnrollmentOutcome.NOT_ENOUGH_SPEECH, outcome)
-        assertTrue(embedder.received.isEmpty())
-    }
-
-    @Test
-    fun `特徴量を作れなかった発話は数えない`() = runTest {
-        val (audio, speech) = bursts(3)
-        val embedder = FakeSpeakerEmbedder(model) { index, _ ->
-            when (index) {
-                0 -> null
-                1 -> floatArrayOf(0f, 0f)
-                else -> floatArrayOf(1f, 0f)
-            }
-        }
-
-        assertEquals(EnrollmentOutcome.NOT_ENOUGH_SPEECH, enrollment(audio, speech, embedder).run())
-    }
-
-    @Test
-    fun `時間の上限で諦める`() = runTest {
-        val silent = SyntheticAudio.silence(100)
-        var frames = 0
-        val endless = object : AudioSource {
-            override val sampleRateHz = 16_000
-
-            override fun frames(): Flow<AudioFrame> = flow {
-                while (true) {
-                    emit(AudioFrame(frames++ * 100L, silent))
-                }
-            }
-        }
-
-        val outcome = enrollment(ShortArray(0), emptyList(), FakeSpeakerEmbedder(model), endless).run()
-
-        assertEquals(EnrollmentOutcome.NOT_ENOUGH_SPEECH, outcome)
-        assertEquals(50, frames)
-    }
-
-    @Test
-    fun `途中で切れた音声の最後の発話も使う`() = runTest {
-        val audio = SyntheticAudio.tone(500) + SyntheticAudio.silence(200) + SyntheticAudio.tone(500)
-
-        val outcome = enrollment(audio, listOf(0L..<500, 700L..<1_200), FakeSpeakerEmbedder(model)).run()
-
-        assertEquals(EnrollmentOutcome.ENROLLED, outcome)
-    }
-
-    @Test
-    fun `特徴量の失敗は例外にして、音声を解放し、何も記録しない`() {
-        val (audio, speech) = bursts(2)
-        val embedder = FakeSpeakerEmbedder(model) { _, _ -> throw IOException("失敗") }
-
-        assertThrows(IOException::class.java) {
-            runTest { enrollment(audio, speech, embedder).run() }
-        }
-
-        assertTrue(embedder.received.all { it.isReleased })
-        runTest { assertTrue(speakers.listSpeakers().isEmpty()) }
-    }
 
     @Test
     fun `キャンセルすると音声を解放し、前の登録を残す`() = runTest {
         val previous = SpeakerEmbedding(floatArrayOf(1f, 0f), model)
         speakers.saveSelfEmbedding(previous, 3, 0)
-        val (audio, speech) = bursts(2)
+        val audio = (0 until 2).fold(ShortArray(0)) { all, _ ->
+            all + SyntheticAudio.tone(500) + SyntheticAudio.silence(200)
+        }
+        val speech = listOf(0L..<500L, 700L..<1_200L)
         val started = CompletableDeferred<Unit>()
         val embedder = FakeSpeakerEmbedder(model) { _, _ ->
             started.complete(Unit)
             awaitCancellation()
         }
+        val enrollment = SelfEnrollment(
+            audioSource = FakeAudioSource(audio),
+            voiceActivityDetector = ScriptedVoiceActivityDetector(speech),
+            embedder = embedder,
+            speakers = speakers,
+            clock = FakeClock(9_000),
+            captureConfig = CaptureConfig(
+                maxUtteranceMillis = 1_000,
+                minSilenceMillis = 100,
+                preRollMillis = 0,
+                minSpeechMillis = 0,
+            ),
+            config = EnrollmentConfig(requiredSamples = 2, minSampleMillis = 400, maxListeningMillis = 5_000),
+        )
 
-        val job = launch { enrollment(audio, speech, embedder).run() }
+        val job = launch { enrollment.run() }
         started.await()
         job.cancelAndJoin()
 

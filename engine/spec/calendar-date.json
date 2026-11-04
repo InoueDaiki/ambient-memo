@@ -1,0 +1,128 @@
+{
+  "area": "calendar-date",
+  "description": "時差を持たない暦の日付 CalendarDate。期限や「今日」の表現に使う。グレゴリオ暦で、年は 1〜9999",
+  "inputSchema": "op で操作を選ぶ。日付の入力は \"YYYY-MM-DD\" の文字列。\"of\": millis(エポックからのミリ秒)と timeZone(IANA の名前)から、その地域の日付を作る。\"plusDays\": date に days 日を足す(負も可)。\"weekday\": date の曜日。\"compare\": first と second の前後。\"parse\": text を \"YYYY-MM-DD\" として読む。桁数が違うもの、区切りが違うもの、存在しない日付、後ろに時刻などが続くものは読まない。\"create\": year、month、day の整数から作る",
+  "expectedSchema": "\"of\"、\"plusDays\"、\"create\": date に \"YYYY-MM-DD\"(年は 4 桁、月日は 2 桁に 0 で埋める)。\"create\" で存在しない日付なら {\"error\": \"invalid-date\"}。\"weekday\": weekdayIndex に月曜を 0、日曜を 6 とした整数。\"compare\": order に first が前なら -1、同じなら 0、後なら 1。\"parse\": date に読んだ日付の文字列、読めなければ null",
+  "cases": [
+    {
+      "name": "日本時間の日付は UTC の日付と違うことがある(日本時間)",
+      "input": { "op": "of", "millis": 1793547000000, "timeZone": "Asia/Tokyo" },
+      "expected": { "date": "2026-11-02" }
+    },
+    {
+      "name": "日本時間の日付は UTC の日付と違うことがある(UTC)",
+      "input": { "op": "of", "millis": 1793547000000, "timeZone": "UTC" },
+      "expected": { "date": "2026-11-01" }
+    },
+    {
+      "name": "月をまたいで日数を足せる",
+      "input": { "op": "plusDays", "date": "2026-11-30", "days": 1 },
+      "expected": { "date": "2026-12-01" }
+    },
+    {
+      "name": "年をまたいで日数を足せる",
+      "input": { "op": "plusDays", "date": "2026-12-31", "days": 1 },
+      "expected": { "date": "2027-01-01" }
+    },
+    {
+      "name": "閏日をまたいで日数を足せる",
+      "input": { "op": "plusDays", "date": "2028-02-28", "days": 1 },
+      "expected": { "date": "2028-02-29" }
+    },
+    {
+      "name": "何日でも足せる",
+      "input": { "op": "plusDays", "date": "2026-11-01", "days": 21 },
+      "expected": { "date": "2026-11-22" }
+    },
+    {
+      "name": "負の日数で戻れる",
+      "input": { "op": "plusDays", "date": "2027-01-01", "days": -1 },
+      "expected": { "date": "2026-12-31" }
+    },
+    {
+      "name": "曜日は月曜を 0 にして数える",
+      "input": { "op": "weekday", "date": "2026-11-02" },
+      "expected": { "weekdayIndex": 0 }
+    },
+    {
+      "name": "日曜は 6",
+      "input": { "op": "weekday", "date": "2026-11-01" },
+      "expected": { "weekdayIndex": 6 }
+    },
+    {
+      "name": "日付の前後を比べられる",
+      "input": { "op": "compare", "first": "2026-12-31", "second": "2027-01-01" },
+      "expected": { "order": -1 }
+    },
+    {
+      "name": "同じ日付は前後がない",
+      "input": { "op": "compare", "first": "2026-11-02", "second": "2026-11-02" },
+      "expected": { "order": 0 }
+    },
+    {
+      "name": "月を年より優先しない",
+      "input": { "op": "compare", "first": "2027-01-01", "second": "2026-12-31" },
+      "expected": { "order": 1 }
+    },
+    {
+      "name": "文字列にすると月日を 0 で埋める",
+      "input": { "op": "create", "year": 2026, "month": 1, "day": 5 },
+      "expected": { "date": "2026-01-05" }
+    },
+    {
+      "name": "文字列から読める",
+      "input": { "op": "parse", "text": "2026-01-05" },
+      "expected": { "date": "2026-01-05" }
+    },
+    {
+      "name": "存在しない日付は読まない(2 月 30 日)",
+      "input": { "op": "parse", "text": "2026-02-30" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "存在しない日付は読まない(13 月)",
+      "input": { "op": "parse", "text": "2026-13-01" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "存在しない日付は読まない(0 月)",
+      "input": { "op": "parse", "text": "2026-00-10" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "桁の足りない日付は読まない",
+      "input": { "op": "parse", "text": "2026-1-5" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "区切りの違う日付は読まない",
+      "input": { "op": "parse", "text": "2026/01/05" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "日付でない言葉は読まない",
+      "input": { "op": "parse", "text": "明日" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "空の文字列は読まない",
+      "input": { "op": "parse", "text": "" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "時刻の付いた日付は読まない",
+      "input": { "op": "parse", "text": "2026-11-02T10:00" },
+      "expected": { "date": null }
+    },
+    {
+      "name": "存在しない日付は作れない",
+      "input": { "op": "create", "year": 2026, "month": 2, "day": 29 },
+      "expected": { "error": "invalid-date" }
+    },
+    {
+      "name": "閏年の 2 月 29 日は作れる",
+      "input": { "op": "create", "year": 2028, "month": 2, "day": 29 },
+      "expected": { "date": "2028-02-29" }
+    }
+  ]
+}

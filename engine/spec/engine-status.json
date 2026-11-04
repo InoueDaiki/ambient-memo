@@ -1,0 +1,13 @@
+{
+  "area": "engine-status",
+  "description": "エンジンの名前と API の版。JS 側が境界の版を確かめるのに使う",
+  "inputSchema": "空のオブジェクト",
+  "expectedSchema": "engineName: エンジンの名前。apiVersion: 境界の API の版の整数",
+  "cases": [
+    {
+      "name": "現在の状態はエンジンの名前と API の版を持つ",
+      "input": {},
+      "expected": { "engineName": "ambient-memo-engine", "apiVersion": 1 }
+    }
+  ]
+}

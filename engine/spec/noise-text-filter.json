@@ -1,0 +1,48 @@
+{
+  "area": "noise-text-filter",
+  "description": "雑音だけの区間から出た短い文字を除く NoiseTextFilter。文字は文字か数字だけを数え、句読点と空白は数えない",
+  "inputSchema": "text: 文字起こしの本文。durationMillis: 発話区間の長さ。longDurationMillis: 長い区間とみなす長さ。省略すると既定値の 2000",
+  "expectedSchema": "shouldSave: 保存するなら true",
+  "cases": [
+    {
+      "name": "1 文字は短い区間でも除く",
+      "input": { "text": "え", "durationMillis": 1600, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": false }
+    },
+    {
+      "name": "2 文字は区間が短ければ残す",
+      "input": { "text": "そう", "durationMillis": 1999, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": true }
+    },
+    {
+      "name": "2 文字は区間が長ければ除く",
+      "input": { "text": "はい", "durationMillis": 2000, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": false }
+    },
+    {
+      "name": "3 文字以上は区間が長くても残す",
+      "input": { "text": "なるほど", "durationMillis": 20000, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": true }
+    },
+    {
+      "name": "句読点と空白は文字に数えない(1 文字)",
+      "input": { "text": "え。 ", "durationMillis": 1600, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": false }
+    },
+    {
+      "name": "句読点と空白は文字に数えない(2 文字の長い区間)",
+      "input": { "text": "はい。", "durationMillis": 3000, "longDurationMillis": 2000 },
+      "expected": { "shouldSave": false }
+    },
+    {
+      "name": "既定の長い区間は 2000 ミリ秒",
+      "input": { "text": "そう", "durationMillis": 2000 },
+      "expected": { "shouldSave": false }
+    },
+    {
+      "name": "数字も文字に数える",
+      "input": { "text": "3時", "durationMillis": 1000 },
+      "expected": { "shouldSave": true }
+    }
+  ]
+}

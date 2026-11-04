@@ -1,0 +1,1512 @@
+{
+  "area": "speaker-identifier",
+  "description": "話者の判定 SpeakerIdentifier。自分の登録がなければ何もしない。区間を窓に分けて自分との類似度を取り、自分でなければ既存の話者に照合し、近い話者がいなければ上限まで仮の話者を作る。窓の動きは speaker-turns、既定の設定での長い聞き取りは speaker-long-conversation で確かめる",
+  "inputSchema": "話者の記録をメモリに持つ世界を作り、setup(結果を見ない)と steps(結果を比べる)を順に流す。modelVersion: 特徴量のモデルの版(省略すると \"fake-1\")。clockMillis: Fake の時計の時刻(advanceClock でだけ進む)。speakerConfig: SpeakerConfig の項目を Kotlin の名前で書き、書かない項目は既定値。recentVoicesCapacity: 覚える声の数の上限(省略すると 256)。embedder: 特徴量の Fake。{modelVersion, responses, cycle}。n 回目(0 から)の呼び出しは responses[n](cycle が true なら responses[n % 個数])を返す。要素は特徴量、null(作れない)、\"fail\"(例外を投げる)。embedder を省略するといつも [1, 0, 0]。特徴量は数の配列か {size, values: {添字: 値}, normalize} で書く。書かない要素は 0、normalize が true なら長さ 1 にする(各要素を Double にして 2 乗和の平方根を取り、Float にしてから各要素を Float のまま割る)。数でない値は文字列 \"NaN\"。値は Float として読む。話者と発話の id は、それぞれ 1 から作った順に振る。setup と steps の操作。どれも結果を返す。{op: \"enrollSelf\", vector, sampleCount, nowMillis, modelVersion}: 自分の特徴量を記録する。自分がいなければ「自分」(nameSource \"SELF\")を作り、いれば特徴量を置き換え、どのモデルの版の育てた声も消す → {speakerId}。{op: \"createProvisional\", vector, nowMillis, voicedMillis}: 仮の話者を作る。名前は、どの話者の表示名にも使われていない最小の番号の「話者N」→ {speakerId}。{op: \"setManualName\" | \"setInferredName\", speakerId, name} → {ok}。推定の名前は、自分以外で名前が仮か推定の話者にだけ付く。{op: \"saveSelfAdaptation\", vector, voicedMillis, nowMillis, modelVersion}: 育てた自分の声を置き換える → {}。{op: \"insertUtterance\", startedAtMillis, endedAtMillis, text, confidence, createdAtMillis, speakerId, speakerConfidence}: 発話を保存する。省略すると 0、1、\"本文\"、null、1、null、0.5 → {utteranceId}。{op: \"advanceClock\", millis} → {}。{op: \"rememberVoice\", utteranceId, vector, voicedMillis}: 最近の声として覚える → {}。{op: \"takeVoice\", utteranceId}: 覚えた声を取り出す(1 度だけ)→ {voice: {vector, voicedMillis} か null}。{op: \"identify\", startedAtMillis, millis, samples, text, confidence, tokens, repeat, save}: 音声が 0 の区間(16 kHz、標本は samples 個。省略すると millis 分)と文字起こし(text は省略すると \"本文\"、tokens は [文字, ミリ秒] の配列で省略すると時刻なし)で SpeakerIdentifier.identify を呼ぶ。save が true なら、聞き取りと同じく行を保存し(createdAtMillis は時計)、行の声を覚える。結果は {turns: [{startedAtMillis, endedAtMillis, text, speakerId, confidence, voice: {vector, voicedMillis} か null}]}。repeat を書くと repeat 回呼び、どの回も 1 行だけ返ることを前提に {speakerIds: [各回の speakerId]} を返す。{op: \"consolidate\"}: SpeakerConsolidation を動かす → {merged}。{op: \"reassign\", utteranceId, target}: SpeakerCorrections.reassign。target は \"self\"、\"unknown\"、\"newOther\"、{existing: 話者の id} → {ok}。{op: \"merge\", fromId, intoId} → {ok}。{op: \"rename\", speakerId, name} → {ok}。{op: \"snapshot\", include: [...]}: include に書いた項目だけを持つオブジェクトを返す。",
+  "expectedSchema": "steps に操作ごとの結果。特徴量は 0 でない要素だけを {size, values: {添字: 値}} で書く。snapshot の項目。speakers: 作った順に [{id, displayName, nameSource, isSelf}]。embeddings: modelVersion の特徴量を、自分を先に、更新の時刻の新しい順、id の大きい順に最大 100 件 [{speakerId, isSelf, vector, sampleCount, voicedMillis, updatedAtMillis}]。adaptation: modelVersion の育てた自分の声 {vector, voicedMillis} か null。utterances: capture-pipeline と同じ。embedderCalls: capture-pipeline と同じ。diagnostics: SpeakerDiagnosticsReader の 7 日分の集計 {days, selfRuns, otherRuns, unknownRuns, selfMillis, otherMillis, unknownMillis, histogram: [{floor, selfRuns, otherRuns, unknownRuns}], provisionalSpeakers, hasAdaptedVoice}。",
+  "cases": [
+    {
+      "name": "自分の登録がなければ特徴量を作らず、話者を判定しない",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              1,
+              0,
+              0
+            ]
+          ]
+        },
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers",
+              "embedderCalls"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          },
+          {
+            "speakers": [],
+            "embedderCalls": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "しきい値以上なら自分にして、類似度を信頼度にする",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0.6,
+              0.8,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 1,
+                "confidence": 0.6000000238418579,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 0.6,
+                      "1": 0.8
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "不明の帯より低ければ仮の話者を作る",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0.44,
+              0.8979978,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 2,
+                "confidence": null,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 0.44,
+                      "1": 0.8979978
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "同じ声は同じ仮の話者にまとまり、別の声は別の話者になる",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16,
+            "repeat": 4
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "speakerIds": [
+              2,
+              3,
+              2,
+              3
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "最も近い仮の話者を選ぶ",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              0.5,
+              0.8660254
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              0.6,
+              0.8
+            ],
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 3,
+                "confidence": 0.9928203225135803,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "1": 0.5,
+                      "2": 0.8660254
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "仮の話者の特徴量は平均で更新する",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              0.921061,
+              0.38941833
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 0,
+            "voicedMillis": 3000
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 2,
+                "confidence": 0.9210609793663025,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "1": 0.921061,
+                      "2": 0.38941833
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          },
+          {
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 0.9800666,
+                    "2": 0.19866934
+                  }
+                },
+                "sampleCount": 2,
+                "voicedMillis": 6000,
+                "updatedAtMillis": 1000
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分の特徴量は照合で変えない",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0.7,
+              0.71414286,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embeddings",
+              "adaptation"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 1,
+                "confidence": 0.699999988079071,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 0.7,
+                      "1": 0.71414286
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          },
+          {
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              }
+            ],
+            "adaptation": {
+              "vector": {
+                "size": 3,
+                "values": {
+                  "0": 0.9998461,
+                  "1": 0.017543806
+                }
+              },
+              "voicedMillis": 3000
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "短い区間は既存の話者には照合するが、平均に入れない",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              1,
+              0,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 1999,
+            "samples": 16
+          },
+          {
+            "op": "identify",
+            "millis": 1999,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embeddings"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1999,
+                "text": "本文",
+                "speakerId": 1,
+                "confidence": 1.0,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 1.0
+                    }
+                  },
+                  "voicedMillis": 1999
+                }
+              }
+            ]
+          },
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1999,
+                "text": "本文",
+                "speakerId": 2,
+                "confidence": 1.0,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "1": 1.0
+                    }
+                  },
+                  "voicedMillis": 1999
+                }
+              }
+            ]
+          },
+          {
+            "embeddings": [
+              {
+                "speakerId": 1,
+                "isSelf": true,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "0": 1.0
+                  }
+                },
+                "sampleCount": 3,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              },
+              {
+                "speakerId": 2,
+                "isSelf": false,
+                "vector": {
+                  "size": 3,
+                  "values": {
+                    "1": 1.0
+                  }
+                },
+                "sampleCount": 1,
+                "voicedMillis": 0,
+                "updatedAtMillis": 0
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "短い区間で誰にも近くなければ、仮の話者を作らず不明にする",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              0,
+              1
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 1999,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 1999,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "2": 1.0
+                    }
+                  },
+                  "voicedMillis": 1999
+                }
+              }
+            ]
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "特徴量を作れなければ不明にする",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            null
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "長さが 0 や数でない特徴量は不明にして、仮の話者を作らない",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              0,
+              0
+            ],
+            [
+              "NaN",
+              1,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          },
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "モデルの版が変わると登録し直すまで判定しない",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "modelVersion": "new",
+          "responses": [
+            [
+              1,
+              0,
+              0
+            ]
+          ],
+          "cycle": true
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0,
+            "modelVersion": "old"
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embedderCalls"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          },
+          {
+            "embedderCalls": []
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分との類似度がしきい値以上なら、より近い仮の話者がいても自分にする",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              0.78,
+              0.62577957,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0.8,
+              0.59999996,
+              0
+            ],
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 1,
+                "confidence": 0.7799999713897705,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 0.78,
+                      "1": 0.62577957
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "正規化していない特徴量でも比べられる",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.7,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 2000,
+          "minReliableRunMillis": 0
+        },
+        "embedder": {
+          "responses": [
+            [
+              30,
+              0,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 1,
+                "confidence": 1.0,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 1.0
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "照合する話者の上限を守る",
+      "input": {
+        "clockMillis": 1000,
+        "speakerConfig": {
+          "selfThreshold": 0.6,
+          "selfExitThreshold": 0.55,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.6,
+          "minNewSpeakerRunMillis": 0,
+          "maxProvisionalSpeakers": 64,
+          "windowMillis": 60000,
+          "trailingSilenceMillis": 0,
+          "minReliableMillis": 0,
+          "minReliableRunMillis": 0,
+          "maxComparedSpeakers": 2
+        },
+        "embedder": {
+          "responses": [
+            [
+              0,
+              1,
+              0
+            ]
+          ],
+          "cycle": true
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              1,
+              0
+            ],
+            "nowMillis": 1
+          },
+          {
+            "op": "createProvisional",
+            "vector": [
+              0,
+              0,
+              1
+            ],
+            "nowMillis": 2
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 3000,
+            "samples": 16
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "speakers"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 3000,
+                "text": "本文",
+                "speakerId": 4,
+                "confidence": null,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "1": 1.0
+                    }
+                  },
+                  "voicedMillis": 3000
+                }
+              }
+            ]
+          },
+          {
+            "speakers": [
+              {
+                "id": 1,
+                "displayName": "自分",
+                "nameSource": "SELF",
+                "isSelf": true
+              },
+              {
+                "id": 2,
+                "displayName": "話者1",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 3,
+                "displayName": "話者2",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              },
+              {
+                "id": 4,
+                "displayName": "話者3",
+                "nameSource": "PROVISIONAL",
+                "isSelf": false
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "句読点は前の語と同じ行に残し、行の先頭にしない",
+      "input": {
+        "clockMillis": 50000,
+        "embedder": {
+          "responses": [
+            [
+              0.9,
+              0.43588996,
+              0
+            ],
+            [
+              0.9,
+              0.43588996,
+              0
+            ],
+            [
+              0.9,
+              0.43588996,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ],
+            [
+              0,
+              1,
+              0
+            ]
+          ]
+        },
+        "setup": [
+          {
+            "op": "enrollSelf",
+            "vector": [
+              1,
+              0,
+              0
+            ],
+            "sampleCount": 3,
+            "nowMillis": 0
+          }
+        ],
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 6800,
+            "text": "あ。い",
+            "tokens": [
+              [
+                "あ",
+                2000
+              ],
+              [
+                "。",
+                2700
+              ],
+              [
+                "い",
+                3000
+              ]
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 2625,
+                "text": "あ。",
+                "speakerId": 1,
+                "confidence": 0.8999999761581421,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "0": 0.8999999,
+                      "1": 0.43588996
+                    }
+                  },
+                  "voicedMillis": 2625
+                }
+              },
+              {
+                "startedAtMillis": 2625,
+                "endedAtMillis": 6800,
+                "text": "い",
+                "speakerId": 2,
+                "confidence": null,
+                "voice": {
+                  "vector": {
+                    "size": 3,
+                    "values": {
+                      "1": 1.0
+                    }
+                  },
+                  "voicedMillis": 3375
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "自分の登録の前は窓を作らず、1 行のまま保存する",
+      "input": {
+        "clockMillis": 50000,
+        "steps": [
+          {
+            "op": "identify",
+            "millis": 6800
+          },
+          {
+            "op": "snapshot",
+            "include": [
+              "embedderCalls"
+            ]
+          }
+        ]
+      },
+      "expected": {
+        "steps": [
+          {
+            "turns": [
+              {
+                "startedAtMillis": 0,
+                "endedAtMillis": 6800,
+                "text": "本文",
+                "speakerId": null,
+                "confidence": null,
+                "voice": null
+              }
+            ]
+          },
+          {
+            "embedderCalls": []
+          }
+        ]
+      }
+    }
+  ]
+}
