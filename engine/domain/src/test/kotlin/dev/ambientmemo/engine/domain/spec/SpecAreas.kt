@@ -15,6 +15,7 @@ internal object SpecAreas {
         "llm-title-parser" to ::llmTitleParser,
         "model-validation" to ::modelValidation,
         "noise-text-filter" to ::noiseTextFilter,
+        "organize-job" to ::organizeJob,
         "organize-policy" to ::organizePolicy,
         "organize-prompts" to ::organizePrompts,
         "quiet-gate" to ::quietGate,

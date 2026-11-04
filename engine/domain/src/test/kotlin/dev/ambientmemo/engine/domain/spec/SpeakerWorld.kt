@@ -33,7 +33,7 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 
-// 話者の記録をメモリに持つ世界。話者の判定、まとめ直し、手の修正、声の登録、聞き取りの流れが共有する
+// 話者の記録をメモリに持つ世界。話者の判定、まとめ直し、手の修正、声の登録、聞き取りの流れ、整理が共有する
 
 private const val MILLIS_PER_SECOND = 1_000L
 private const val LISTED_EMBEDDINGS = 100
@@ -121,8 +121,11 @@ internal class SpeakerWorld(input: JsonObject) {
         input.objects("setup").forEach { step(it) }
     }
 
+    suspend fun step(step: JsonObject): JsonObject = stepOrNull(step) ?: error("知らない op です: ${step.str("op")}")
+
+    /** 操作を 1 つ流す。知らない op なら null を返し、呼び出し側が自分の操作として扱えるようにする。 */
     @Suppress("CyclomaticComplexMethod", "LongMethod") // 操作の一覧をそのまま並べている
-    suspend fun step(step: JsonObject): JsonObject = when (val op = step.str("op")) {
+    suspend fun stepOrNull(step: JsonObject): JsonObject? = when (step.str("op")) {
         "enrollSelf" -> obj(
             "speakerId" to speakers.saveSelfEmbedding(embedding(step), step.intOr("sampleCount", 3), now(step)).id,
         )
@@ -150,7 +153,7 @@ internal class SpeakerWorld(input: JsonObject) {
         "merge" -> obj("ok" to corrections.merge(step.long("fromId"), step.long("intoId")))
         "rename" -> obj("ok" to corrections.rename(step.long("speakerId"), step.str("name")))
         "snapshot" -> snapshot(step.strings("include"))
-        else -> error("知らない op です: $op")
+        else -> null
     }
 
     private fun now(step: JsonObject) = step.longOr("nowMillis", 0)

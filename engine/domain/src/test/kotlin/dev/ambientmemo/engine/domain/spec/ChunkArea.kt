@@ -61,9 +61,11 @@ internal fun utterance(json: JsonObject) = Utterance(
 internal fun organizeConfig(json: JsonObject?): OrganizeConfig {
     val default = OrganizeConfig()
     val values = json ?: JsonObject(emptyMap())
-    values.requireKeys(setOf("minSilenceGapMillis", "maxChunkChars"), "config")
+    values.requireKeys(setOf("minSilenceGapMillis", "maxChunkChars", "maxRetries", "maxChunkAttempts"), "config")
     return default.copy(
         minSilenceGapMillis = values.longOr("minSilenceGapMillis", default.minSilenceGapMillis),
         maxChunkChars = values.intOr("maxChunkChars", default.maxChunkChars),
+        maxRetries = values.intOr("maxRetries", default.maxRetries),
+        maxChunkAttempts = values.intOr("maxChunkAttempts", default.maxChunkAttempts),
     )
 }

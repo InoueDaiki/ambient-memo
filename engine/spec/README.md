@@ -58,6 +58,7 @@ Android(Kotlin)と iOS(Swift)のエンジンに、同じ入力を渡して同じ
 | `llm-title-parser.json` | LLM の出力からタイトルを読む `parseTitle` |
 | `model-validation.json` | 発話、欠落、文字起こし、聞き取りの設定の値の検査 |
 | `noise-text-filter.json` | 雑音の短い文字を除く `NoiseTextFilter` |
+| `organize-job.json` | 整理ジョブ `OrganizeJob` と、今整理できる量 `organizeBacklog`。記録はメモリの Fake、LLM は依頼の種類と本文で応答を決める Fake |
 | `organize-policy.json` | 整理を止める理由 `stopReason` |
 | `organize-prompts.json` | 整理のプロンプト `OrganizePrompts`。要約と ToDo の文面は検証のスクリプトの出力と一字一句同じ |
 | `quiet-gate.json` | 静かな間は VAD を動かさない `QuietGatedVoiceActivityDetector` |
@@ -99,4 +100,14 @@ Android(Kotlin)と iOS(Swift)のエンジンに、同じ入力を渡して同じ
 | `FakeContractTests`(各 Fake とメモリの記録の契約テスト)、`testFixtures` の `PortContracts`、`RepositoryContracts` | Fake と本物の実装に同じ契約を流すためのもので、本物の実装(SQLite、sherpa-onnx など)が Kotlin にある |
 | `WavAudioSourceTest` | テスト用の WAV の読み取りの実装そのもののテスト |
 
-`OrganizeJob` のテストは `engine/adapters` の `OrganizeJobIntegrationTest` にあり、本物の SQLite を使う。`domain` のテストではないので、ここには移していない。
+## Swift の実行役
+
+`engine/ios/Tests/EngineDomainTests/SpecTests.swift` が、全ファイルのケースをパラメータ化した `@Test` の引数にし、`area: ケースの名前` の名前でテストにする。
+JSON は Package.swift のリソースにせず、`#filePath` から相対でこのディレクトリを読む。
+Foundation の `JSONSerialization` は文字列の中の U+FEFF を消し、`JSONDecoder` は数の書き方を残さないので、`SpecJSON.swift` の小さな読み取りで読み、数は書かれたままの文字列で持つ。
+ファイル名と `area` が揃っていること、ケースの名前が重ならないこと、どの `area` にも実行役があることも Kotlin と同じく確かめる。
+
+## 整理ジョブ
+
+`organize-job.json` はメモリの Fake(`InMemoryMemoRepository`)で `OrganizeJob` を流す。
+本物の SQLite に依るもの(書き込みの途中の失敗、開き直し、版 1 からの移行、同じまとまりを別のジョブが先に記録したとき)と、キャンセル、LLM の内側のタイムアウトは、`engine/adapters` の `OrganizeJobIntegrationTest` に残す。
