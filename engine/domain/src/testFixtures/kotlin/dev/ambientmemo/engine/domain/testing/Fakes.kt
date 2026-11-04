@@ -412,14 +412,19 @@ class FakeLlm(
     }
 
     companion object {
-        /** 要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。 */
+        /**
+         * 話題の切れ目、要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。
+         * 話題の切れ目は、既定では1つの話題と答える。
+         */
         fun organizing(
             summary: String = "- 要約",
             todos: String = """{"items": []}""",
             title: String = summary,
+            topics: String = "1",
             todoTitle: (String) -> String = { it },
         ) = FakeLlm { _, request ->
             when {
+                request.isTopicRequest -> topics
                 request.isTodoRequest -> todos
                 request.isTodoTitleRequest -> todoTitle(request.user.substringAfter("ToDo:\n"))
                 request.isTitleRequest -> title
@@ -428,6 +433,9 @@ class FakeLlm(
         }
     }
 }
+
+val LlmRequest.isTopicRequest: Boolean
+    get() = "話題ごとに分けて" in user
 
 val LlmRequest.isTodoRequest: Boolean
     get() = "JSON だけを出力" in user

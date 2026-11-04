@@ -58,7 +58,7 @@ Android(Kotlin)と iOS(Swift)のエンジンに、同じ入力を渡して同じ
 | `llm-title-parser.json` | LLM の出力からタイトルを読む `parseTitle` |
 | `model-validation.json` | 発話、欠落、文字起こし、聞き取りの設定の値の検査 |
 | `noise-text-filter.json` | 雑音の短い文字を除く `NoiseTextFilter` |
-| `organize-job.json` | 整理ジョブ `OrganizeJob` と、今整理できる量 `organizeBacklog`。記録はメモリの Fake、LLM は依頼の種類と本文で応答を決める Fake |
+| `organize-job.json` | 整理ジョブ `OrganizeJob` と、今整理できる量 `organizeBacklog`。話題の切れ目の読み取り `parseTopicStarts` もここで確かめる。記録はメモリの Fake、LLM は依頼の種類と本文で応答を決める Fake |
 | `organize-policy.json` | 整理を止める理由 `stopReason` |
 | `organize-prompts.json` | 整理のプロンプト `OrganizePrompts`。要約と ToDo の文面は検証のスクリプトの出力と一字一句同じ |
 | `quiet-gate.json` | 静かな間は VAD を動かさない `QuietGatedVoiceActivityDetector` |

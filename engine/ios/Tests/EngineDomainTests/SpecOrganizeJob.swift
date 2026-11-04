@@ -6,6 +6,7 @@ import Foundation
 
 /// 依頼の種類。FakeLlm.organizing と同じ順で見分ける。
 private func requestKind(_ request: LlmRequest) -> String {
+    if request.isTopicRequest { return "topics" }
     if request.isTodoRequest { return "todo" }
     if request.isTodoTitleRequest { return "todoTitle" }
     if request.isTitleRequest { return "title" }
@@ -52,10 +53,11 @@ private struct LlmRule: Sendable {
 /// `llm` の形は organize-job.json の inputSchema にある。
 private func scriptedLlm(_ json: SpecObject?) throws -> FakeLlm {
     let values = json ?? [:]
-    try values.requireKeys(["modelVersion", "summary", "todos", "title", "todoTitles", "rules", "probes"], "llm")
+    try values.requireKeys(["modelVersion", "summary", "todos", "title", "topics", "todoTitles", "rules", "probes"], "llm")
     let summary = try values.strOr("summary", "- 要約")
     let todos = try values.strOr("todos", #"{"items": []}"#)
     let title = try values.strOr("title", summary)
+    let topics = try values.strOr("topics", "1")
     let todoTitles = try values.objOrNull("todoTitles")?.mapValues { try $0.content } ?? [:]
     let rules = try values.objects("rules").map(LlmRule.init)
     let kindCounts = SpecLocked<[String: Int]>([:])
@@ -69,6 +71,7 @@ private func scriptedLlm(_ json: SpecObject?) throws -> FakeLlm {
             return try rule.respond()
         }
         switch kind {
+        case "topics": return topics
         case "todo": return todos
         case "todoTitle":
             let task = request.user.kotlinSubstringAfter("ToDo:\n")

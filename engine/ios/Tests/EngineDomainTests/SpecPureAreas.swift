@@ -100,6 +100,8 @@ func timeZone(_ input: SpecObject) throws -> TimeZone {
         return request(OrganizePrompts.memoTitle(try input.str("summary")))
     case "todoTitle":
         return request(OrganizePrompts.todoTitle(try input.str("task")))
+    case "topics":
+        return request(OrganizePrompts.topics(try input.strings("lines")))
     case "retryNotes":
         return obj(["summary": OrganizePrompts.SUMMARY_RETRY_NOTE, "todo": OrganizePrompts.TODO_RETRY_NOTE])
     case "calendarDays":
