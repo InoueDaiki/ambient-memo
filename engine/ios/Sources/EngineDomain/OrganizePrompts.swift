@@ -1,21 +1,16 @@
 import Foundation
 
 /**
- * 要約と ToDo 抽出のプロンプト。
+ * 整理のプロンプト。
  *
  * 文面は `tools/spike-llm/scripts/prompts.py`(spike-llm ブランチ)と同じにする。
- * 変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
+ * 要約の文面を変えると `docs/検証-LLM.md` の成績が根拠にならなくなるので、変えるときは評価をやり直す。
  * タイトルのプロンプトは評価していない。
  * 話題の切れ目のプロンプトは `docs/検証-話題の切れ目.md` で評価した。変えるときは `tools/spike-llm/scripts/topic_eval.py` で測り直す。
  *
  * Kotlin の `trimMargin()` の文字列を、同じ文字列になる Swift の複数行の文字列で書いた。Kotlin と一字一句揃える。
- * 日付の計算が範囲外になると [IllegalArgumentException] を投げるので、Swift では `throws` にした。
  */
 enum OrganizePrompts {
-    /// 日付の表の日数。今日を含む。
-    static let CALENDAR_DAYS = 22
-
-    private static let WEEKDAYS = Array("月火水木金土日")
     private static let MAX_OUTPUT_TOKENS = 400
     private static let MAX_TITLE_OUTPUT_TOKENS = 48
     private static let MAX_TOPIC_OUTPUT_TOKENS = 64
@@ -25,10 +20,7 @@ enum OrganizePrompts {
         "「自分」は端末の持ち主です。" +
         "書かれていないことを補ったり推測したりしないでください。"
 
-    private static let DAY_LABELS = [" 今日", " 明日", " あさって"]
-
     static let SUMMARY_RETRY_NOTE = "\n\n前回の出力は空でした。「- 」で始まる箇条書きだけを出力してください。"
-    static let TODO_RETRY_NOTE = "\n\n前回の出力は JSON として読めませんでした。指定の形式の JSON だけを、最後まで出力してください。"
 
     static func summary(_ date: CalendarDate, _ transcript: String) -> LlmRequest {
         request(
@@ -64,24 +56,6 @@ enum OrganizePrompts {
         )
     }
 
-    /// 抽出した内容から作る。文字起こしは渡さず、内容にないことを足させない。
-    static func todoTitle(_ task: String) -> LlmRequest {
-        LlmRequest(
-            SYSTEM,
-            """
-            次の ToDo に、一覧で見分けるためのタイトルを付けてください。
-
-            - やることが分かる日本語の短い句で、20文字以内
-            - 日付や曜日だけのタイトルにしない
-            - タイトルだけを1行で出力する。記号や説明は付けない
-
-            ToDo:
-
-            """ + task.kotlinTrim(),
-            MAX_TITLE_OUTPUT_TOKENS
-        )
-    }
-
     /// 行番号を付けて渡し、新しい話題が始まる行の番号だけを答えさせる。文字起こしを書き直させない。
     static func topics(_ lines: [String]) -> LlmRequest {
         LlmRequest(
@@ -107,55 +81,11 @@ enum OrganizePrompts {
         )
     }
 
-    static func todo(_ date: CalendarDate, _ transcript: String) throws -> LlmRequest {
-        let tomorrow = try date.plusDays(1)
-        let table = try calendar(date)
-        return request(
-            """
-            今日は \(label(date)) です。次の文字起こしから、「自分」に関するものだけを抽出してください。
-
-            抽出するもの:
-            - todo: 自分がこれからやること
-            - reminder: 自分が日時を覚えておくべき予定
-
-            抽出しないもの:
-            - 自分以外の人がやること
-            - もう終わったこと
-            - 取り消したこと、やめたこと
-            - 願望、仮定、冗談、雑談
-
-            出力の形式:
-            - JSON だけを出力する。説明やコードブロックは書かない
-            - kind は todo か reminder
-            - due は YYYY-MM-DD 形式の期限や予定の日付。日付が分からなければ null
-            - 該当するものがなければ {"items": []}
-
-            例: 「[09:00] 話者1: 請求書、明日までに送ってくれる? [09:00] 自分: はい、送ります。」の出力は
-            {"items": [{"task": "請求書を送る", "kind": "todo", "due": "\(tomorrow)"}]}
-
-            カレンダー(日付は必ずここから選ぶ。週は月曜始まり。範囲外の日付は月日から直接書く):
-            \(table)
-
-            文字起こし:
-
-            """ + transcript.kotlinTrim()
-        )
-    }
-
     private static func request(_ user: String) -> LlmRequest {
         LlmRequest(SYSTEM, user, MAX_OUTPUT_TOKENS)
     }
 
     private static func label(_ date: CalendarDate) -> String {
-        "\(date)(\(WEEKDAYS[date.weekdayIndex])曜日)"
-    }
-
-    /// 日付の計算をモデルに任せず、対応表を渡す。小型モデルは曜日の暗算を誤る。
-    private static func calendar(_ start: CalendarDate) throws -> String {
-        try (0..<CALENDAR_DAYS).map { offset in
-            let date = try start.plusDays(offset)
-            let dayLabel = offset < DAY_LABELS.count ? DAY_LABELS[offset] : ""
-            return "\(date) \(WEEKDAYS[date.weekdayIndex])\(dayLabel)"
-        }.joined(separator: "\n")
+        "\(date)(\(date.weekdayName)曜日)"
     }
 }

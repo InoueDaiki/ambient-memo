@@ -155,12 +155,17 @@ public final class EngineBridgeModule: Module {
       try await call { try await engine.getMemo(id: id) }
     }
 
-    AsyncFunction("listTodos") { (limit: Int) async throws -> [WireObject] in
-      try await call { try await engine.listTodos(limit: limit) }
+    // 整理のモデルを読み込むので、数十秒から数分かかる
+    AsyncFunction("askMemos") { (question: String) async throws -> WireObject in
+      try await call {
+        try await engine.askMemos(question: question) { phase in
+          self.sendEvent(eventEngine, ["type": "ask-progress", "phase": phase])
+        }
+      }
     }
 
-    AsyncFunction("completeTodo") { (id: String) async throws in
-      try await call { try await engine.completeTodo(id: id) }
+    AsyncFunction("cancelAsk") {
+      engine.cancelAsk()
     }
 
     AsyncFunction("getOrganizeStatus") { () async throws -> WireObject in

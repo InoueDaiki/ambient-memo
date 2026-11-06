@@ -98,7 +98,7 @@ public struct LlmLoaded: DiagnosticEvent, Hashable {
     }
 }
 
-/// [maxOutputTokens] で要約や ToDo とタイトルを見分ける。
+/// [maxOutputTokens] で依頼の種類を見分ける。
 public struct LlmGenerated: DiagnosticEvent, Hashable {
     public let inputChars: Int
     public let maxOutputTokens: Int
@@ -118,15 +118,28 @@ public struct LlmGenerated: DiagnosticEvent, Hashable {
 public struct OrganizeFinished: DiagnosticEvent, Hashable {
     public let outcome: OrganizeOutcome
     public let memoCount: Int
-    public let todoCount: Int
     public let unreadableCount: Int
     public let totalMillis: Int64
 
-    public init(outcome: OrganizeOutcome, memoCount: Int, todoCount: Int, unreadableCount: Int, totalMillis: Int64) {
+    public init(outcome: OrganizeOutcome, memoCount: Int, unreadableCount: Int, totalMillis: Int64) {
         self.outcome = outcome
         self.memoCount = memoCount
-        self.todoCount = todoCount
         self.unreadableCount = unreadableCount
+        self.totalMillis = totalMillis
+    }
+}
+
+/// 質問に 1 回答えた。[searchRounds] は検索の回数、[sourceCount] は答えの根拠にしたメモの数。
+public struct AskFinished: DiagnosticEvent, Hashable {
+    public let outcome: AnswerOutcome
+    public let searchRounds: Int
+    public let sourceCount: Int
+    public let totalMillis: Int64
+
+    public init(outcome: AnswerOutcome, searchRounds: Int, sourceCount: Int, totalMillis: Int64) {
+        self.outcome = outcome
+        self.searchRounds = searchRounds
+        self.sourceCount = sourceCount
         self.totalMillis = totalMillis
     }
 }
@@ -311,6 +324,7 @@ private func diagnosticName(_ event: any DiagnosticEvent) -> String {
     case is LlmLoaded: return "llm_load"
     case is LlmGenerated: return "llm_generate"
     case is OrganizeFinished: return "organize"
+    case is AskFinished: return "ask"
     case is DeviceSample: return "device"
     case is AudioLevelSummary: return "audio_level"
     default: preconditionFailure("未知の出来事です: \(type(of: event))")
@@ -349,8 +363,14 @@ private func diagnosticFields(_ event: any DiagnosticEvent) -> [(String, Any)] {
         return [
             ("outcome", event.outcome.name),
             ("memos", event.memoCount),
-            ("todos", event.todoCount),
             ("unreadable", event.unreadableCount),
+            ("totalMs", event.totalMillis),
+        ]
+    case let event as AskFinished:
+        return [
+            ("outcome", event.outcome.name),
+            ("searchRounds", event.searchRounds),
+            ("sources", event.sourceCount),
             ("totalMs", event.totalMillis),
         ]
     case let event as DeviceSample:

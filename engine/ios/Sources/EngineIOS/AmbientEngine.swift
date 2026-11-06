@@ -37,6 +37,33 @@ public enum EngineChange: Sendable {
 /// 手動の整理を始めたときの結果。JS の OrganizeStartResult と同じ並び。
 public enum OrganizeStartResult: Sendable { case started, alreadyRunning, modelUnavailable, nothingToOrganize, failed }
 
+/// 質問の進み具合。JS の AskPhase と同じ並び。読み込みの段階は、モデルを持つエンジンだけが知っている。
+public enum AskStep: Sendable { case preparing, searching, answering }
+
+/// 質問の終わり方。JS の MemoAnswerOutcome と同じ並び。
+public enum AskOutcome: Sendable {
+    case answered, notFound, modelUnavailable
+
+    /// 整理か別の質問が動いている。モデルを 2 つ読み込むとメモリが足りない。
+    case busy
+
+    /// 実行基盤が動かなかった。
+    case failed
+}
+
+/// 質問の答え。[text] は [AskOutcome.answered] のときだけある。[sources] は答えが根拠にしたメモで、答えが挙げた順。
+public struct AskReply: Sendable {
+    public let outcome: AskOutcome
+    public let text: String?
+    public let sources: [Memo]
+
+    init(_ outcome: AskOutcome, _ text: String? = nil, _ sources: [Memo] = []) {
+        self.outcome = outcome
+        self.text = text
+        self.sources = sources
+    }
+}
+
 /// 話者と発話の数。
 public struct SpeakerSummary: Sendable {
     public let speaker: Speaker
@@ -53,6 +80,7 @@ public struct EngineStoreUnavailable: Error, CustomStringConvertible {
  *
  * - 聞き取りは画面が前面にある間だけ始める。音声のバックグラウンド モードで続ける。自動では再開しない
  * - 整理は BGProcessingTask(充電中)と画面の操作で動かす。LLM は同じプロセスで、整理の間だけ持つ
+ * - メモへの質問も同じ LLM を、質問の間だけ持つ。整理と質問は同時に動かさない
  * - 音声はディスクに書かない。文字起こし、メモ、話者の特徴量を端末の外へ送らない
  */
 public final class AmbientEngine: @unchecked Sendable {
@@ -79,6 +107,14 @@ public final class AmbientEngine: @unchecked Sendable {
     private var organizeRunner: OrganizeRunner!
     private let deviceConditions: DeviceConditions
     private let backgroundTask = Guarded<BGProcessingTask?>(nil)
+    /// 動いている質問。整理の開始と同じロックで確かめ、LLM を 2 つ読み込まない。
+    private let asking = Guarded<AskJob?>(nil)
+
+    /// 動いている質問の1回分。[preempted] は、手動の整理に場所を譲るために止めたこと。
+    private final class AskJob: @unchecked Sendable {
+        var task: Task<AskReply, any Error>?
+        var preempted = false
+    }
 
     /// 開いた DB と、変更を知らせる包み。
     private struct Opened: Sendable {
@@ -482,7 +518,7 @@ public final class AmbientEngine: @unchecked Sendable {
 
     // MARK: - メモと整理
 
-    /// メモと ToDo の読み書き。書くと [addListener] の相手に届く。
+    /// メモの読み書き。書くと [addListener] の相手に届く。
     public func memoRepository() throws -> any MemoRepository { try opened().memos }
 
     public var organizeStatus: OrganizeStatus { organizeRunner.status }
@@ -504,16 +540,36 @@ public final class AmbientEngine: @unchecked Sendable {
         )
     }
 
-    /// 利用者の操作でだけ呼ぶ。始めるものがないときはモデルを読み込まない。
+    /**
+     * 利用者の操作でだけ呼ぶ。始めるものがないときはモデルを読み込まない。
+     *
+     * 質問が動いていれば、Android と同じく質問を止め、そのモデルを解放してから読み込む。止めた質問は busy で終わる。
+     */
     public func startOrganize() async throws -> OrganizeStartResult {
         let status = organizeRunner.status
         if status.isRunning, status.isManual { return .alreadyRunning }
         if !isOrganizerModelReady { return .modelUnavailable }
         if !status.isRunning, try await organizeBacklog().readyChunks == 0 { return .nothingToOrganize }
-        switch organizeRunner.start(.MANUAL) {
+        await preemptAsk()
+        let started = asking.withLock { job -> OrganizeStart in
+            // 譲るのを待つ間に、別の質問が始まった
+            if job != nil { return .busy }
+            return organizeRunner.start(.MANUAL)
+        }
+        switch started {
         case .started, .joined: return .started
         case .busy: return .failed
         }
+    }
+
+    /// 動いている質問を止め、終わるまで待つ。
+    private func preemptAsk() async {
+        let task = asking.withLock { job -> Task<AskReply, any Error>? in
+            job?.preempted = true
+            job?.task?.cancel()
+            return job?.task
+        }
+        _ = await task?.result
     }
 
     /// 区切りで止まる。動いていなければ何もしない。
@@ -528,7 +584,9 @@ public final class AmbientEngine: @unchecked Sendable {
             task.setTaskCompleted(success: true)
             return
         }
-        guard organizeRunner.start(.SCHEDULED) == .started else {
+        // 質問の間は、モデルを 2 つ読み込まないように次の機会に任せる
+        let started = asking.withLock { job in job == nil ? organizeRunner.start(.SCHEDULED) : .busy }
+        guard started == .started else {
             task.setTaskCompleted(success: true)
             return
         }
@@ -600,7 +658,6 @@ public final class AmbientEngine: @unchecked Sendable {
                 OrganizeFinished(
                     outcome: result.outcome,
                     memoCount: result.memoCount,
-                    todoCount: result.todoCount,
                     unreadableCount: result.unreadableCount,
                     totalMillis: clock.nowMillis() - started
                 )
@@ -614,6 +671,108 @@ public final class AmbientEngine: @unchecked Sendable {
             }
         } catch {
             return .failed
+        }
+    }
+
+    // MARK: - メモへの質問
+
+    /**
+     * 過去のメモを探して、質問に答える。整理のモデルを読み込むので、数十秒から数分かかる。[onStep] で進み具合を知らせる。
+     *
+     * 整理か別の質問が動いていれば [AskOutcome.busy] を返す。実行基盤の失敗は [AskOutcome.failed] で返す。
+     * [cancelAsk] か呼び出し側のタスクの取り消しで止めたら [CancellationError] を投げる。空の質問は [IllegalArgumentException] を投げる。
+     */
+    public func askMemos(_ question: String, onStep: @escaping @Sendable (AskStep) -> Void) async throws -> AskReply {
+        let question = question.trimmingCharacters(in: .whitespacesAndNewlines)
+        if question.isEmpty { throw IllegalArgumentException("質問が空です") }
+        if !isOrganizerModelReady { return AskReply(.modelUnavailable) }
+        // 整理の開始と同じロックの中で確かめて、タスクまで作る。止める依頼がタスクのない間に来ないように
+        let claimed = asking.withLock { current -> (AskJob, Task<AskReply, any Error>)? in
+            if current != nil || organizeRunner.status.isRunning { return nil }
+            let job = AskJob()
+            let task = Task.detached(priority: .userInitiated) { [weak self] () async throws -> AskReply in
+                guard let self else { throw CancellationError() }
+                // 整理が待つのはこのタスクなので、終わる前に場所を空ける
+                defer { asking.withLock { if $0 === job { $0 = nil } } }
+                return try await askSession(question, onStep)
+            }
+            job.task = task
+            current = job
+            return (job, task)
+        }
+        guard let (job, task) = claimed else { return AskReply(.busy) }
+        do {
+            return try await withTaskCancellationHandler {
+                try await task.value
+            } onCancel: {
+                task.cancel()
+            }
+        } catch is CancellationError {
+            if asking.withLock({ _ in job.preempted }) { return AskReply(.busy) }
+            throw CancellationError()
+        }
+    }
+
+    /// 動いている質問を止める。[askMemos] は [CancellationError] を投げる。動いていなければ何もしない。
+    public func cancelAsk() {
+        asking.withLock { $0?.task?.cancel() }
+    }
+
+    /// 読み込みから解放までの1回分。Android の `AskSession` と同じく、記録には読み込みと答えの数だけを残す。
+    private func askSession(_ question: String, _ onStep: @escaping @Sendable (AskStep) -> Void) async throws -> AskReply {
+        let opened: Opened
+        do { opened = try self.opened() } catch { return AskReply(.failed) }
+        onStep(.preparing)
+        let askLog = journal.log(.ORGANIZE)
+        let llm = LocalLlm(
+            modelVersion: llmModel.version,
+            modelPath: modelStore.pathOf(llmModel.modelPackage, llmModel.model),
+            cacheDirectory: ((try? StorageDirectories.llmCache()) ?? FileManager.default.temporaryDirectory).path,
+            onBackendChosen: { askLog.record(LlmBackendChosen($0)) }
+        )
+        defer { llm.close() }
+        let loadStarted = clock.nowMillis()
+        do {
+            try await llm.load()
+            askLog.record(LlmLoaded(loadMillis: clock.nowMillis() - loadStarted, isLoaded: true))
+        } catch {
+            askLog.record(LlmLoaded(loadMillis: clock.nowMillis() - loadStarted, isLoaded: false))
+            try Task.checkCancellation()
+            NSLog("AmbientMemoEngine: LLM を読み込めません: %@", String(describing: type(of: error)))
+            return AskReply(.failed)
+        }
+        // 読み込みはネイティブの中で止められないので、終わってから確かめる
+        try Task.checkCancellation()
+        let started = clock.nowMillis()
+        let answerer = MemoQuestionAnswerer(
+            memos: opened.memos,
+            speakers: opened.store.speakers,
+            llm: TimedLlm(llm, askLog),
+            clock: clock,
+            timeZone: TimeZone.current
+        )
+        let answer: MemoAnswer
+        do {
+            answer = try await answerer.answer(question) { phase in
+                onStep(phase == .SEARCHING ? .searching : .answering)
+            }
+        } catch {
+            // 取り消しかどうかは例外の型ではなく状態で判断する。実行基盤の失敗の中身は文字起こしを含みうるので、外へ渡さない
+            try Task.checkCancellation()
+            NSLog("AmbientMemoEngine: 質問に答えられません: %@", String(describing: type(of: error)))
+            return AskReply(.failed)
+        }
+        askLog.record(
+            AskFinished(
+                outcome: answer.outcome,
+                searchRounds: answer.searchRounds,
+                sourceCount: answer.sources.count,
+                totalMillis: clock.nowMillis() - started
+            )
+        )
+        switch answer.outcome {
+        case .ANSWERED: return AskReply(.answered, answer.text, answer.sources)
+        case .NOT_FOUND: return AskReply(.notFound)
         }
     }
 }

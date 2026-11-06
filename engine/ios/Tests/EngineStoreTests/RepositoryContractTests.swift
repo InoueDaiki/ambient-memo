@@ -549,12 +549,12 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
 
     private typealias Stores = (utterances: any UtteranceRepository, memos: any MemoRepository)
 
-    private func utterance(_ stores: Stores, _ startedAtMillis: Int64) async throws -> Int64 {
+    private func utterance(_ stores: Stores, _ startedAtMillis: Int64, _ text: String = "本文") async throws -> Int64 {
         try await stores.utterances.insert(
             try NewUtterance(
                 startedAtMillis: startedAtMillis,
                 endedAtMillis: startedAtMillis + 10,
-                text: "本文",
+                text: text,
                 confidence: nil,
                 createdAtMillis: startedAtMillis + 10
             )
@@ -563,12 +563,10 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
 
     private func memo(
         _ utteranceIds: Int64...,
-        todos: [NewTodo] = [],
         startedAtMillis: Int64 = 100,
         endedAtMillis: Int64 = 200,
         title: String? = "題名",
         summary: String? = "- 要約",
-        todoExtraction: TodoExtraction = .COMPLETE,
         createdAtMillis: Int64 = 1_000
     ) throws -> NewMemo {
         try NewMemo(
@@ -576,11 +574,9 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
             endedAtMillis: endedAtMillis,
             title: title,
             summary: summary,
-            todoExtraction: todoExtraction,
             modelVersion: "fake-1",
             createdAtMillis: createdAtMillis,
-            utteranceIds: utteranceIds,
-            todos: todos
+            utteranceIds: utteranceIds
         )
     }
 
@@ -598,32 +594,21 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
     }
 
     @Test(arguments: Implementation.allCases)
-    func 記録したメモと_ToDo_と根拠をそのまま読み出せる(_ implementation: Implementation) async throws {
+    func 記録したメモと根拠をそのまま読み出せる(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
         let first = try await utterance(stores, 100)
         let second = try await utterance(stores, 200)
-        let todos = [
-            try NewTodo(task: "期限のある作業", kind: .REMINDER, dueDate: try CalendarDate(2026, 11, 5), status: .OPEN, title: "題名"),
-            try NewTodo(task: "期限のない作業", kind: .TODO, dueDate: nil, status: .CANDIDATE),
-        ]
 
-        let saved = try #require(try await stores.memos.recordMemo(try memo(second, first, todos: todos)))
+        let saved = try #require(try await stores.memos.recordMemo(try memo(second, first)))
 
         #expect(try await stores.memos.listMemos() == [saved])
         #expect(try await stores.memos.listUtteranceIds(memoId: saved.id) == [first, second])
-        let read = try await stores.memos.listTodos(memoId: saved.id)
-        #expect(read.map(\.task) == todos.map(\.task))
-        #expect(read.map(\.title) == todos.map(\.title))
-        #expect(read.map(\.kind) == todos.map(\.kind))
-        #expect(read.map(\.dueDate) == todos.map(\.dueDate))
-        #expect(read.map(\.status) == todos.map(\.status))
-        #expect(read.allSatisfy { $0.memoId == saved.id })
     }
 
     @Test(arguments: Implementation.allCases)
     func 要約に失敗したメモも読み出せる(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
-        let failed = try memo(try await utterance(stores, 100), title: nil, summary: nil, todoExtraction: .INCOMPLETE)
+        let failed = try memo(try await utterance(stores, 100), title: nil, summary: nil)
 
         _ = try await stores.memos.recordMemo(failed)
 
@@ -631,7 +616,6 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
         try #require(read.count == 1)
         #expect(read[0].title == nil)
         #expect(read[0].summary == nil)
-        #expect(read[0].todoExtraction == .INCOMPLETE)
     }
 
     @Test(arguments: Implementation.allCases)
@@ -693,17 +677,15 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
     }
 
     @Test(arguments: Implementation.allCases)
-    func 他のメモの_ToDo_と根拠は混ざらない(_ implementation: Implementation) async throws {
+    func 他のメモの根拠は混ざらない(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
         let first = try await utterance(stores, 100)
         let second = try await utterance(stores, 200)
-        let todo = try NewTodo(task: "作業", kind: .TODO, dueDate: nil, status: .OPEN)
-        let memoWithTodo = try #require(try await stores.memos.recordMemo(try memo(first, todos: [todo])))
+        let saved = try #require(try await stores.memos.recordMemo(try memo(first)))
         let other = try #require(try await stores.memos.recordMemo(try memo(second)))
 
-        #expect(try await stores.memos.listTodos(memoId: other.id).isEmpty)
+        #expect(try await stores.memos.listUtteranceIds(memoId: saved.id) == [first])
         #expect(try await stores.memos.listUtteranceIds(memoId: other.id) == [second])
-        #expect(try await stores.memos.listTodos(memoId: memoWithTodo.id).count == 1)
     }
 
     @Test(arguments: Implementation.allCases)
@@ -739,70 +721,53 @@ private func utterance(_ startedAtMillis: Int64, _ endedAtMillis: Int64, _ text:
     }
 
     @Test(arguments: Implementation.allCases)
-    func ToDo_は未完了_期限の早い順_新しい順_記録した順に並べ_期限のないものは後ろにする(_ implementation: Implementation) async throws {
+    func 検索はタイトル_要約_根拠の発話の本文のどれかに語を含むメモを新しい順に返す(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
-        func todo(_ task: String, _ due: CalendarDate?, _ status: TodoStatus = .OPEN) throws -> NewTodo {
-            try NewTodo(task: task, kind: .TODO, dueDate: due, status: status)
-        }
-        let soon = try CalendarDate(2026, 11, 1)
-        let older = try memo(
-            try await utterance(stores, 1),
-            todos: [try todo("完了", try CalendarDate(2026, 1, 1)), try todo("期限なし", nil), try todo("古い", soon)],
-            createdAtMillis: 1_000
+        let byTitle = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 1), startedAtMillis: 100, endedAtMillis: 200, title: "歯医者の予約", summary: "- 要約")
+        ))
+        let bySummary = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 2), startedAtMillis: 200, endedAtMillis: 300, title: "題名", summary: "- 歯医者は十時")
+        ))
+        let byUtterance = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 3, "明日は歯医者だね"), startedAtMillis: 300, endedAtMillis: 400, title: nil, summary: nil)
+        ))
+        _ = try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 4, "週末の予定"), startedAtMillis: 400, endedAtMillis: 500)
         )
-        let newer = try memo(
-            try await utterance(stores, 2),
-            todos: [try todo("新しい1", soon, .CANDIDATE), try todo("新しい2", soon), try todo("遅い", try CalendarDate(2026, 12, 1))],
-            createdAtMillis: 2_000
-        )
-        let saved = try #require(try await stores.memos.recordMemo(older))
-        _ = try await stores.memos.recordMemo(newer)
-        let done = try #require(try await stores.memos.listTodos(memoId: saved.id).first { $0.task == "完了" })
-        _ = try await stores.memos.completeTodo(todoId: done.id, completedAtMillis: 3_000)
 
         #expect(
-            try await stores.memos.listTodosByPriority(limit: 10).map(\.task)
-                == ["新しい1", "新しい2", "古い", "遅い", "期限なし", "完了"]
+            try await stores.memos.searchMemos(term: "歯医者", fromMillis: Int64.min, toMillis: Int64.max, limit: 10)
+                == [byUtterance, bySummary, byTitle]
         )
-        #expect(try await stores.memos.listTodosByPriority(limit: 2).count == 2)
+        #expect(try await stores.memos.searchMemos(term: "歯医者", fromMillis: Int64.min, toMillis: Int64.max, limit: 1) == [byUtterance])
     }
 
     @Test(arguments: Implementation.allCases)
-    func 完了すると状態と時刻が残り_他の_ToDo_は変わらない(_ implementation: Implementation) async throws {
+    func 検索は英字の大文字と小文字を区別せず_ほかの文字は区別する(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
-        let todos = [
-            try NewTodo(task: "完了する", kind: .TODO, dueDate: nil, status: .CANDIDATE),
-            try NewTodo(task: "そのまま", kind: .TODO, dueDate: nil, status: .OPEN),
-        ]
-        let saved = try #require(try await stores.memos.recordMemo(try memo(try await utterance(stores, 100), todos: todos)))
-        let before = try await stores.memos.listTodos(memoId: saved.id)
-        try #require(before.count == 2)
+        let saved = try #require(try await stores.memos.recordMemo(try memo(try await utterance(stores, 1, "PDF を送る"), title: "ｶﾀｶﾅ")))
 
-        #expect(try await stores.memos.completeTodo(todoId: before[0].id, completedAtMillis: 5_000) == .COMPLETED)
-
-        let after = try await stores.memos.listTodos(memoId: saved.id)
-        try #require(after.count == 2)
-        #expect(after[0].status == .DONE)
-        #expect(after[0].completedAtMillis == 5_000)
-        #expect(after[1] == before[1])
-        #expect(before[0].completedAtMillis == nil)
+        #expect(try await stores.memos.searchMemos(term: "pdf", fromMillis: Int64.min, toMillis: Int64.max, limit: 10) == [saved])
+        #expect(try await stores.memos.searchMemos(term: "カタカナ", fromMillis: Int64.min, toMillis: Int64.max, limit: 10).isEmpty)
     }
 
     @Test(arguments: Implementation.allCases)
-    func 完了済みの_ToDo_の完了は最初の時刻を変えない(_ implementation: Implementation) async throws {
+    func 検索は期間に重なるメモだけを返し_空の語はすべてに当たる(_ implementation: Implementation) async throws {
         let stores = try fixture.memoStores(implementation)
-        let todos = [try NewTodo(task: "作業", kind: .TODO, dueDate: nil, status: .OPEN)]
-        let saved = try #require(try await stores.memos.recordMemo(try memo(try await utterance(stores, 100), todos: todos)))
-        let id = try #require(try await stores.memos.listTodos(memoId: saved.id).first).id
-        _ = try await stores.memos.completeTodo(todoId: id, completedAtMillis: 5_000)
+        let before = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 1, "a"), startedAtMillis: 0, endedAtMillis: 99)
+        ))
+        let edge = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 2, "b"), startedAtMillis: 50, endedAtMillis: 100)
+        ))
+        let inside = try #require(try await stores.memos.recordMemo(
+            try memo(try await utterance(stores, 3, "c"), startedAtMillis: 150, endedAtMillis: 160)
+        ))
+        _ = try await stores.memos.recordMemo(try memo(try await utterance(stores, 4, "d"), startedAtMillis: 200, endedAtMillis: 250))
 
-        #expect(try await stores.memos.completeTodo(todoId: id, completedAtMillis: 6_000) == .ALREADY_DONE)
-        #expect(try await stores.memos.listTodos(memoId: saved.id).map(\.completedAtMillis) == [5_000])
-    }
-
-    @Test(arguments: Implementation.allCases)
-    func ない_ToDo_の完了は_NOT_FOUND_を返す(_ implementation: Implementation) async throws {
-        #expect(try await fixture.memoStores(implementation).memos.completeTodo(todoId: 1, completedAtMillis: 5_000) == .NOT_FOUND)
+        #expect(try await stores.memos.searchMemos(term: "", fromMillis: 100, toMillis: 200, limit: 10) == [inside, edge])
+        #expect(try await stores.memos.searchMemos(term: "", fromMillis: 0, toMillis: 50, limit: 10) == [before])
     }
 }
 

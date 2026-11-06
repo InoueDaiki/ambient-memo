@@ -28,6 +28,23 @@ public struct CalendarDate: Sendable, Hashable, Comparable, CustomStringConverti
         return (weekday + Self.DAYS_FROM_SUNDAY_TO_SATURDAY) % Self.DAYS_PER_WEEK
     }
 
+    /// 曜日の 1 文字。「月」から「日」。
+    public var weekdayName: String {
+        String(Self.WEEKDAYS[weekdayIndex])
+    }
+
+    /// [timeZone] での、この日が始まる時刻。
+    ///
+    /// 0 時が夏時間の切り替えで存在しない日は、Foundation の暦が決めた時刻になる。Kotlin(java.util)とずれるかもしれない。
+    public func startOfDayMillis(_ timeZone: TimeZone) -> Int64 {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        calendar.locale = Locale(identifier: "en_US_POSIX")
+        // isValid を通った日付なので必ず作れる
+        let date = calendar.date(from: DateComponents(year: year, month: month, day: day))!
+        return Int64((date.timeIntervalSince1970 * 1_000).rounded())
+    }
+
     public func plusDays(_ days: Int) throws -> CalendarDate {
         guard let date = Self.utcCalendar.date(byAdding: .day, value: days, to: utcDate()) else {
             throw IllegalArgumentException("存在しない日付です")
@@ -82,6 +99,7 @@ public struct CalendarDate: Sendable, Hashable, Comparable, CustomStringConverti
         return calendar
     }()
 
+    private static let WEEKDAYS = Array("月火水木金土日")
     private static let DAYS_PER_WEEK = 7
     private static let DAYS_FROM_SUNDAY_TO_SATURDAY = 5
     private static let MAX_YEAR = 9_999

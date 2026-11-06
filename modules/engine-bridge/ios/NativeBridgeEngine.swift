@@ -1,9 +1,6 @@
 import AmbientMemoEngine
 import Foundation
 
-/// JS への値の変換で、秒にするための値。
-private let MILLIS_PER_SECOND = 1_000.0
-
 /**
  * engine/ios の [AmbientEngine] で [BridgeEngine] を実装する。値の形は Android の EngineBridgeModule.kt と MemoBridge.kt に合わせる。
  *
@@ -41,8 +38,8 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
       send(["type": "organizer-model-changed", "status": organizerModelStatus()])
     case .utterances:
       send(["type": "utterances-changed"])
-    case let .memo(memo):
-      send(["type": memo == .memos ? "memos-changed" : "todos-changed"])
+    case .memo:
+      send(["type": "memos-changed"])
     case let .enrollmentProgress(progress):
       send([
         "type": "enrollment-progress",
@@ -303,7 +300,7 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
 
   func cancelSelfEnrollment() { engine.cancelEnrollment() }
 
-  // MARK: - メモと ToDo
+  // MARK: - メモと整理
 
   func listMemos(limit: Int) async throws -> [WireObject] {
     try await engine.memoRepository().listRecentMemos(limit: limit).map(memoWire)
@@ -315,21 +312,7 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
     let speakers = try await engine.speakers()
     var wire = memoWire(memo)
     wire["utterances"] = try await memos.listMemoUtterances(memoId: memo.id).map { utteranceWire($0, speakers) }
-    wire["todos"] = try await memos.listTodos(memoId: memo.id).map(todoWire)
     return wire
-  }
-
-  func listTodos(limit: Int) async throws -> [WireObject] {
-    try await engine.memoRepository().listTodosByPriority(limit: limit).map(todoWire)
-  }
-
-  /// 完了済みなら何もせず戻る。
-  func completeTodo(id: String) async throws {
-    guard let todoId = Int64(id) else { throw BridgeEngineError.todoNotFound }
-    let now = Int64((Date().timeIntervalSince1970 * MILLIS_PER_SECOND).rounded(.down))
-    if try await engine.memoRepository().completeTodo(todoId: todoId, completedAtMillis: now) == .NOT_FOUND {
-      throw BridgeEngineError.todoNotFound
-    }
   }
 
   func organizeStatus() async throws -> WireObject {
@@ -372,6 +355,50 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
 
   func stopOrganize() { engine.stopOrganize() }
 
+  // MARK: - メモへの質問
+
+  /// 実行基盤の失敗は outcome の failed で解決する。Android の MemoBridge.askMemos と同じ形にする。
+  func askMemos(question: String, onProgress: @escaping @Sendable (String) -> Void) async throws -> WireObject {
+    let reply: AskReply
+    do {
+      reply = try await engine.askMemos(question) { step in
+        switch step {
+        case .preparing: onProgress("preparing")
+        case .searching: onProgress("searching")
+        case .answering: onProgress("answering")
+        }
+      }
+    } catch is IllegalArgumentException {
+      throw BridgeEngineError.askEmptyQuestion
+    } catch is CancellationError {
+      throw BridgeEngineError.askCancelled
+    }
+    let outcome: String = switch reply.outcome {
+    case .answered: "answered"
+    case .notFound: "not-found"
+    case .modelUnavailable: "model-unavailable"
+    case .busy: "busy"
+    case .failed: "failed"
+    }
+    let isAnswered = reply.outcome == .answered
+    // 答えを作っている間に消えたメモは挙げない(Android と同じ)
+    var sources: [WireObject] = []
+    if isAnswered {
+      let memos = try engine.memoRepository()
+      for source in reply.sources {
+        if let memo = try await memos.findMemo(memoId: source.id) { sources.append(memoWire(memo)) }
+      }
+    }
+    return [
+      "outcome": outcome,
+      "answer": (isAnswered ? reply.text : nil) ?? NSNull(),
+      "sources": sources,
+    ]
+  }
+
+  /// 動いていなければ何もしない。
+  func cancelAsk() { engine.cancelAsk() }
+
   // MARK: - 値の形
 
   private func utteranceWire(_ utterance: Utterance, _ speakers: [Int64: Speaker]) -> WireObject {
@@ -392,27 +419,8 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
       "id": String(memo.id),
       "title": memo.title ?? NSNull(),
       "summary": memo.summary ?? NSNull(),
-      "todoExtraction": memo.todoExtraction == .COMPLETE ? "complete" : "incomplete",
       "startedAt": Double(memo.startedAtMillis),
       "endedAt": Double(memo.endedAtMillis),
-    ]
-  }
-
-  private func todoWire(_ todo: Todo) -> WireObject {
-    let status: String = switch todo.status {
-    case .CANDIDATE: "candidate"
-    case .OPEN: "open"
-    case .DONE: "done"
-    }
-    return [
-      "id": String(todo.id),
-      "memoId": String(todo.memoId),
-      "task": todo.task,
-      "title": todo.title,
-      "kind": todo.kind == .TODO ? "todo" : "reminder",
-      "dueDate": todo.dueDate.map { $0.description } ?? NSNull(),
-      "status": status,
-      "createdAt": Double(todo.createdAtMillis),
     ]
   }
 }

@@ -575,35 +575,36 @@ public final class FakeLlm: Llm {
     }
 
     /**
-     * 話題の切れ目、要約、タイトル、ToDo の依頼を見分けて、固定の出力を返す。ToDo のタイトルは [todoTitle] の結果を返す。
+     * 話題の切れ目、要約、タイトルの依頼を見分けて、固定の出力を返す。
      * 話題の切れ目は、既定では1つの話題と答える。
      */
     public static func organizing(
         summary: String = "- 要約",
-        todos: String = #"{"items": []}"#,
         title: String? = nil,
-        topics: String = "1",
-        todoTitle: @escaping @Sendable (String) -> String = { $0 }
+        topics: String = "1"
     ) -> FakeLlm {
         let title = title ?? summary
         return FakeLlm { _, request in
             if request.isTopicRequest { return topics }
-            if request.isTodoRequest { return todos }
-            if request.isTodoTitleRequest { return todoTitle(request.user.substringAfter("ToDo:\n")) }
             if request.isTitleRequest { return title }
             return summary
         }
+    }
+
+    /// 質問の検索の計画と答えを見分けて、固定の出力を返す。
+    public static func asking(plan: String = "語: \n期間: なし", answer: String = "") -> FakeLlm {
+        FakeLlm { _, request in request.isSearchPlanRequest ? plan : answer }
     }
 }
 
 extension LlmRequest {
     public var isTopicRequest: Bool { user.utf16Contains("話題ごとに分けて") }
 
-    public var isTodoRequest: Bool { user.utf16Contains("JSON だけを出力") }
-
     public var isTitleRequest: Bool { user.utf16Contains("タイトルだけを") }
 
-    public var isTodoTitleRequest: Bool { isTitleRequest && user.utf16Contains("ToDo:") }
+    public var isSearchPlanRequest: Bool { user.utf16Contains("検索の条件を考えて") }
+
+    public var isAnswerRequest: Bool { user.utf16Contains("質問に日本語で答えて") }
 }
 
 extension String {
@@ -635,12 +636,10 @@ public final class InMemoryMemoRepository: MemoRepository {
     private final class Record: @unchecked Sendable {
         let memo: Memo
         let utteranceIds: [Int64]
-        var todos: [Todo]
 
-        init(_ memo: Memo, _ utteranceIds: [Int64], _ todos: [Todo]) {
+        init(_ memo: Memo, _ utteranceIds: [Int64]) {
             self.memo = memo
             self.utteranceIds = utteranceIds
-            self.todos = todos
         }
     }
 
@@ -648,7 +647,6 @@ public final class InMemoryMemoRepository: MemoRepository {
         var records: [Record] = []
         var organized: Set<Int64> = []
         var nextMemoId: Int64 = 1
-        var nextTodoId: Int64 = 1
     }
 
     private let utterances: any UtteranceRepository
@@ -683,26 +681,11 @@ public final class InMemoryMemoRepository: MemoRepository {
                     endedAtMillis: memo.endedAtMillis,
                     title: memo.title,
                     summary: memo.summary,
-                    todoExtraction: memo.todoExtraction,
                     modelVersion: memo.modelVersion,
                     createdAtMillis: memo.createdAtMillis
                 )
                 state.nextMemoId += 1
-                let todos = memo.todos.map { todo in
-                    let saved = Todo(
-                        id: state.nextTodoId,
-                        memoId: saved.id,
-                        task: todo.task,
-                        title: todo.title,
-                        kind: todo.kind,
-                        dueDate: todo.dueDate,
-                        status: todo.status,
-                        createdAtMillis: memo.createdAtMillis
-                    )
-                    state.nextTodoId += 1
-                    return saved
-                }
-                state.records.append(Record(saved, memo.utteranceIds, todos))
+                state.records.append(Record(saved, memo.utteranceIds))
                 state.organized.formUnion(memo.utteranceIds)
                 return saved
             }
@@ -726,10 +709,6 @@ public final class InMemoryMemoRepository: MemoRepository {
         }
     }
 
-    public func listTodos(memoId: Int64) async throws -> [Todo] {
-        try await mutex.withLock { state.withLock { $0.records.first { $0.memo.id == memoId }?.todos ?? [] } }
-    }
-
     public func listRecentMemos(limit: Int) async throws -> [Memo] {
         try await mutex.withLock {
             Array(
@@ -751,48 +730,23 @@ public final class InMemoryMemoRepository: MemoRepository {
         }
     }
 
-    public func listTodosByPriority(limit: Int) async throws -> [Todo] {
+    public func searchMemos(term: String, fromMillis: Int64, toMillis: Int64, limit: Int) async throws -> [Memo] {
         try await mutex.withLock {
-            let todos = state.withLock { $0.records.flatMap(\.todos) }
-            return Array(todos.stableSorted(by: Self.isHigherPriority).prefix(limit))
-        }
-    }
-
-    /// 未完了、期限あり、期限の早い順、新しい順、記録した順。Kotlin の compareBy は null を先に置く。
-    private static func isHigherPriority(_ first: Todo, _ second: Todo) -> Bool {
-        let firstDone = first.status == .DONE
-        let secondDone = second.status == .DONE
-        if firstDone != secondDone { return !firstDone }
-        let firstNoDue = first.dueDate == nil
-        let secondNoDue = second.dueDate == nil
-        if firstNoDue != secondNoDue { return !firstNoDue }
-        let firstDue = first.dueDate?.description
-        let secondDue = second.dueDate?.description
-        if firstDue != secondDue {
-            guard let firstDue else { return true }
-            guard let secondDue else { return false }
-            return firstDue < secondDue
-        }
-        if first.createdAtMillis != second.createdAtMillis { return first.createdAtMillis > second.createdAtMillis }
-        return first.id < second.id
-    }
-
-    public func completeTodo(todoId: Int64, completedAtMillis: Int64) async throws -> TodoCompletion {
-        try await mutex.withLock {
-            state.withLock { state in
-                guard let record = state.records.first(where: { $0.todos.contains { $0.id == todoId } }) else {
-                    return .NOT_FOUND
-                }
-                if record.todos.first(where: { $0.id == todoId })!.status == .DONE { return .ALREADY_DONE }
-                record.todos = record.todos.map { todo in
-                    guard todo.id == todoId else { return todo }
-                    var done = todo
-                    done.status = .DONE
-                    done.completedAtMillis = completedAtMillis
-                    return done
-                }
-                return .COMPLETED
-            }
+            let key = foldAscii(term)
+            var bodies: [Int64: String] = [:]
+            for utterance in try await all() { bodies[utterance.id] = foldAscii(utterance.text) }
+            return Array(
+                state.withLock { $0.records }
+                    .filter { $0.memo.startedAtMillis < toMillis && $0.memo.endedAtMillis >= fromMillis }
+                    .filter { record in
+                        let texts = [record.memo.title, record.memo.summary].compactMap { $0 }.map(foldAscii) +
+                            record.utteranceIds.compactMap { bodies[$0] }
+                        return texts.contains { $0.utf16Contains(key) }
+                    }
+                    .map(\.memo)
+                    .stableSorted { ($0.startedAtMillis, $0.id) > ($1.startedAtMillis, $1.id) }
+                    .prefix(limit)
+            )
         }
     }
 }

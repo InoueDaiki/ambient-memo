@@ -111,6 +111,7 @@ class OrganizeService : Service() {
 
     /** メインのスレッドだけで読み書きする。 */
     private var asking: Job? = null
+    private var askReplyTo: Messenger? = null
 
     private val isAsking: Boolean get() = asking?.isActive == true
 
@@ -179,7 +180,8 @@ class OrganizeService : Service() {
         if (question == null) {
             runner.start(OrganizeTrigger.MANUAL)
         } else {
-            // 質問のモデルを解放してから読み込む
+            // 止めた質問は返事を送らずに終わるので、ここで busy を返す。質問のモデルを解放してから読み込む
+            askReplyTo?.let { send(it, AskReply(AskEnding.BUSY).toMessage()) }
             question.cancel()
             question.invokeOnCompletion { main.post { runner.start(OrganizeTrigger.MANUAL) } }
         }
@@ -191,6 +193,7 @@ class OrganizeService : Service() {
             send(replyTo, AskReply(AskEnding.BUSY).toMessage())
             return
         }
+        askReplyTo = replyTo
         asking = scope.launch {
             val reply = askSession().run(question) { step ->
                 send(replyTo, Message.obtain(null, MESSAGE_ASK_STEP, step.ordinal, 0))

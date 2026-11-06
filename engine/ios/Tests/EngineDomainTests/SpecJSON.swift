@@ -337,9 +337,8 @@ extension SegmentOutcome: SpecEnum {}
 extension OrganizeStopReason: SpecEnum {}
 extension EnrollmentOutcome: SpecEnum {}
 extension OrganizeOutcome: SpecEnum {}
-extension TodoExtraction: SpecEnum {}
-extension TodoKind: SpecEnum {}
-extension TodoStatus: SpecEnum {}
+extension AnswerOutcome: SpecEnum {}
+extension AskPhase: SpecEnum {}
 
 func obj(_ pairs: KeyValuePairs<String, any SpecJSONConvertible>) -> SpecJSON {
     var values: [String: SpecJSON] = [:]
