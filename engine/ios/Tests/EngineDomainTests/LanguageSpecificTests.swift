@@ -136,15 +136,17 @@ struct KotlinCompatibilityTests {
         #expect(CalendarDate.parse("２０２６-01-05") == nil)
         #expect(cleanTitle("タイトル\u{3000}: x") == "タイトル\u{3000}: x")
         #expect(cleanTitle("タイトル : 「x」") == "x")
-        #expect(containsDateExpression("3\t日"))
-        #expect(!containsDateExpression("3\u{3000}日"))
+        #expect(parseSearchPlan("語\t: 会議")?.terms == ["会議"])
+        #expect(parseSearchPlan("語\u{3000}: 会議") == nil)
     }
 
-    @Test func 引用符のない値と末尾のカンマを読む() throws {
-        let parsed = parseTodos(#"{items: [{task: 牛乳, kind: todo, due: 20261102},],}"#)
-        #expect(parsed == ParsedTodos([RawTodo("牛乳", "todo", "20261102")], isComplete: true))
-        #expect(parseTodos("{,}") == nil)
-        #expect(throws: LenientJsonException.self) { try LenientJson.parse("[1] 2") }
+    @Test func 答えの番号は_Int_に収まらなければ読まない() {
+        #expect(parseAnswer("答え [99999999999] [1]", 1) == ParsedAnswer("答え", [1]))
+    }
+
+    @Test func 語は_UTF_16_の単位で重ねない() {
+        // Swift の == は正規化で比べるので、合成済みの「が」と分解した「か」+濁点を同じとみなす。Kotlin は別の語にする
+        #expect(parseSearchPlan("語: が行, か\u{3099}行")?.terms == ["が行", "か\u{3099}行"])
     }
 
     @Test func 閉じていないコードブロックと考えを外す() {
@@ -168,14 +170,13 @@ struct KotlinCompatibilityTests {
 }
 
 struct OrganizeJobTests {
-    @Test func 発話をメモとToDoにまとめる() async throws {
+    @Test func 発話をメモにまとめる() async throws {
         let utterances = InMemoryUtteranceRepository()
         let start: Int64 = 1_793_547_000_000
         _ = utterances.insert(try NewUtterance(startedAtMillis: start, endedAtMillis: start + 1_000, text: "明日、牛乳を買う", confidence: nil, createdAtMillis: 0))
         let memos = InMemoryMemoRepository(utterances: utterances)
         let llm = FakeLlm.organizing(
             summary: "- 牛乳を買う",
-            todos: #"{"items": [{"task": "牛乳を買う", "kind": "todo", "due": "2026-11-03"}]}"#,
             title: "買い物"
         )
         let job = OrganizeJob(
@@ -188,12 +189,10 @@ struct OrganizeJobTests {
 
         let result = try await job.run()
 
-        #expect(result == OrganizeResult(.COMPLETED, 1, 1))
+        #expect(result == OrganizeResult(.COMPLETED, 1))
         let memo = try #require(try await memos.listMemos().first)
         #expect(memo.title == "買い物")
-        let todos = try await memos.listTodos(memoId: memo.id)
-        #expect(todos.map(\.status) == [.OPEN])
-        #expect(todos.map(\.dueDate) == [try CalendarDate(2026, 11, 3)])
+        #expect(memo.summary == "- 牛乳を買う")
     }
 
     @Test func 取り消すと回数を戻して投げる() async throws {
@@ -220,5 +219,31 @@ struct OrganizeJobTests {
 
         await #expect(throws: CancellationError.self) { try await task.value }
         #expect(attempts.count(firstUtteranceId: 1) == 0)
+    }
+}
+
+/// 質問の、言語に依る挙動。データで表す挙動は memo-question.json にある。
+struct MemoQuestionTests {
+    @Test func 取り消すと答えずに投げる() async throws {
+        let utterances = InMemoryUtteranceRepository()
+        let started = Signal()
+        let llm = FakeLlm { _, _ in
+            started.signal()
+            try await awaitCancellation()
+        }
+        let answerer = MemoQuestionAnswerer(
+            memos: InMemoryMemoRepository(utterances: utterances),
+            speakers: InMemorySpeakerRepository(utterances: utterances),
+            llm: llm,
+            clock: FakeClock(1_793_547_000_000),
+            timeZone: TimeZone(identifier: "Asia/Tokyo")!
+        )
+
+        let task = Task { try await answerer.answer("歯医者はいつ?") }
+        await started.wait()
+        task.cancel()
+
+        await #expect(throws: CancellationError.self) { try await task.value }
+        #expect(llm.received.count == 1)
     }
 }

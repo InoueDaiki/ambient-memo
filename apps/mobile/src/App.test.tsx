@@ -321,7 +321,7 @@ describe("文字起こしの画面", () => {
       const client = new FakeEngineClient({ organizerModel: idle });
       await renderApp(client);
 
-      await screen.findByText(/発話をメモと ToDo に整理するには/);
+      await screen.findByText(/発話をメモに整理したり、メモに質問したりするには/);
       screen.getByRole("button", { name: "聞き取りを始める" });
       expect(client.organizerModelStarts).toBe(0);
 

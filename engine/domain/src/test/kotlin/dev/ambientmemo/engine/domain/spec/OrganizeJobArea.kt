@@ -12,8 +12,6 @@ import dev.ambientmemo.engine.domain.testing.FakeLlm
 import dev.ambientmemo.engine.domain.testing.InMemoryMemoRepository
 import dev.ambientmemo.engine.domain.testing.isTitleRequest
 import dev.ambientmemo.engine.domain.testing.isTopicRequest
-import dev.ambientmemo.engine.domain.testing.isTodoRequest
-import dev.ambientmemo.engine.domain.testing.isTodoTitleRequest
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
@@ -30,8 +28,6 @@ private const val SAY_CONFIDENCE = 0.9
 /** 依頼の種類。FakeLlm.organizing と同じ順で見分ける。 */
 private fun requestKind(request: LlmRequest): String = when {
     request.isTopicRequest -> "topics"
-    request.isTodoRequest -> "todo"
-    request.isTodoTitleRequest -> "todoTitle"
     request.isTitleRequest -> "title"
     else -> "summary"
 }
@@ -70,14 +66,12 @@ private fun JsonObject.intOrNull(key: String): Int? = get(key)?.takeUnless { it 
 private fun scriptedLlm(json: JsonObject?): FakeLlm {
     val values = json ?: JsonObject(emptyMap())
     values.requireKeys(
-        setOf("modelVersion", "summary", "todos", "title", "topics", "todoTitles", "rules", "probes"),
+        setOf("modelVersion", "summary", "title", "topics", "rules", "probes"),
         "llm",
     )
     val summary = values.strOr("summary", "- 要約")
-    val todos = values.strOr("todos", """{"items": []}""")
     val title = values.strOr("title", summary)
     val topics = values.strOr("topics", "1")
-    val todoTitles = values.objOrNull("todoTitles")?.mapValues { it.value.jsonPrimitive.content }.orEmpty()
     val rules = values.objects("rules").map(::LlmRule)
     val kindCounts = mutableMapOf<String, Int>()
     return FakeLlm(values.strOr("modelVersion", "fake-1")) { index, request ->
@@ -86,8 +80,6 @@ private fun scriptedLlm(json: JsonObject?): FakeLlm {
         kindCounts[kind] = nth + 1
         rules.firstOrNull { it.matches(request, kind, nth, index) }?.respond() ?: when (kind) {
             "topics" -> topics
-            "todo" -> todos
-            "todoTitle" -> request.user.substringAfter("ToDo:\n").let { todoTitles[it] ?: it }
             "title" -> title
             else -> summary
         }
@@ -150,7 +142,6 @@ private class OrganizeWorld(input: JsonObject) {
             "result" to obj(
                 "outcome" to result.outcome,
                 "memoCount" to result.memoCount,
-                "todoCount" to result.todoCount,
                 "unreadableCount" to result.unreadableCount,
             ),
             "progress" to progress.map { listOf(it.completedChunks, it.totalChunks) },
@@ -174,18 +165,7 @@ private suspend fun memoJson(memo: Memo, memos: InMemoryMemoRepository) = obj(
     "endedAtMillis" to memo.endedAtMillis,
     "title" to memo.title,
     "summary" to memo.summary,
-    "todoExtraction" to memo.todoExtraction,
     "modelVersion" to memo.modelVersion,
     "createdAtMillis" to memo.createdAtMillis,
     "utteranceIds" to memos.listUtteranceIds(memo.id),
-    "todos" to memos.listTodos(memo.id).map { todo ->
-        obj(
-            "id" to todo.id,
-            "task" to todo.task,
-            "title" to todo.title,
-            "kind" to todo.kind,
-            "dueDate" to todo.dueDate?.toString(),
-            "status" to todo.status,
-        )
-    },
 )

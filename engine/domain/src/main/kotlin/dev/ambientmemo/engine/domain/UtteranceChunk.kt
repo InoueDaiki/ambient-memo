@@ -25,17 +25,14 @@ private const val MINUTES_PER_DAY = 24 * MINUTES_PER_HOUR
  * 発話を、検証の文字起こしと同じ `[HH:mm] 自分: 本文` の形にする。
  * 話者が分からない発話は、話者識別の前と同じ `[HH:mm] 本文` の形にする。
  */
-internal fun Utterance.toTranscriptLine(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String {
-    val localMillis = startedAtMillis + timeZone.getOffset(startedAtMillis)
+internal fun Utterance.toTranscriptLine(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String =
+    "[${clockLabel(startedAtMillis, timeZone)}] ${labels.of(this)?.let { "$it: " }.orEmpty()}${text.trim()}"
+
+/** [timeZone] での時刻の `HH:mm`。 */
+internal fun clockLabel(millis: Long, timeZone: TimeZone): String {
+    val localMillis = millis + timeZone.getOffset(millis)
     val minutes = Math.floorMod(Math.floorDiv(localMillis, MILLIS_PER_MINUTE), MINUTES_PER_DAY)
-    return String.format(
-        Locale.ROOT,
-        "[%02d:%02d] %s%s",
-        minutes / MINUTES_PER_HOUR,
-        minutes % MINUTES_PER_HOUR,
-        labels.of(this)?.let { "$it: " }.orEmpty(),
-        text.trim(),
-    )
+    return String.format(Locale.ROOT, "%02d:%02d", minutes / MINUTES_PER_HOUR, minutes % MINUTES_PER_HOUR)
 }
 
 internal fun UtteranceChunk.toTranscript(timeZone: TimeZone, labels: SpeakerLabels = SpeakerLabels.NONE): String =

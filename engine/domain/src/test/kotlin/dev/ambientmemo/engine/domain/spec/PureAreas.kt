@@ -10,11 +10,9 @@ import dev.ambientmemo.engine.domain.OrganizeConditions
 import dev.ambientmemo.engine.domain.OrganizePrompts
 import dev.ambientmemo.engine.domain.OrganizeTrigger
 import dev.ambientmemo.engine.domain.Transcription
-import dev.ambientmemo.engine.domain.assessDue
 import dev.ambientmemo.engine.domain.currentEngineStatus
 import dev.ambientmemo.engine.domain.parseSummary
 import dev.ambientmemo.engine.domain.parseTitle
-import dev.ambientmemo.engine.domain.parseTodos
 import dev.ambientmemo.engine.domain.stopReason
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -56,25 +54,7 @@ internal fun timeZone(input: JsonObject): TimeZone = TimeZone.getTimeZone(input.
     check(it.id == input.str("timeZone")) { "知らないタイムゾーンです: ${input.str("timeZone")}" }
 }
 
-internal fun assessedDue(input: JsonObject): JsonElement {
-    val due = assessDue(
-        input.strOrNull("rawDue"),
-        date(input, "spokenOn"),
-        date(input, "endedOn"),
-        input.str("transcript"),
-    )
-    return obj("date" to due.date?.toString(), "isConfident" to due.isConfident)
-}
-
 internal fun llmOutputParser(input: JsonObject): JsonElement = when (val op = input.str("op")) {
-    "todos" -> obj(
-        "result" to parseTodos(input.str("text"))?.let { parsed ->
-            obj(
-                "items" to parsed.items.map { obj("task" to it.task, "kind" to it.kind, "due" to it.due) },
-                "isComplete" to parsed.isComplete,
-            )
-        },
-    )
     "summary" -> obj("summary" to parseSummary(input.str("text")))
     else -> error("知らない op です: $op")
 }
@@ -83,16 +63,13 @@ internal fun llmTitleParser(input: JsonObject): JsonElement = obj("title" to par
 
 internal fun organizePrompts(input: JsonObject): JsonElement = when (val op = input.str("op")) {
     "summary" -> request(OrganizePrompts.summary(date(input, "date"), input.str("transcript")))
-    "todo" -> request(OrganizePrompts.todo(date(input, "date"), input.str("transcript")))
     "memoTitle" -> request(OrganizePrompts.memoTitle(input.str("summary")))
-    "todoTitle" -> request(OrganizePrompts.todoTitle(input.str("task")))
     "topics" -> request(OrganizePrompts.topics(input.strings("lines")))
-    "retryNotes" -> obj("summary" to OrganizePrompts.SUMMARY_RETRY_NOTE, "todo" to OrganizePrompts.TODO_RETRY_NOTE)
-    "calendarDays" -> obj("days" to OrganizePrompts.CALENDAR_DAYS)
+    "retryNotes" -> obj("summary" to OrganizePrompts.SUMMARY_RETRY_NOTE)
     else -> error("知らない op です: $op")
 }
 
-private fun request(request: LlmRequest) =
+internal fun request(request: LlmRequest) =
     obj("system" to request.system, "user" to request.user, "maxOutputTokens" to request.maxOutputTokens)
 
 /** 値の検査だけを見る。作れたら `{"valid": true}`、検査で断られたら `{"error": "invalid-argument"}`。 */

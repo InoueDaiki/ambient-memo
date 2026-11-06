@@ -72,7 +72,6 @@ internal class OrganizeSession(
             OrganizeFinished(
                 result.outcome,
                 result.memoCount,
-                result.todoCount,
                 result.unreadableCount,
                 started.elapsedNow().inWholeMilliseconds,
             ),

@@ -1,0 +1,27 @@
+-- 版 6 から 7: ToDo をなくす。todo を消し、memo の todo_extraction を外す
+-- 既定の方言の SQLite には DROP COLUMN がないので、memo を作り直して行を写す
+DROP TABLE todo;
+
+CREATE TABLE memo_new (
+  id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  started_at_ms INTEGER NOT NULL,
+  ended_at_ms INTEGER NOT NULL,
+  title TEXT,
+  summary TEXT,
+  model_version TEXT NOT NULL,
+  created_at_ms INTEGER NOT NULL,
+  CHECK (ended_at_ms >= started_at_ms)
+);
+
+INSERT INTO memo_new (id, started_at_ms, ended_at_ms, title, summary, model_version, created_at_ms)
+SELECT id, started_at_ms, ended_at_ms, title, summary, model_version, created_at_ms
+FROM memo;
+
+-- SQLDelight の検査はテーブルと一緒に消える索引を追わないので、先に消す
+DROP INDEX memo_started_at;
+
+DROP TABLE memo;
+
+ALTER TABLE memo_new RENAME TO memo;
+
+CREATE INDEX memo_started_at ON memo (started_at_ms);

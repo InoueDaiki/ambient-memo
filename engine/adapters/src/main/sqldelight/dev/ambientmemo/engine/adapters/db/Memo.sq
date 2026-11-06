@@ -1,12 +1,10 @@
 -- 発話のまとまり。title と summary は要約に失敗すると NULL になる
--- todo_extraction は SqliteMemoRepository の対応表で読み書きする
 CREATE TABLE memo (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   started_at_ms INTEGER NOT NULL,
   ended_at_ms INTEGER NOT NULL,
   title TEXT,
   summary TEXT,
-  todo_extraction TEXT NOT NULL,
   model_version TEXT NOT NULL,
   created_at_ms INTEGER NOT NULL,
   CHECK (ended_at_ms >= started_at_ms)
@@ -24,8 +22,8 @@ CREATE TABLE memo_utterance (
 CREATE UNIQUE INDEX memo_utterance_utterance ON memo_utterance (utterance_id);
 
 insert:
-INSERT INTO memo (started_at_ms, ended_at_ms, title, summary, todo_extraction, model_version, created_at_ms)
-VALUES (?, ?, ?, ?, ?, ?, ?);
+INSERT INTO memo (started_at_ms, ended_at_ms, title, summary, model_version, created_at_ms)
+VALUES (?, ?, ?, ?, ?, ?);
 
 lastInsertedId:
 SELECT last_insert_rowid();
@@ -56,3 +54,24 @@ FROM memo_utterance
 JOIN utterance ON utterance.id = memo_utterance.utterance_id
 WHERE memo_utterance.memo_id = :memoId
 ORDER BY utterance.started_at_ms, utterance.id;
+
+-- 質問の検索。:term は英字だけ小文字にして渡す。lower も英字だけを小文字にするので、ほかの文字は区別する
+-- 空の :term はすべてのメモに当たる
+search:
+SELECT memo.*
+FROM memo
+WHERE memo.started_at_ms < :toMillis
+  AND memo.ended_at_ms >= :fromMillis
+  AND (
+    :term = ''
+    OR instr(lower(coalesce(memo.title, '')), :term) > 0
+    OR instr(lower(coalesce(memo.summary, '')), :term) > 0
+    OR EXISTS (
+      SELECT 1
+      FROM memo_utterance
+      JOIN utterance ON utterance.id = memo_utterance.utterance_id
+      WHERE memo_utterance.memo_id = memo.id AND instr(lower(utterance.body), :term) > 0
+    )
+  )
+ORDER BY memo.started_at_ms DESC, memo.id DESC
+LIMIT :limit;

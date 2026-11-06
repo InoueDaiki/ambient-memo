@@ -5,10 +5,8 @@ package dev.ambientmemo.engine.domain.testing
 import dev.ambientmemo.engine.domain.CaptureGap
 import dev.ambientmemo.engine.domain.CaptureGapReason
 import dev.ambientmemo.engine.domain.CaptureGapRepository
-import dev.ambientmemo.engine.domain.CalendarDate
 import dev.ambientmemo.engine.domain.MemoRepository
 import dev.ambientmemo.engine.domain.NewMemo
-import dev.ambientmemo.engine.domain.NewTodo
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.MergedEmbedding
 import dev.ambientmemo.engine.domain.SelfAdaptation
@@ -20,10 +18,6 @@ import dev.ambientmemo.engine.domain.SpeakerEmbedding
 import dev.ambientmemo.engine.domain.SpeakerMerge
 import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerRepository
-import dev.ambientmemo.engine.domain.TodoCompletion
-import dev.ambientmemo.engine.domain.TodoExtraction
-import dev.ambientmemo.engine.domain.TodoKind
-import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.UtteranceRepository
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertArrayEquals
@@ -567,16 +561,14 @@ abstract class MemoRepositoryContract {
     private suspend fun Stores.utterance(startedAtMillis: Long) =
         utterances.insert(NewUtterance(startedAtMillis, startedAtMillis + 10, "本文", null, startedAtMillis + 10)).id
 
-    private fun memo(vararg utteranceIds: Long, todos: List<NewTodo> = emptyList()) = NewMemo(
+    private fun memo(vararg utteranceIds: Long) = NewMemo(
         startedAtMillis = 100,
         endedAtMillis = 200,
         title = "題名",
         summary = "- 要約",
-        todoExtraction = TodoExtraction.COMPLETE,
         modelVersion = "fake-1",
         createdAtMillis = 1_000,
         utteranceIds = utteranceIds.toList(),
-        todos = todos,
     )
 
     @Test
@@ -589,43 +581,27 @@ abstract class MemoRepositoryContract {
     }
 
     @Test
-    fun `記録したメモと ToDo と根拠をそのまま読み出せる`() = runTest {
+    fun `記録したメモと根拠をそのまま読み出せる`() = runTest {
         val stores = stores()
         val first = stores.utterance(100)
         val second = stores.utterance(200)
-        val todos = listOf(
-            NewTodo("期限のある作業", TodoKind.REMINDER, CalendarDate(2026, 11, 5), TodoStatus.OPEN, title = "題名"),
-            NewTodo("期限のない作業", TodoKind.TODO, null, TodoStatus.CANDIDATE),
-        )
 
-        val saved = stores.memos.recordMemo(memo(second, first, todos = todos))!!
+        val saved = stores.memos.recordMemo(memo(second, first))!!
 
         assertEquals(listOf(saved), stores.memos.listMemos())
         assertEquals(listOf(first, second), stores.memos.listUtteranceIds(saved.id))
-        val read = stores.memos.listTodos(saved.id)
-        assertEquals(todos.map { it.task }, read.map { it.task })
-        assertEquals(todos.map { it.title }, read.map { it.title })
-        assertEquals(todos.map { it.kind }, read.map { it.kind })
-        assertEquals(todos.map { it.dueDate }, read.map { it.dueDate })
-        assertEquals(todos.map { it.status }, read.map { it.status })
-        assertTrue(read.all { it.memoId == saved.id })
     }
 
     @Test
     fun `要約に失敗したメモも読み出せる`() = runTest {
         val stores = stores()
-        val failed = memo(stores.utterance(100)).copy(
-            title = null,
-            summary = null,
-            todoExtraction = TodoExtraction.INCOMPLETE,
-        )
+        val failed = memo(stores.utterance(100)).copy(title = null, summary = null)
 
         stores.memos.recordMemo(failed)
 
         val read = stores.memos.listMemos().single()
         assertNull(read.title)
         assertNull(read.summary)
-        assertEquals(TodoExtraction.INCOMPLETE, read.todoExtraction)
     }
 
     @Test
@@ -687,17 +663,15 @@ abstract class MemoRepositoryContract {
     }
 
     @Test
-    fun `他のメモの ToDo と根拠は混ざらない`() = runTest {
+    fun `他のメモの根拠は混ざらない`() = runTest {
         val stores = stores()
         val first = stores.utterance(100)
         val second = stores.utterance(200)
-        val todo = NewTodo("作業", TodoKind.TODO, null, TodoStatus.OPEN)
-        val memoWithTodo = stores.memos.recordMemo(memo(first, todos = listOf(todo)))!!
+        val memo = stores.memos.recordMemo(memo(first))!!
         val other = stores.memos.recordMemo(memo(second))!!
 
-        assertTrue(stores.memos.listTodos(other.id).isEmpty())
+        assertEquals(listOf(first), stores.memos.listUtteranceIds(memo.id))
         assertEquals(listOf(second), stores.memos.listUtteranceIds(other.id))
-        assertEquals(1, stores.memos.listTodos(memoWithTodo.id).size)
     }
 
     private fun startingAt(memo: NewMemo, startedAtMillis: Long) =
@@ -735,69 +709,49 @@ abstract class MemoRepositoryContract {
         assertEquals(listOf(earlier, later), stores.memos.listMemoUtterances(saved.id).map { it.id })
     }
 
+    private suspend fun Stores.said(startedAtMillis: Long, text: String) =
+        utterances.insert(NewUtterance(startedAtMillis, startedAtMillis + 10, text, null, startedAtMillis + 10)).id
+
     @Test
-    fun `ToDo は未完了、期限の早い順、新しい順、記録した順に並べ、期限のないものは後ろにする`() = runTest {
+    fun `検索はタイトル、要約、根拠の発話の本文のどれかに語を含むメモを新しい順に返す`() = runTest {
         val stores = stores()
-        fun todo(task: String, due: CalendarDate?, status: TodoStatus = TodoStatus.OPEN) =
-            NewTodo(task, TodoKind.TODO, due, status)
-        val soon = CalendarDate(2026, 11, 1)
-        val older = memo(
-            stores.utterance(1),
-            todos = listOf(todo("完了", CalendarDate(2026, 1, 1)), todo("期限なし", null), todo("古い", soon)),
-        ).copy(createdAtMillis = 1_000)
-        val newer = memo(
-            stores.utterance(2),
-            todos = listOf(
-                todo("新しい1", soon, TodoStatus.CANDIDATE),
-                todo("新しい2", soon),
-                todo("遅い", CalendarDate(2026, 12, 1)),
-            ),
-        ).copy(createdAtMillis = 2_000)
-        val saved = stores.memos.recordMemo(older)!!
-        stores.memos.recordMemo(newer)
-        val done = stores.memos.listTodos(saved.id).first { it.task == "完了" }
-        stores.memos.completeTodo(done.id, 3_000)
+        val byTitle = stores.memos.recordMemo(
+            startingAt(memo(stores.said(1, "本文")), 100).copy(title = "歯医者の予約", summary = "- 要約"),
+        )!!
+        val bySummary = stores.memos.recordMemo(
+            startingAt(memo(stores.said(2, "本文")), 200).copy(title = "題名", summary = "- 歯医者は十時"),
+        )!!
+        val byUtterance = stores.memos.recordMemo(
+            startingAt(memo(stores.said(3, "明日は歯医者だね")), 300).copy(title = null, summary = null),
+        )!!
+        stores.memos.recordMemo(startingAt(memo(stores.said(4, "週末の予定")), 400))
 
         assertEquals(
-            listOf("新しい1", "新しい2", "古い", "遅い", "期限なし", "完了"),
-            stores.memos.listTodosByPriority(10).map { it.task },
+            listOf(byUtterance, bySummary, byTitle),
+            stores.memos.searchMemos("歯医者", Long.MIN_VALUE, Long.MAX_VALUE, 10),
         )
-        assertEquals(2, stores.memos.listTodosByPriority(2).size)
+        assertEquals(listOf(byUtterance), stores.memos.searchMemos("歯医者", Long.MIN_VALUE, Long.MAX_VALUE, 1))
     }
 
     @Test
-    fun `完了すると状態と時刻が残り、他の ToDo は変わらない`() = runTest {
+    fun `検索は英字の大文字と小文字を区別せず、ほかの文字は区別する`() = runTest {
         val stores = stores()
-        val todos = listOf(
-            NewTodo("完了する", TodoKind.TODO, null, TodoStatus.CANDIDATE),
-            NewTodo("そのまま", TodoKind.TODO, null, TodoStatus.OPEN),
-        )
-        val saved = stores.memos.recordMemo(memo(stores.utterance(100), todos = todos))!!
-        val (target, other) = stores.memos.listTodos(saved.id)
+        val saved = stores.memos.recordMemo(memo(stores.said(1, "PDF を送る")).copy(title = "ｶﾀｶﾅ"))!!
 
-        assertEquals(TodoCompletion.COMPLETED, stores.memos.completeTodo(target.id, 5_000))
-
-        val (completed, untouched) = stores.memos.listTodos(saved.id)
-        assertEquals(TodoStatus.DONE, completed.status)
-        assertEquals(5_000L, completed.completedAtMillis)
-        assertEquals(other, untouched)
-        assertNull(target.completedAtMillis)
+        assertEquals(listOf(saved), stores.memos.searchMemos("pdf", Long.MIN_VALUE, Long.MAX_VALUE, 10))
+        assertTrue(stores.memos.searchMemos("カタカナ", Long.MIN_VALUE, Long.MAX_VALUE, 10).isEmpty())
     }
 
     @Test
-    fun `完了済みの ToDo の完了は最初の時刻を変えない`() = runTest {
+    fun `検索は期間に重なるメモだけを返し、空の語はすべてに当たる`() = runTest {
         val stores = stores()
-        val todos = listOf(NewTodo("作業", TodoKind.TODO, null, TodoStatus.OPEN))
-        val saved = stores.memos.recordMemo(memo(stores.utterance(100), todos = todos))!!
-        val id = stores.memos.listTodos(saved.id).single().id
-        stores.memos.completeTodo(id, 5_000)
+        val before = stores.memos.recordMemo(memo(stores.said(1, "a")).copy(startedAtMillis = 0, endedAtMillis = 99))!!
+        val edge = stores.memos.recordMemo(memo(stores.said(2, "b")).copy(startedAtMillis = 50, endedAtMillis = 100))!!
+        val inside =
+            stores.memos.recordMemo(memo(stores.said(3, "c")).copy(startedAtMillis = 150, endedAtMillis = 160))!!
+        stores.memos.recordMemo(memo(stores.said(4, "d")).copy(startedAtMillis = 200, endedAtMillis = 250))
 
-        assertEquals(TodoCompletion.ALREADY_DONE, stores.memos.completeTodo(id, 6_000))
-        assertEquals(5_000L, stores.memos.listTodos(saved.id).single().completedAtMillis)
-    }
-
-    @Test
-    fun `ない ToDo の完了は NOT_FOUND を返す`() = runTest {
-        assertEquals(TodoCompletion.NOT_FOUND, stores().memos.completeTodo(1, 5_000))
+        assertEquals(listOf(inside, edge), stores.memos.searchMemos("", 100, 200, 10))
+        assertEquals(listOf(before), stores.memos.searchMemos("", 0, 50, 10))
     }
 }

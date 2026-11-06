@@ -94,31 +94,6 @@ import Testing
         #expect(bytes.map(Array.init) == [0x00, 0x00, 0x80, 0x3F, 0x00, 0x00, 0x00, 0xBF])
     }
 
-    @Test func 完了の前の状態を取り消しのために残す() async throws {
-        let store = EngineStore(database: try fixture.open())
-        let utterance = try await store.utterances.insert(try utterance(0, 10, "本文"))
-        let memo = try NewMemo(
-            startedAtMillis: 0,
-            endedAtMillis: 10,
-            title: nil,
-            summary: nil,
-            todoExtraction: .COMPLETE,
-            modelVersion: "fake-1",
-            createdAtMillis: 100,
-            utteranceIds: [utterance.id],
-            todos: [try NewTodo(task: "作業", kind: .TODO, dueDate: nil, status: .CANDIDATE)]
-        )
-        let saved = try #require(try await store.memos.recordMemo(memo))
-        let todo = try #require(try await store.memos.listTodos(memoId: saved.id).first)
-
-        _ = try await store.memos.completeTodo(todoId: todo.id, completedAtMillis: 200)
-
-        let previous = try await store.database.perform { connection in
-            try connection.queryOne("SELECT completed_from_status FROM todo WHERE id = ?", [.integer(todo.id)]) { $0.optionalString(0) }
-        }
-        #expect(previous == .some("candidate"))
-    }
-
     @Test func 並行に書いても行を失わず_別の_id_が付く() async throws {
         let store = EngineStore(database: try fixture.open())
         let count = 200
@@ -213,11 +188,90 @@ import Testing
         #expect(throws: EngineStoreError.unsupportedSchemaVersion(EngineSchema.firstVersion - 1)) { try self.fixture.open() }
     }
 
+    @Test func 版_6_から移すと_ToDo_を消し_メモと根拠を残す() async throws {
+        try Self.prepare(fixture.databaseURL, version: 6)
+
+        let store = EngineStore(database: try fixture.open())
+
+        #expect(try await store.database.schemaVersion() == 7)
+        // 版 7 の DB に Android と同じ版 7 の行を入れたものと、表の中身が同じになる
+        let expectedURL = fixture.directory.appendingPathComponent("expected.db")
+        try Self.prepare(expectedURL, version: 7)
+        let expected = try Self.contents(of: expectedURL)
+        #expect(try await store.database.perform { try Self.contents($0) } == expected)
+        // 作り直した memo の続きの id を使い、作り直した索引で読める
+        let memo = try #require(try await store.memos.findMemo(memoId: 1))
+        #expect(memo.title == "題名")
+        #expect(try await store.memos.listMemoUtterances(memoId: 1).map(\.id) == [1])
+        #expect(try await store.memos.searchMemos(term: "要約", fromMillis: Int64.min, toMillis: Int64.max, limit: 10) == [memo])
+        let utterance = try #require(try await store.memos.listUnorganizedUtterances().first)
+        let next = try #require(try await store.memos.recordMemo(
+            try NewMemo(
+                startedAtMillis: utterance.startedAtMillis,
+                endedAtMillis: utterance.endedAtMillis,
+                title: nil,
+                summary: nil,
+                modelVersion: "fake-1",
+                createdAtMillis: 10_000,
+                utteranceIds: [utterance.id]
+            )
+        ))
+        #expect(next.id == 2)
+        let indexes = try await store.database.perform { connection in
+            try connection.query("SELECT name FROM sqlite_master WHERE type = 'index' AND tbl_name = 'memo'") { $0.string(0) }
+        }
+        #expect(indexes == ["memo_started_at"])
+    }
+
+    @Test func 移した版_6_の_DB_の表と列と制約と索引は_Android_の最新のスキーマと同じ() async throws {
+        try Self.prepare(fixture.databaseURL, version: 6)
+        let android = Self.sqldelightDirectory.appendingPathComponent("databases/\(EngineSchema.version).db")
+
+        let actual = try await fixture.open().perform { try Self.schema($0) }
+
+        // 名前を変えた表は、SQLite が CREATE 文の表の名前を引用符で囲む。それだけが違う
+        let normalized = actual.map { $0.replacingOccurrences(of: #"CREATE TABLE "memo""#, with: "CREATE TABLE memo") }
+        #expect(normalized == (try Self.schema(of: android)))
+    }
+
     @Test func すべての版からのマイグレーションがある() {
         // 版を上げたら、iOS の最初の版から今の版までのどこからでも移せる。各版からの中身のテストは版を上げるときに足す
         for version in EngineSchema.firstVersion..<EngineSchema.version {
             #expect(EngineSchema.migrations[version] != nil, "版 \(version) からのマイグレーションがありません")
         }
+    }
+
+    private static let seedsDirectory = engineDirectory.appendingPathComponent("adapters/src/test/resources/migration-seeds")
+
+    /// Android のその版のスキーマ(`databases/<版>.db`)を写し、Android の移行のテストと同じ行(`migration-seeds/<版>.sql`)を入れる。
+    /// Android のスキーマのファイルは版を持たないので、ここで付ける。
+    private static func prepare(_ url: URL, version: Int32) throws {
+        try FileManager.default.copyItem(at: sqldelightDirectory.appendingPathComponent("databases/\(version).db"), to: url)
+        let seed = try String(contentsOf: seedsDirectory.appendingPathComponent("\(version).sql"), encoding: .utf8)
+        let connection = try SQLiteConnection(path: url.path, flags: SQLITE_OPEN_READWRITE)
+        defer { connection.close() }
+        try connection.executeScript(seed)
+        try connection.executeScript("PRAGMA user_version = \(version)")
+    }
+
+    /// 表ごとの行を、列の値を SQLite の quote で書いた文字列にして rowid の順に並べる。表は名前の順。
+    private static func contents(_ connection: SQLiteConnection) throws -> [String: [String]] {
+        let tables = try connection.query(
+            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"
+        ) { $0.string(0) }
+        var contents: [String: [String]] = [:]
+        for table in tables {
+            let columns = try connection.query("SELECT name FROM pragma_table_info(?) ORDER BY cid", [.text(table)]) { $0.string(0) }
+            let row = columns.map { "quote(\($0))" }.joined(separator: " || ',' || ")
+            contents[table] = try connection.query("SELECT \(row) FROM \(table) ORDER BY rowid") { $0.string(0) }
+        }
+        return contents
+    }
+
+    private static func contents(of url: URL) throws -> [String: [String]] {
+        let connection = try SQLiteConnection(path: url.path, flags: SQLITE_OPEN_READONLY)
+        defer { connection.close() }
+        return try contents(connection)
     }
 
     /// sqlite_master の、SQLite が自動で作るものを除いた定義。比べやすいように名前の順に並べる。

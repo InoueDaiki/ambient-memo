@@ -1,0 +1,250 @@
+{
+  "area": "ask-parsers",
+  "description": "メモへの質問の LLM の出力を読む parseSearchPlan と parseAnswer。前処理は llm-output-parser と同じで、<think> から </think>(なければ末尾)までと、``` で始まる行を消し、前後の空白を除く",
+  "inputSchema": "op で選ぶ。\"plan\": text(LLM の出力)。\"answer\": text と sourceCount(渡したメモの数)",
+  "expectedSchema": "\"plan\": plan に読んだ計画。「語」「検索語」「キーワード」の行も「期間」の行もなければ null。あれば {terms: 語の配列(カンマ、読点、スラッシュで区切り、前後の空白と括弧や引用符を除き、2 文字以上、重ねず、最大 5 個), from, to: \"YYYY-MM-DD\"。期間の行の最初の 2 つの存在する日付の小さいほうと大きいほう。日付が 1 つなら同じ日。なければどちらも null}。\"answer\": answer に読んだ答え。空か、答えがないことを表す文で始まれば null。それ以外は {text: [n] と［n］の印を外し、各行の前後の空白と句読点の前の空白を除き、空行を除いて改行でつないだ本文, citations: 1 から sourceCount までの番号を、現れた順に重ねずに}",
+  "cases": [
+    {
+      "name": "語と期間を読む",
+      "input": {
+        "op": "plan",
+        "text": "語: 打ち合わせ, 会議, 決定\n期間: 2026-11-02〜2026-11-08"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "打ち合わせ",
+            "会議",
+            "決定"
+          ],
+          "from": "2026-11-02",
+          "to": "2026-11-08"
+        }
+      }
+    },
+    {
+      "name": "期間がなければ null にする",
+      "input": {
+        "op": "plan",
+        "text": "語: 歯医者、予約\n期間: なし"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "歯医者",
+            "予約"
+          ],
+          "from": null,
+          "to": null
+        }
+      }
+    },
+    {
+      "name": "前置き、箇条書き、全角のコロン、包みの記号があっても読む",
+      "input": {
+        "op": "plan",
+        "text": "はい。\n- 語：「歯医者」, 『予約』, \"保険証\"\n- 期間：2026-11-01 から 2026-11-03\n以上です"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "歯医者",
+            "予約",
+            "保険証"
+          ],
+          "from": "2026-11-01",
+          "to": "2026-11-03"
+        }
+      }
+    },
+    {
+      "name": "短い語と重なった語を捨て、6 個目からは使わない",
+      "input": {
+        "op": "plan",
+        "text": "語: 会, 予算, 予算, 会議, 資料, 日程, 場所, 担当"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "予算",
+            "会議",
+            "資料",
+            "日程",
+            "場所"
+          ],
+          "from": null,
+          "to": null
+        }
+      }
+    },
+    {
+      "name": "逆順の期間は入れ替え、日付が 1 つならその日にする",
+      "input": {
+        "op": "plan",
+        "text": "語: 予算\n期間: 2026-11-08〜2026-11-02"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "予算"
+          ],
+          "from": "2026-11-02",
+          "to": "2026-11-08"
+        }
+      }
+    },
+    {
+      "name": "日付が 1 つならその 1 日にする",
+      "input": {
+        "op": "plan",
+        "text": "期間: 2026-11-05"
+      },
+      "expected": {
+        "plan": {
+          "terms": [],
+          "from": "2026-11-05",
+          "to": "2026-11-05"
+        }
+      }
+    },
+    {
+      "name": "存在しない日付は使わない",
+      "input": {
+        "op": "plan",
+        "text": "語: 予算\n期間: 2026-02-30〜2026-03-01"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "予算"
+          ],
+          "from": "2026-03-01",
+          "to": "2026-03-01"
+        }
+      }
+    },
+    {
+      "name": "考えの区間とコードブロックは読まない",
+      "input": {
+        "op": "plan",
+        "text": "<think>語: 間違い</think>\n```\n語: 映画\n期間: なし\n```"
+      },
+      "expected": {
+        "plan": {
+          "terms": [
+            "映画"
+          ],
+          "from": null,
+          "to": null
+        }
+      }
+    },
+    {
+      "name": "語も期間の行もなければ null を返す",
+      "input": {
+        "op": "plan",
+        "text": "わかりません"
+      },
+      "expected": {
+        "plan": null
+      }
+    },
+    {
+      "name": "番号の印を外し、挙げた番号を挙げた順に返す",
+      "input": {
+        "op": "answer",
+        "text": "歯医者はあさっての十時です [2]。保険証を持っていきます [1][2]。",
+        "sourceCount": 3
+      },
+      "expected": {
+        "answer": {
+          "text": "歯医者はあさっての十時です。保険証を持っていきます。",
+          "citations": [
+            2,
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "範囲の外の番号と全角の括弧の番号を扱う",
+      "input": {
+        "op": "answer",
+        "text": "映画は土曜です［1］ [4] [0]",
+        "sourceCount": 2
+      },
+      "expected": {
+        "answer": {
+          "text": "映画は土曜です",
+          "citations": [
+            1
+          ]
+        }
+      }
+    },
+    {
+      "name": "番号がなくても答えとして読む",
+      "input": {
+        "op": "answer",
+        "text": "土曜に映画を見ます。",
+        "sourceCount": 2
+      },
+      "expected": {
+        "answer": {
+          "text": "土曜に映画を見ます。",
+          "citations": []
+        }
+      }
+    },
+    {
+      "name": "複数行の答えは空行を除いてつなぐ",
+      "input": {
+        "op": "answer",
+        "text": "土曜に映画 [1]\n\n日曜は休み [2]",
+        "sourceCount": 2
+      },
+      "expected": {
+        "answer": {
+          "text": "土曜に映画\n日曜は休み",
+          "citations": [
+            1,
+            2
+          ]
+        }
+      }
+    },
+    {
+      "name": "答えがないことを表す文なら null を返す",
+      "input": {
+        "op": "answer",
+        "text": "メモには見つかりませんでした。",
+        "sourceCount": 2
+      },
+      "expected": {
+        "answer": null
+      }
+    },
+    {
+      "name": "空の出力は null を返す",
+      "input": {
+        "op": "answer",
+        "text": "  \n ",
+        "sourceCount": 2
+      },
+      "expected": {
+        "answer": null
+      }
+    },
+    {
+      "name": "考えの区間の中は読まない",
+      "input": {
+        "op": "answer",
+        "text": "<think>答えは [1]</think>メモには見つかりませんでした",
+        "sourceCount": 1
+      },
+      "expected": {
+        "answer": null
+      }
+    }
+  ]
+}

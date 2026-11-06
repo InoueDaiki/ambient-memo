@@ -59,26 +59,8 @@ func timeZone(_ input: SpecObject) throws -> TimeZone {
     return zone
 }
 
-@Sendable func assessedDue(_ input: SpecObject) async throws -> SpecJSON {
-    let due = try assessDue(
-        try input.strOrNull("rawDue"),
-        try date(input, "spokenOn"),
-        try date(input, "endedOn"),
-        try input.str("transcript")
-    )
-    return obj(["date": due.date?.description, "isConfident": due.isConfident])
-}
-
 @Sendable func llmOutputParser(_ input: SpecObject) async throws -> SpecJSON {
     switch try input.str("op") {
-    case "todos":
-        let result = parseTodos(try input.str("text")).map { parsed in
-            obj([
-                "items": parsed.items.map { obj(["task": $0.task, "kind": $0.kind, "due": $0.due]) },
-                "isComplete": parsed.isComplete,
-            ])
-        }
-        return obj(["result": result])
     case "summary":
         return obj(["summary": parseSummary(try input.str("text"))])
     case let op:
@@ -94,24 +76,18 @@ func timeZone(_ input: SpecObject) throws -> TimeZone {
     switch try input.str("op") {
     case "summary":
         return request(OrganizePrompts.summary(try date(input, "date"), try input.str("transcript")))
-    case "todo":
-        return request(try OrganizePrompts.todo(try date(input, "date"), try input.str("transcript")))
     case "memoTitle":
         return request(OrganizePrompts.memoTitle(try input.str("summary")))
-    case "todoTitle":
-        return request(OrganizePrompts.todoTitle(try input.str("task")))
     case "topics":
         return request(OrganizePrompts.topics(try input.strings("lines")))
     case "retryNotes":
-        return obj(["summary": OrganizePrompts.SUMMARY_RETRY_NOTE, "todo": OrganizePrompts.TODO_RETRY_NOTE])
-    case "calendarDays":
-        return obj(["days": OrganizePrompts.CALENDAR_DAYS])
+        return obj(["summary": OrganizePrompts.SUMMARY_RETRY_NOTE])
     case let op:
         throw SpecError("知らない op です: \(op)")
     }
 }
 
-private func request(_ request: LlmRequest) -> SpecJSON {
+func request(_ request: LlmRequest) -> SpecJSON {
     obj(["system": request.system, "user": request.user, "maxOutputTokens": request.maxOutputTokens])
 }
 

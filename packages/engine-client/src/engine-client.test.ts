@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import { FakeEngineClient } from "./fake.ts";
-import { memo, runMemoClientContract, todo } from "./memo-contract.ts";
+import { FAKE_ANSWER, FakeEngineClient } from "./fake.ts";
+import { memo, runMemoClientContract } from "./memo-contract.ts";
 import { sampleMemos } from "./sample-memos.ts";
 import {
   SelfEnrollmentError,
@@ -294,33 +294,94 @@ describe("FakeEngineClient の整理", () => {
   });
 });
 
-describe("FakeEngineClient のメモと ToDo", () => {
+describe("FakeEngineClient のメモ", () => {
   it("メモが増えるとイベントが届く", () => {
     const client = new FakeEngineClient();
     const events: EngineEvent[] = [];
     client.subscribe((event) => events.push(event));
 
     client.addMemo(memo("a"));
-    client.addMemo(memo("b", { todos: [todo("t")] }));
+    client.addMemo(memo("b"));
 
-    expect(events).toEqual([
-      { type: "memos-changed" },
-      { type: "memos-changed" },
-      { type: "todos-changed" },
-    ]);
+    expect(events).toEqual([{ type: "memos-changed" }, { type: "memos-changed" }]);
   });
 
-  it("読み取りと完了の失敗は1回だけ起きる", async () => {
-    const client = new FakeEngineClient({ memos: [memo("a", { todos: [todo("t")] })] });
+  it("読み取りの失敗は1回だけ起きる", async () => {
+    const client = new FakeEngineClient({ memos: [memo("a")] });
 
     client.failNextMemoRead(new Error("読めない"));
     await expect(client.listMemos({ limit: 1 })).rejects.toThrow("読めない");
     expect(await client.listMemos({ limit: 1 })).toHaveLength(1);
+  });
+});
 
-    client.failNextComplete(new Error("書けない"));
-    await expect(client.completeTodo("t")).rejects.toThrow("書けない");
-    await client.completeTodo("t");
-    expect((await client.listTodos({ limit: 1 }))[0]?.status).toBe("done");
+describe("FakeEngineClient の質問", () => {
+  const memos = [
+    memo("a", { title: "読書会の日程", summary: "第2日曜", startedAt: 1 }),
+    memo("b", { title: "庭の手入れ", summary: "読書会の前に土を買う", startedAt: 2 }),
+    memo("c", { title: "買い物", summary: "日程は未定", startedAt: 3 }),
+    memo("d", { title: "読書会の本", summary: null, startedAt: 4 }),
+    memo("e", { title: null, summary: null, startedAt: 5 }),
+    memo("f", { title: "読書会の感想", summary: null, startedAt: 0 }),
+  ];
+
+  it("タイトルか要約に質問の語を含むメモを、新しい順に 3 件まで根拠にし、決まった文で答える", async () => {
+    const answer = await new FakeEngineClient({ memos }).askMemos("読書会、どうなった?");
+
+    expect(answer).toEqual({
+      outcome: "answered",
+      answer: FAKE_ANSWER,
+      sources: [
+        { id: "d", title: "読書会の本", summary: null, startedAt: 4, endedAt: 2 },
+        { id: "b", title: "庭の手入れ", summary: "読書会の前に土を買う", startedAt: 2, endedAt: 2 },
+        { id: "a", title: "読書会の日程", summary: "第2日曜", startedAt: 1, endedAt: 2 },
+      ],
+    });
+  });
+
+  it("空白や句読点で区切り、1 文字の語は使わない", async () => {
+    const client = new FakeEngineClient({ memos });
+
+    expect((await client.askMemos("日程、買い物")).sources.map((item) => item.id)).toEqual([
+      "c",
+      "a",
+    ]);
+    expect((await client.askMemos("本 土")).outcome).toBe("not-found");
+  });
+
+  it("止めておいた質問は、進めると答え、止めると reject する。動いている間は busy", async () => {
+    const client = new FakeEngineClient({ memos });
+    const phases: string[] = [];
+    client.subscribe((event) => {
+      if (event.type === "ask-progress") phases.push(event.phase);
+    });
+
+    client.holdNextAsk();
+    const held = client.askMemos("読書会");
+    expect(phases).toEqual(["preparing"]);
+    expect((await client.askMemos("読書会")).outcome).toBe("busy");
+    client.finishAsk();
+    expect((await held).outcome).toBe("answered");
+    expect(phases).toEqual(["preparing", "searching", "answering"]);
+
+    client.holdNextAsk();
+    const cancelled = client.askMemos("読書会");
+    await client.cancelAsk();
+    await expect(cancelled).rejects.toThrow();
+    expect((await client.askMemos("読書会")).outcome).toBe("answered");
+  });
+
+  it("実行基盤の失敗は1回だけ起きる", async () => {
+    const client = new FakeEngineClient({ memos });
+
+    client.failNextAsk();
+
+    expect(await client.askMemos("読書会")).toEqual({
+      outcome: "failed",
+      answer: null,
+      sources: [],
+    });
+    expect((await client.askMemos("読書会")).outcome).toBe("answered");
   });
 });
 
@@ -346,18 +407,15 @@ describe("FakeEngineClient の診断の記録", () => {
 
 describe("見本のメモ", () => {
   it("画面が扱う状態をすべて含む", () => {
-    const todos = sampleMemos.flatMap((item) => item.todos);
-
     expect(sampleMemos.some((item) => item.summary === null)).toBe(true);
-    expect(sampleMemos.some((item) => item.todoExtraction === "incomplete")).toBe(true);
-    expect(todos.some((item) => item.status === "candidate" && item.dueDate !== null)).toBe(true);
-    expect(todos.some((item) => item.status === "candidate" && item.dueDate === null)).toBe(true);
+    expect(sampleMemos.some((item) => item.summary !== null)).toBe(true);
   });
 
-  it("ToDo の memoId が親のメモを指す", () => {
-    for (const item of sampleMemos) {
-      expect(item.todos.every((entry) => entry.memoId === item.id)).toBe(true);
-    }
+  it("見本のメモに質問すると答える", async () => {
+    const client = new FakeEngineClient({ memos: sampleMemos });
+
+    expect((await client.askMemos("読書会はいつ")).outcome).toBe("not-found");
+    expect((await client.askMemos("読書会 いつ")).sources[0]?.id).toBe("sample-memo-2");
   });
 });
 

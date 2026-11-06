@@ -17,7 +17,8 @@ struct BridgeEngineError: Error {
     code: "speaker-not-found", message: "直す先の発話か話者がありません")
   static let diagnosticsEmpty = BridgeEngineError(
     code: "diagnostics-empty", message: "書き出す記録がありません")
-  static let todoNotFound = BridgeEngineError(code: "todo-not-found", message: "ToDo がありません")
+  static let askEmptyQuestion = BridgeEngineError(code: "ask-empty-question", message: "質問が空です")
+  static let askCancelled = BridgeEngineError(code: "ask-cancelled", message: "質問を止めました")
   static let speakerResetBusy = BridgeEngineError(
     code: "speaker-reset-busy", message: "聞き取りや声の登録の途中はリセットできません")
   static let microphonePermission = BridgeEngineError(
@@ -72,8 +73,9 @@ protocol BridgeEngine: AnyObject {
 
   func listMemos(limit: Int) async throws -> [WireObject]
   func getMemo(id: String) async throws -> WireObject?
-  func listTodos(limit: Int) async throws -> [WireObject]
-  func completeTodo(id: String) async throws
+  /// 進み具合は [onProgress] に JS の AskPhase の名前で渡す。空の質問と、[cancelAsk] で止めたときは投げる
+  func askMemos(question: String, onProgress: @escaping @Sendable (String) -> Void) async throws -> WireObject
+  func cancelAsk()
   func organizeStatus() async throws -> WireObject
   func startOrganize() async throws -> String
   func stopOrganize()

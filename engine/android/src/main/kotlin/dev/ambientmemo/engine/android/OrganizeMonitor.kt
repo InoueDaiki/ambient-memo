@@ -67,7 +67,7 @@ internal interface OrganizeControl {
 internal class OrganizeMonitor(
     context: Context,
     private val modelReady: () -> Boolean,
-    private val onMemoChanged: (MemoChange) -> Unit,
+    private val onMemoChanged: () -> Unit,
 ) : OrganizeControl, ServiceConnection {
     private val context = context.applicationContext
     private val tracker = OrganizeStatusTracker()
@@ -129,7 +129,7 @@ internal class OrganizeMonitor(
                 tracker.onStatus(next)
                 publish()
             }
-            OrganizeService.MESSAGE_MEMO_CHANGED -> onMemoChanged(MemoChange.entries[message.arg1])
+            OrganizeService.MESSAGE_MEMO_CHANGED -> onMemoChanged()
         }
         return true
     }

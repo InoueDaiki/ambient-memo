@@ -2,18 +2,19 @@ package dev.ambientmemo.engine.android
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
+import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.db.AmbientMemoDatabase
-import dev.ambientmemo.engine.domain.CalendarDate
+import dev.ambientmemo.engine.domain.LlmRequest
+import dev.ambientmemo.engine.domain.MemoQuestionAnswerer
 import dev.ambientmemo.engine.domain.NewMemo
-import dev.ambientmemo.engine.domain.NewTodo
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.Speaker
 import dev.ambientmemo.engine.domain.SpeakerNameSource
-import dev.ambientmemo.engine.domain.TodoExtraction
-import dev.ambientmemo.engine.domain.TodoKind
-import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.testing.FakeClock
+import dev.ambientmemo.engine.domain.testing.isSearchPlanRequest
+import dev.ambientmemo.engine.llm.LocalLlm
+import dev.ambientmemo.engine.llm.NativeLlm
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.runTest
@@ -41,10 +42,7 @@ class MemoBridgeContractTest {
     private val driver = JdbcSqliteDriver(JdbcSqliteDriver.IN_MEMORY, Properties(), AmbientMemoDatabase.Schema)
     private val database = AmbientMemoDatabase(driver)
     private val utterances = SqliteUtteranceRepository(database, Dispatchers.Unconfined)
-    private val events = mutableListOf<MemoChange>()
-    private val memos = ObservableMemoRepository(SqliteMemoRepository(database, Dispatchers.Unconfined)) {
-        events += it
-    }
+    private val memos = ObservableMemoRepository(SqliteMemoRepository(database, Dispatchers.Unconfined)) {}
     private val self = Speaker(SELF_SPEAKER_ID, "自分", SpeakerNameSource.SELF, isSelf = true, createdAtMillis = 0)
 
     private class FakeOrganize : OrganizeControl {
@@ -65,9 +63,38 @@ class MemoBridgeContractTest {
         }
     }
 
+    /** 検索の語は質問そのもの。答えは 1 つ目のメモを挙げる。 */
+    private class ScriptedNative : NativeLlm {
+        override fun generate(request: LlmRequest): String = if (request.isSearchPlanRequest) {
+            "語: ${request.user.substringAfterLast("質問: ")}\n期間: なし"
+        } else {
+            "メモにあります [1]"
+        }
+
+        override fun cancel() = Unit
+
+        override fun close() = Unit
+    }
+
     private val organize = FakeOrganize()
     private val clock = FakeClock(50_000)
-    private val bridge = MemoBridge(memos, { mapOf(self.id to self) }, clock, organize, TimeZone.getTimeZone("UTC"))
+    private val utc = TimeZone.getTimeZone("UTC")
+
+    /** `:organize` の Service と同じ組み立てを、bind を通さずに動かす。 */
+    private val asks = object : AskControl {
+        private val session = AskSession(
+            isModelReady = { true },
+            openLlm = { LocalLlm("stub-1", { ScriptedNative() }, Dispatchers.Unconfined) },
+            answererFor = { llm ->
+                MemoQuestionAnswerer(memos, SqliteSpeakerRepository(database, Dispatchers.Unconfined), llm, clock, utc)
+            },
+        )
+
+        override suspend fun ask(question: String, onStep: (AskStep) -> Unit) = session.run(question, onStep)
+
+        override fun cancel() = Unit
+    }
+    private val bridge = MemoBridge(memos, { mapOf(self.id to self) }, clock, organize, asks, utc)
 
     @AfterEach
     fun close() = driver.close()
@@ -80,7 +107,6 @@ class MemoBridgeContractTest {
         title: String? = "タイトル",
         summary: String? = "要約",
         createdAt: Long = 1,
-        todos: List<NewTodo> = emptyList(),
         speakerId: Long? = null,
     ): Long {
         val millis = nextUtteranceMillis++
@@ -90,21 +116,14 @@ class MemoBridgeContractTest {
             endedAtMillis = startedAt + 1,
             title = title,
             summary = summary,
-            todoExtraction = TodoExtraction.COMPLETE,
             modelVersion = "fake-1",
             createdAtMillis = createdAt,
             utteranceIds = listOf(utterance.id),
-            todos = todos,
         )
-        return memos.recordMemo(memo)!!.id.also { events.clear() }
+        return memos.recordMemo(memo)!!.id
     }
 
-    private fun todo(task: String, due: CalendarDate? = null, status: TodoStatus = TodoStatus.OPEN) =
-        NewTodo(task, TodoKind.TODO, due, status)
-
     private fun ids(items: List<WireObject>) = items.map { it["id"] }
-
-    private fun tasks(items: List<WireObject>) = items.map { it["task"] }
 
     @Test
     fun `メモは開始時刻の新しい順に limit 件まで返す`() = runTest {
@@ -118,13 +137,10 @@ class MemoBridgeContractTest {
     }
 
     @Test
-    fun `一覧のメモには発話と ToDo を含めない`() = runTest {
-        record(todos = listOf(todo("作業")))
+    fun `一覧のメモには発話を含めない`() = runTest {
+        record()
 
-        val item = bridge.listMemos(1).single()
-
-        assertFalse(item.containsKey("utterances"))
-        assertFalse(item.containsKey("todos"))
+        assertFalse(bridge.listMemos(1).single().containsKey("utterances"))
     }
 
     @Test
@@ -137,8 +153,8 @@ class MemoBridgeContractTest {
     }
 
     @Test
-    fun `メモの詳細は根拠の発話と ToDo を返す`() = runTest {
-        val id = record(todos = listOf(todo("作業")), speakerId = SELF_SPEAKER_ID)
+    fun `メモの詳細は根拠の発話を返す`() = runTest {
+        val id = record(speakerId = SELF_SPEAKER_ID)
 
         val detail = bridge.getMemo(id.toString())!!
 
@@ -147,71 +163,12 @@ class MemoBridgeContractTest {
         assertEquals("発話", utterance["text"])
         assertEquals("self", utterance["speaker"])
         assertEquals("自分", utterance["speakerName"])
-        val todo = (detail["todos"] as List<*>).single() as Map<*, *>
-        assertEquals(id.toString(), todo["memoId"])
-        assertEquals("作業", todo["task"])
-        assertEquals("作業", todo["title"])
     }
 
     @Test
     fun `ないメモは null を返す`() = runTest {
         assertNull(bridge.getMemo("none"))
         assertNull(bridge.getMemo("12345"))
-    }
-
-    @Test
-    fun `ToDo は未完了、期限の早い順、新しい順に並べ、期限のないものは後ろにする`() = runTest {
-        record(
-            createdAt = 1,
-            todos = listOf(
-                todo("done", CalendarDate(2026, 1, 1)),
-                todo("no-due"),
-                todo("later", CalendarDate(2026, 12, 1)),
-                todo("sooner-old", CalendarDate(2026, 11, 1)),
-            ),
-        )
-        record(createdAt = 2, todos = listOf(todo("sooner-new", CalendarDate(2026, 11, 1), TodoStatus.CANDIDATE)))
-        bridge.completeTodo(bridge.listTodos(10).first { it["task"] == "done" }["id"] as String)
-
-        assertEquals(listOf("sooner-new", "sooner-old", "later", "no-due", "done"), tasks(bridge.listTodos(10)))
-    }
-
-    @Test
-    fun `ToDo は limit 件まで返す`() = runTest {
-        record(todos = listOf(todo("1"), todo("2"), todo("3")))
-
-        assertEquals(2, bridge.listTodos(2).size)
-    }
-
-    @Test
-    fun `完了すると状態が変わり、解決するまでにイベントが届く`() = runTest {
-        val memoId = record(todos = listOf(todo("t", status = TodoStatus.CANDIDATE)))
-
-        bridge.completeTodo(bridge.listTodos(1).single()["id"] as String)
-
-        assertEquals(listOf(MemoChange.TODOS), events)
-        assertEquals("done", bridge.listTodos(1).single()["status"])
-        val detail = bridge.getMemo(memoId.toString())!!
-        assertEquals("done", ((detail["todos"] as List<*>).single() as Map<*, *>)["status"])
-    }
-
-    @Test
-    fun `完了済みの ToDo の完了は何もせず成功する`() = runTest {
-        record(todos = listOf(todo("t")))
-        val id = bridge.listTodos(1).single()["id"] as String
-        bridge.completeTodo(id)
-        events.clear()
-
-        bridge.completeTodo(id)
-
-        assertEquals(emptyList<MemoChange>(), events)
-    }
-
-    @Test
-    fun `ない ToDo の完了は reject する`() = runTest {
-        listOf("none", "12345").forEach { id ->
-            assertThrows(TodoNotFoundException::class.java) { runBlocking { bridge.completeTodo(id) } }
-        }
     }
 
     private suspend fun leaveUnorganized(atMillis: Long) {
@@ -286,6 +243,88 @@ class MemoBridgeContractTest {
 
         assertEquals("model-unavailable", bridge.startOrganize())
         assertEquals(0, organize.starts)
+    }
+
+    /** 読書会のメモが 2 つと、関係のないメモが 1 つ。 */
+    private suspend fun recordRelated(): Map<String, String> = mapOf(
+        record(title = "読書会の日程", summary = "次の読書会は来月の第2日曜", startedAt = 1).toString() to "old",
+        record(title = "読書会の本", summary = "課題の本を読んでおく", startedAt = 3).toString() to "new",
+        record(title = "庭の手入れ", summary = "土曜に土を買う", startedAt = 2).toString() to "other",
+    )
+
+    private suspend fun ask(question: String, progress: MutableList<String> = mutableListOf()) =
+        bridge.askMemos(question) { progress += it }
+
+    private fun unanswered(outcome: String) =
+        mapOf("outcome" to outcome, "answer" to null, "sources" to emptyList<Any>())
+
+    @Test
+    fun `空の質問は reject する`() = runTest {
+        recordRelated()
+
+        listOf("", "  ").forEach { question ->
+            assertThrows(IllegalArgumentException::class.java) { runBlocking { ask(question) } }
+        }
+    }
+
+    @Test
+    fun `関係するメモがなければ not-found で、答えも根拠もない`() = runTest {
+        recordRelated()
+
+        assertEquals(unanswered("not-found"), ask("引っ越し"))
+    }
+
+    @Test
+    fun `関係するメモがあれば answered で、答えと根拠のメモを返す`() = runTest {
+        val names = recordRelated()
+
+        val answer = ask("読書会")
+
+        assertEquals("answered", answer["outcome"])
+        assertTrue((answer["answer"] as String).isNotEmpty())
+        val sources = (answer["sources"] as List<*>).map { it as Map<*, *> }
+        assertTrue(sources.isNotEmpty())
+        sources.forEach { source ->
+            assertTrue(names[source["id"]] in setOf("old", "new"), source.toString())
+            assertFalse(source.containsKey("utterances"))
+        }
+    }
+
+    @Test
+    fun `解決するまでに進み具合が準備、検索、回答の順に届く`() = runTest {
+        recordRelated()
+        val progress = mutableListOf<String>()
+
+        ask("読書会", progress)
+
+        assertEquals(listOf("preparing", "searching", "answering"), progress)
+    }
+
+    @Test
+    fun `整理のモデルがなければ model-unavailable を返す`() = runTest {
+        recordRelated()
+        organize.modelReady = false
+
+        assertEquals(unanswered("model-unavailable"), ask("読書会"))
+    }
+
+    @Test
+    fun `整理が動いている間は busy を返す`() = runTest {
+        recordRelated()
+        leaveUnorganized(0)
+        clock.advanceBy(TEN_MINUTES)
+        bridge.startOrganize()
+
+        assertEquals(unanswered("busy"), ask("読書会"))
+    }
+
+    @Test
+    fun `質問が動いていないときに止めても何も起きない`() = runTest {
+        recordRelated()
+
+        bridge.cancelAsk()
+
+        assertEquals("answered", ask("読書会")["outcome"])
     }
 
     @Test

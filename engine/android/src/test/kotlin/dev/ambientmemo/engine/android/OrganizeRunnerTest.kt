@@ -12,7 +12,6 @@ import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeTrigger
 import dev.ambientmemo.engine.domain.testing.FakeClock
-import dev.ambientmemo.engine.domain.testing.isTodoRequest
 import dev.ambientmemo.engine.llm.LocalLlm
 import dev.ambientmemo.engine.llm.NativeLlm
 import kotlinx.coroutines.CompletableDeferred
@@ -66,7 +65,7 @@ class OrganizeRunnerTest {
 
         override fun generate(request: LlmRequest): String {
             if (calls++ == 0) duringFirstChunk()
-            return if (request.isTodoRequest) """{"items": []}""" else "- 要約"
+            return "- 要約"
         }
 
         override fun cancel() = Unit

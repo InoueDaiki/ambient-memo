@@ -14,17 +14,48 @@ import Foundation
  */
 enum EngineSchema {
     /// 今のスキーマの版。Android の SQLDelight の版(マイグレーションの数 + 1)と同じ番号にする。
-    static let version: Int32 = 6
+    static let version: Int32 = 7
 
     /// iOS で最初に作った版。これより古い版の DB は iOS にはない。
     static let firstVersion: Int32 = 6
 
     /**
      * 版 n から n + 1 へのマイグレーション。キーは移す前の版。
-     * 例: 版 6 から 7 へ列を足すなら `6: "ALTER TABLE todo ADD COLUMN ...;"` を足し、[version] を 7 にして、
+     * 例: 版 7 から 8 へ列を足すなら `7: "ALTER TABLE memo ADD COLUMN ...;"` を足し、[version] を 8 にして、
      * [create] にも同じ列を足す。新しく作る DB は [create] で、既存の DB はここで同じ形になるようにする。
+     * 文は Android の `migrations/<版>.sqm` と同じにする。
      */
-    static let migrations: [Int32: String] = [:]
+    static let migrations: [Int32: String] = [
+        // ToDo をなくす。todo を消し、memo の todo_extraction を外す。
+        // DROP COLUMN は Android の既定の方言の SQLite にないので、Android と同じく memo を作り直して行を写す。
+        // 外部キーの制約は有効にしていないので、memo を消しても memo_utterance はそのまま残る
+        6: """
+            DROP TABLE todo;
+
+            CREATE TABLE memo_new (
+              id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+              started_at_ms INTEGER NOT NULL,
+              ended_at_ms INTEGER NOT NULL,
+              title TEXT,
+              summary TEXT,
+              model_version TEXT NOT NULL,
+              created_at_ms INTEGER NOT NULL,
+              CHECK (ended_at_ms >= started_at_ms)
+            );
+
+            INSERT INTO memo_new (id, started_at_ms, ended_at_ms, title, summary, model_version, created_at_ms)
+            SELECT id, started_at_ms, ended_at_ms, title, summary, model_version, created_at_ms
+            FROM memo;
+
+            DROP INDEX memo_started_at;
+
+            DROP TABLE memo;
+
+            ALTER TABLE memo_new RENAME TO memo;
+
+            CREATE INDEX memo_started_at ON memo (started_at_ms);
+            """,
+    ]
 
     /// 新しい DB に今の版のスキーマを作る。文は Android の `.sq` の CREATE と同じ。
     static let create = """
@@ -105,7 +136,6 @@ enum EngineSchema {
           ended_at_ms INTEGER NOT NULL,
           title TEXT,
           summary TEXT,
-          todo_extraction TEXT NOT NULL,
           model_version TEXT NOT NULL,
           created_at_ms INTEGER NOT NULL,
           CHECK (ended_at_ms >= started_at_ms)
@@ -120,21 +150,6 @@ enum EngineSchema {
         );
 
         CREATE UNIQUE INDEX memo_utterance_utterance ON memo_utterance (utterance_id);
-
-        CREATE TABLE todo (
-          id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
-          memo_id INTEGER NOT NULL REFERENCES memo (id),
-          task TEXT NOT NULL,
-          kind TEXT NOT NULL,
-          due_date TEXT,
-          status TEXT NOT NULL,
-          created_at_ms INTEGER NOT NULL,
-          completed_at_ms INTEGER,
-          completed_from_status TEXT,
-          title TEXT NOT NULL DEFAULT ''
-        );
-
-        CREATE INDEX todo_memo ON todo (memo_id);
         """
 
     /**

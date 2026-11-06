@@ -3,14 +3,14 @@ import Foundation
 private let MAX_TITLE_CHARS = 30
 
 /**
- * 未処理の発話をメモと ToDo に整理する。
+ * 未処理の発話をメモに整理する。
  *
  * 発話をまとまりに分け、まとまりを話題に分ける。
- * 話題ごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
+ * 話題ごとに、メモと発話の処理済みの印を1つのトランザクションで記録する。
  * 途中で止まっても、記録していないまとまりは未処理のまま残り、次回の実行が続きから処理する。
  *
  * [timeZone] は発話の日付を決める。「今日」は実行時ではなく、話した日にする。
- * 夜の充電中に整理するので、実行が日付をまたぐと「明日」がずれるため。
+ * 夜の充電中に整理するので、実行が日付をまたぐと要約の「明日」がずれるため。
  *
  * 失敗の回数は [attempts] に残す。アプリでは実行をまたいで残る実装を渡す。
  */
@@ -82,7 +82,7 @@ public final class OrganizeJob: Sendable {
         }
         // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
         let finished: OrganizeOutcome = pass.suspects.isEmpty ? .COMPLETED : .LLM_FAILED
-        return OrganizeResult(stoppedBy ?? finished, pass.memoCount, pass.todoCount, pass.unreadableCount)
+        return OrganizeResult(stoppedBy ?? finished, pass.memoCount, pass.unreadableCount)
     }
 
     /// まとまりを1つ処理した結果。[carried] は、次のまとまりの頭に回した話題の最初の発話。
@@ -140,7 +140,6 @@ public final class OrganizeJob: Sendable {
     private final class Pass {
         let labels: SpeakerLabels
         var memoCount = 0
-        var todoCount = 0
         var unreadableCount = 0
         var suspects: [UtteranceChunk] = []
 
@@ -191,10 +190,7 @@ public final class OrganizeJob: Sendable {
     }
 
     private func record(_ memo: NewMemo, _ key: Int64, _ pass: Pass) async throws {
-        if try await memos.recordMemo(memo) != nil {
-            pass.memoCount += 1
-            pass.todoCount += memo.todos.count
-        }
+        if try await memos.recordMemo(memo) != nil { pass.memoCount += 1 }
         try attempts.clear(firstUtteranceId: key)
     }
 
@@ -222,11 +218,9 @@ public final class OrganizeJob: Sendable {
             endedAtMillis: chunk.endedAtMillis,
             title: nil,
             summary: nil,
-            todoExtraction: .INCOMPLETE,
             modelVersion: llm.modelVersion,
             createdAtMillis: clock.nowMillis(),
-            utteranceIds: chunk.utterances.map(\.id),
-            todos: []
+            utteranceIds: chunk.utterances.map(\.id)
         )
         if try await memos.recordMemo(memo) != nil {
             pass.memoCount += 1
@@ -259,30 +253,15 @@ public final class OrganizeJob: Sendable {
 
     private func draft(_ chunk: UtteranceChunk, _ labels: SpeakerLabels) async throws -> NewMemo {
         let transcript = chunk.toTranscript(timeZone, labels)
-        // 話者の名前は日付の手がかりにしない。「明日香」などを「明日」と読まないように、本文だけで確かめる
-        let spokenText = chunk.toTranscript(timeZone)
-        let spokenOn = try CalendarDate.of(chunk.startedAtMillis, timeZone)
-        let endedOn = try CalendarDate.of(chunk.endedAtMillis, timeZone)
-        let summary = try await summarize(spokenOn, transcript)
-        let parsed = try await extractTodos(spokenOn, transcript)
-        let title = try await summary.asyncMap { try await titleOf($0) }
-        var seen = Set<String>()
-        var todos: [NewTodo] = []
-        // Kotlin の distinctBy と同じく、空白を除いた内容が同じものは最初の 1 件だけを残す
-        for item in parsed.items where seen.insert(item.task.kotlinWithoutWhitespace()).inserted {
-            let todoTitle = try await todoTitleOf(item.task)
-            todos.append(try toNewTodo(item, todoTitle, try assessDue(item.due, spokenOn, endedOn, spokenText)))
-        }
+        let summary = try await summarize(try CalendarDate.of(chunk.startedAtMillis, timeZone), transcript)
         return try NewMemo(
             startedAtMillis: chunk.startedAtMillis,
             endedAtMillis: chunk.endedAtMillis,
-            title: title,
+            title: try await summary.asyncMap { try await titleOf($0) },
             summary: summary,
-            todoExtraction: parsed.isComplete ? .COMPLETE : .INCOMPLETE,
             modelVersion: llm.modelVersion,
             createdAtMillis: clock.nowMillis(),
-            utteranceIds: chunk.utterances.map(\.id),
-            todos: todos
+            utteranceIds: chunk.utterances.map(\.id)
         )
     }
 
@@ -293,18 +272,6 @@ public final class OrganizeJob: Sendable {
             if let summary = parseSummary(output) { return summary }
         }
         return nil
-    }
-
-    /// 温度 0 では同じ入力に同じ出力が返るので、再試行では指示を足す。読めなければ空の不完全な結果を返す。
-    private func extractTodos(_ date: CalendarDate, _ transcript: String) async throws -> ParsedTodos {
-        let request = try OrganizePrompts.todo(date, transcript)
-        var best: ParsedTodos?
-        for attempt in 0...config.maxRetries {
-            let parsed = parseTodos(try await llm.generate(forAttempt(request, attempt, OrganizePrompts.TODO_RETRY_NOTE)))
-            if parsed?.isComplete == true { return parsed! }
-            best = parsed ?? best
-        }
-        return best ?? ParsedTodos([], isComplete: false)
     }
 
     private func forAttempt(_ request: LlmRequest, _ attempt: Int, _ retryNote: String) -> LlmRequest {
@@ -323,21 +290,6 @@ public final class OrganizeJob: Sendable {
             throw NoSuchElementException("List is empty.")
         }
         return title.kotlinTake(MAX_TITLE_CHARS)
-    }
-
-    /// ToDo のタイトルは内容から別に作る。使えない出力なら、内容で代わりにする。
-    private func todoTitleOf(_ task: String) async throws -> String {
-        (parseTitle(try await llm.generate(OrganizePrompts.todoTitle(task))) ?? task).kotlinTake(MAX_TITLE_CHARS)
-    }
-
-    private func toNewTodo(_ item: RawTodo, _ title: String, _ due: AssessedDue) throws -> NewTodo {
-        try NewTodo(
-            task: item.task,
-            kind: item.kind?.kotlinTrim().kotlinLowercase() == "reminder" ? .REMINDER : .TODO,
-            dueDate: due.date,
-            status: due.isConfident ? .OPEN : .CANDIDATE,
-            title: title
-        )
     }
 }
 

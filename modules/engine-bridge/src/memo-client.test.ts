@@ -28,11 +28,11 @@ function nativeModule(memos: MemoDetail[], organize: OrganizeSetup = {}): MemoNa
         })),
       };
     },
-    listTodos: (limit) => fake.listTodos({ limit }),
-    completeTodo: (id) => fake.completeTodo(id),
     getOrganizeStatus: () => fake.getOrganizeStatus(),
     startOrganize: () => fake.startOrganize(),
     stopOrganize: () => fake.stopOrganize(),
+    askMemos: (question) => fake.askMemos(question),
+    cancelAsk: () => fake.cancelAsk(),
     addListener: (_name, listener) => ({ remove: fake.subscribe(listener) }),
   };
 }
@@ -44,5 +44,11 @@ runMemoClientContract("engine-bridge の JS", (memos, organize) =>
 describe("createMemoClient", () => {
   it("本物の接続では見本の帯を出さない", async () => {
     expect(await createMemoClient(nativeModule([])).getMemoMode()).toBe("ready");
+  });
+
+  it("質問を止めたときのネイティブの null を返さない", async () => {
+    const native = { ...nativeModule([]), cancelAsk: () => Promise.resolve(null as never) };
+
+    expect(await createMemoClient(native).cancelAsk()).toBeUndefined();
   });
 });

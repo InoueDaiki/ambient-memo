@@ -50,131 +50,24 @@ public struct LlmRequest: Sendable, Hashable {
     }
 }
 
-public enum TodoKind: String, Sendable, Hashable, CaseIterable {
-    /// 自分がこれからやること。
-    case TODO
-
-    /// 自分が日時を覚えておくべき予定。
-    case REMINDER
-
-    public var name: String { rawValue }
-}
-
-public enum TodoStatus: String, Sendable, Hashable, CaseIterable {
-    /// 期限の確度が低い。人が確かめるまで、リマインドの対象にしない。
-    case CANDIDATE
-
-    /// 確定した ToDo。
-    case OPEN
-
-    /// 完了した。保存の前の [NewTodo] には使わない。
-    case DONE
-
-    public var name: String { rawValue }
-}
-
-/// [MemoRepository.completeTodo] の結果。
-public enum TodoCompletion: String, Sendable, Hashable, CaseIterable {
-    case COMPLETED
-
-    /// すでに完了している。何も変えていない。
-    case ALREADY_DONE
-
-    case NOT_FOUND
-
-    public var name: String { rawValue }
-}
-
-public enum TodoExtraction: String, Sendable, Hashable, CaseIterable {
-    /// LLM の出力を最後まで読めた。
-    case COMPLETE
-
-    /// 読めなかったか一部だけ読めた。ToDo が欠けているかもしれない。
-    case INCOMPLETE
-
-    public var name: String { rawValue }
-}
-
-public struct NewTodo: Sendable, Hashable {
-    public let task: String
-    public let kind: TodoKind
-    public let dueDate: CalendarDate?
-    public let status: TodoStatus
-    /// 一覧に出す短い名前。
-    public let title: String
-
-    /// [title] を省くと [task] と同じにする。
-    public init(task: String, kind: TodoKind, dueDate: CalendarDate?, status: TodoStatus, title: String? = nil) throws {
-        let title = title ?? task
-        try require(!task.kotlinIsBlank, "内容が空です")
-        try require(!title.kotlinIsBlank, "タイトルが空です")
-        try require(status != .DONE, "完了は記録の後に completeTodo で行います")
-        self.task = task
-        self.kind = kind
-        self.dueDate = dueDate
-        self.status = status
-        self.title = title
-    }
-}
-
-public struct Todo: Sendable, Hashable {
-    public var id: Int64
-    public var memoId: Int64
-    public var task: String
-    /// 一覧に出す短い名前。タイトルのなかった版の ToDo では [task] と同じ。
-    public var title: String
-    public var kind: TodoKind
-    public var dueDate: CalendarDate?
-    public var status: TodoStatus
-    public var createdAtMillis: Int64
-    /// 完了した時刻。[status] が [TodoStatus.DONE] のときだけある。
-    public var completedAtMillis: Int64?
-
-    public init(
-        id: Int64,
-        memoId: Int64,
-        task: String,
-        title: String,
-        kind: TodoKind,
-        dueDate: CalendarDate?,
-        status: TodoStatus,
-        createdAtMillis: Int64,
-        completedAtMillis: Int64? = nil
-    ) {
-        self.id = id
-        self.memoId = memoId
-        self.task = task
-        self.title = title
-        self.kind = kind
-        self.dueDate = dueDate
-        self.status = status
-        self.createdAtMillis = createdAtMillis
-        self.completedAtMillis = completedAtMillis
-    }
-}
-
 /// 保存前のメモ。[title] と [summary] は要約に失敗すると nil になる。発話は残るので、後からたどれる。
 public struct NewMemo: Sendable, Hashable {
     public let startedAtMillis: Int64
     public let endedAtMillis: Int64
     public let title: String?
     public let summary: String?
-    public let todoExtraction: TodoExtraction
     public let modelVersion: String
     public let createdAtMillis: Int64
     public let utteranceIds: [Int64]
-    public let todos: [NewTodo]
 
     public init(
         startedAtMillis: Int64,
         endedAtMillis: Int64,
         title: String?,
         summary: String?,
-        todoExtraction: TodoExtraction,
         modelVersion: String,
         createdAtMillis: Int64,
-        utteranceIds: [Int64],
-        todos: [NewTodo]
+        utteranceIds: [Int64]
     ) throws {
         try require(endedAtMillis >= startedAtMillis, "終了時刻が開始時刻より前です")
         try require(!utteranceIds.isEmpty, "根拠の発話がありません")
@@ -183,11 +76,9 @@ public struct NewMemo: Sendable, Hashable {
         self.endedAtMillis = endedAtMillis
         self.title = title
         self.summary = summary
-        self.todoExtraction = todoExtraction
         self.modelVersion = modelVersion
         self.createdAtMillis = createdAtMillis
         self.utteranceIds = utteranceIds
-        self.todos = todos
     }
 }
 
@@ -197,7 +88,6 @@ public struct Memo: Sendable, Hashable {
     public var endedAtMillis: Int64
     public var title: String?
     public var summary: String?
-    public var todoExtraction: TodoExtraction
     public var modelVersion: String
     public var createdAtMillis: Int64
 
@@ -207,7 +97,6 @@ public struct Memo: Sendable, Hashable {
         endedAtMillis: Int64,
         title: String?,
         summary: String?,
-        todoExtraction: TodoExtraction,
         modelVersion: String,
         createdAtMillis: Int64
     ) {
@@ -216,7 +105,6 @@ public struct Memo: Sendable, Hashable {
         self.endedAtMillis = endedAtMillis
         self.title = title
         self.summary = summary
-        self.todoExtraction = todoExtraction
         self.modelVersion = modelVersion
         self.createdAtMillis = createdAtMillis
     }
@@ -261,13 +149,11 @@ public struct OrganizeBacklog: Sendable, Hashable {
 public struct OrganizeResult: Sendable, Hashable {
     public let outcome: OrganizeOutcome
     public let memoCount: Int
-    public let todoCount: Int
     public let unreadableCount: Int
 
-    public init(_ outcome: OrganizeOutcome, _ memoCount: Int, _ todoCount: Int, _ unreadableCount: Int = 0) {
+    public init(_ outcome: OrganizeOutcome, _ memoCount: Int, _ unreadableCount: Int = 0) {
         self.outcome = outcome
         self.memoCount = memoCount
-        self.todoCount = todoCount
         self.unreadableCount = unreadableCount
     }
 }

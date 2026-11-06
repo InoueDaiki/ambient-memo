@@ -31,16 +31,23 @@ extension Utterance {
     /**
      * 発話を、検証の文字起こしと同じ `[HH:mm] 自分: 本文` の形にする。
      * 話者が分からない発話は、話者識別の前と同じ `[HH:mm] 本文` の形にする。
-     *
-     * 時差は Foundation の TimeZone から秒の単位で読む。Kotlin(java.util.TimeZone)とは tz データの版が違うことがある。
      */
     func toTranscriptLine(_ timeZone: TimeZone, _ labels: SpeakerLabels = .NONE) -> String {
-        let date = Date(timeIntervalSince1970: Double(floorDiv(startedAtMillis, MILLIS_PER_SECOND)))
-        let localMillis = startedAtMillis + Int64(timeZone.secondsFromGMT(for: date)) * MILLIS_PER_SECOND
-        let minutes = floorMod(floorDiv(localMillis, MILLIS_PER_MINUTE), MINUTES_PER_DAY)
         let label = labels.of(self).map { "\($0): " } ?? ""
-        return "[\(pad2(minutes / MINUTES_PER_HOUR)):\(pad2(minutes % MINUTES_PER_HOUR))] \(label)\(text.kotlinTrim())"
+        return "[\(clockLabel(startedAtMillis, timeZone))] \(label)\(text.kotlinTrim())"
     }
+}
+
+/**
+ * [timeZone] での時刻の `HH:mm`。
+ *
+ * 時差は Foundation の TimeZone から秒の単位で読む。Kotlin(java.util.TimeZone)とは tz データの版が違うことがある。
+ */
+func clockLabel(_ millis: Int64, _ timeZone: TimeZone) -> String {
+    let date = Date(timeIntervalSince1970: Double(floorDiv(millis, MILLIS_PER_SECOND)))
+    let localMillis = millis + Int64(timeZone.secondsFromGMT(for: date)) * MILLIS_PER_SECOND
+    let minutes = floorMod(floorDiv(localMillis, MILLIS_PER_MINUTE), MINUTES_PER_DAY)
+    return "\(pad2(minutes / MINUTES_PER_HOUR)):\(pad2(minutes % MINUTES_PER_HOUR))"
 }
 
 private func pad2(_ value: Int64) -> String {

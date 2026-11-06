@@ -6,13 +6,15 @@ import kotlinx.serialization.json.JsonObject
 /** area の名前と実行役。area は `engine/spec/<area>.json` のファイル名と同じ。 */
 internal object SpecAreas {
     val handlers: Map<String, (JsonObject) -> JsonElement> = mapOf(
-        "assessed-due" to ::assessedDue,
+        "ask-parsers" to ::askParsers,
+        "ask-prompts" to ::askPrompts,
         "calendar-date" to ::calendarDate,
         "capture-pipeline" to ::capturePipeline,
         "diagnostics" to ::diagnostics,
         "engine-status" to ::engineStatus,
         "llm-output-parser" to ::llmOutputParser,
         "llm-title-parser" to ::llmTitleParser,
+        "memo-question" to ::memoQuestion,
         "model-validation" to ::modelValidation,
         "noise-text-filter" to ::noiseTextFilter,
         "organize-job" to ::organizeJob,

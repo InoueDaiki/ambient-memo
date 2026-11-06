@@ -93,13 +93,15 @@ typealias SpecHandler = @Sendable (SpecObject) async throws -> SpecJSON
 /// area の名前と実行役。area は `engine/spec/<area>.json` のファイル名と同じ。
 enum SpecAreas {
     static let handlers: [String: SpecHandler] = [
-        "assessed-due": assessedDue,
+        "ask-parsers": askParsers,
+        "ask-prompts": askPrompts,
         "calendar-date": calendarDate,
         "capture-pipeline": capturePipeline,
         "diagnostics": diagnostics,
         "engine-status": engineStatus,
         "llm-output-parser": llmOutputParser,
         "llm-title-parser": llmTitleParser,
+        "memo-question": memoQuestion,
         "model-validation": modelValidation,
         "noise-text-filter": noiseTextFilter,
         "organize-job": organizeJob,

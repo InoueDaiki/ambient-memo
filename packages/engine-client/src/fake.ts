@@ -1,5 +1,6 @@
 import { SelfEnrollmentError } from "./types.ts";
 import type {
+  AskPhase,
   EngineEvent,
   EngineListener,
   EnginePermissions,
@@ -13,6 +14,7 @@ import type {
   OrganizeStartResult,
   OrganizeStatus,
   Memo,
+  MemoAnswer,
   MemoDetail,
   MemoEngineClient,
   MemoMode,
@@ -20,7 +22,6 @@ import type {
   DiagnosticsStatus,
   SpeakerInfo,
   SpeakerTarget,
-  Todo,
   TranscriptEngineClient,
   Utterance,
 } from "./types.ts";
@@ -40,22 +41,27 @@ export interface FakeEngineClientOptions {
   organizeBacklog?: { pendingChunks: number; isWaitingForSilence?: boolean };
 }
 
-// 未完了を先に、期限の早い順。期限がなければ後ろ、同じなら新しい順
-function compareTodos(a: Todo, b: Todo): number {
-  const byDone = Number(a.status === "done") - Number(b.status === "done");
-  if (byDone !== 0) return byDone;
-  if (a.dueDate !== b.dueDate) {
-    if (a.dueDate === null) return 1;
-    if (b.dueDate === null) return -1;
-    return a.dueDate < b.dueDate ? -1 : 1;
-  }
-  return b.createdAt - a.createdAt;
+function toMemo(detail: MemoDetail): Memo {
+  const { id, title, summary, startedAt, endedAt } = detail;
+  return { id, title, summary, startedAt, endedAt };
 }
 
-function toMemo(detail: MemoDetail): Memo {
-  const { id, title, summary, todoExtraction, startedAt, endedAt } = detail;
-  return { id, title, summary, todoExtraction, startedAt, endedAt };
+// Fake の答えの文。本物の LLM の答えと見分けられるようにする
+export const FAKE_ANSWER = "見本の答えです。メモの内容から作った答えではありません。";
+
+// 根拠にするメモの上限
+const MAX_SOURCES = 3;
+
+// 空白や句読点で区切った、2 文字以上の部分を質問の語にする
+function questionTerms(question: string): string[] {
+  return question.split(/[\s\p{P}]+/u).filter((term) => term.length >= 2);
 }
+
+const unanswered = (outcome: MemoAnswer["outcome"]): MemoAnswer => ({
+  outcome,
+  answer: null,
+  sources: [],
+});
 
 // エンジンなしで画面を開発・テストするための実装
 export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClient {
@@ -81,7 +87,10 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   #organize: OrganizeStatus;
   #organizeStarts = 0;
   #memoReadError: Error | undefined;
-  #completeError: Error | undefined;
+  #holdsNextAsk = false;
+  #failsNextAsk = false;
+  #finishAsk: (() => void) | undefined;
+  #rejectAsk: ((error: Error) => void) | undefined;
 
   constructor({
     status = { engineName: "fake-engine", apiVersion: 1, transcription: "ready" },
@@ -420,29 +429,50 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     return this.#readMemos(() => this.#memos.find((memo) => memo.id === id) ?? null);
   }
 
-  listTodos({ limit }: { limit: number }): Promise<Todo[]> {
-    return this.#readMemos(() =>
-      this.#memos
-        .flatMap((memo) => memo.todos)
-        .sort(compareTodos)
-        .slice(0, limit),
-    );
+  // タイトルと要約に質問の語を含むメモを、新しい順に根拠にする。答えの文は FAKE_ANSWER で固定。
+  // holdNextAsk を呼んでおくと、preparing を届けたところで finishAsk を待つ
+  askMemos(question: string): Promise<MemoAnswer> {
+    if (question.trim() === "") return Promise.reject(new Error("ask-empty-question"));
+    const terms = questionTerms(question);
+    if (this.#organizerModel.state !== "installed") {
+      return Promise.resolve(unanswered("model-unavailable"));
+    }
+    if (this.#organize.state !== "idle" || this.#finishAsk) {
+      return Promise.resolve(unanswered("busy"));
+    }
+    const answer = (): MemoAnswer => {
+      if (this.#failsNextAsk) {
+        this.#failsNextAsk = false;
+        return unanswered("failed");
+      }
+      // 止めておいた間にモデルが消えたときも、読み込みで気づく
+      if (this.#organizerModel.state !== "installed") return unanswered("model-unavailable");
+      const sources = [...this.#memos]
+        .filter((memo) =>
+          terms.some((term) => `${memo.title ?? ""}\n${memo.summary ?? ""}`.includes(term)),
+        )
+        .sort((a, b) => b.startedAt - a.startedAt)
+        .slice(0, MAX_SOURCES)
+        .map(toMemo);
+      if (sources.length === 0) return unanswered("not-found");
+      this.reportAskProgress("answering");
+      return { outcome: "answered", answer: FAKE_ANSWER, sources };
+    };
+    this.reportAskProgress("preparing");
+    if (!this.#holdsNextAsk) {
+      this.reportAskProgress("searching");
+      return Promise.resolve(answer());
+    }
+    this.#holdsNextAsk = false;
+    return new Promise((resolve, reject) => {
+      this.#finishAsk = () => resolve(answer());
+      this.#rejectAsk = reject;
+    });
   }
 
-  completeTodo(id: string): Promise<void> {
-    if (this.#completeError) {
-      const error = this.#completeError;
-      this.#completeError = undefined;
-      return Promise.reject(error);
-    }
-    const todo = this.#memos.flatMap((memo) => memo.todos).find((item) => item.id === id);
-    if (!todo) return Promise.reject(new Error(`ToDo がありません: ${id}`));
-    if (todo.status === "done") return Promise.resolve();
-    this.#memos = this.#memos.map((memo) => ({
-      ...memo,
-      todos: memo.todos.map((item) => (item.id === id ? { ...item, status: "done" } : item)),
-    }));
-    this.#emit({ type: "todos-changed" });
+  cancelAsk(): Promise<void> {
+    this.#rejectAsk?.(new Error("ask-cancelled"));
+    this.#clearAsk();
     return Promise.resolve();
   }
 
@@ -502,7 +532,11 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   addMemo(memo: MemoDetail): void {
     this.#memos.push(memo);
     this.#emit({ type: "memos-changed" });
-    if (memo.todos.length > 0) this.#emit({ type: "todos-changed" });
+  }
+
+  removeMemo(id: string): void {
+    this.#memos = this.#memos.filter((memo) => memo.id !== id);
+    this.#emit({ type: "memos-changed" });
   }
 
   // エンジンの都合での停止(マイクの占有など)も、これで再現する
@@ -579,14 +613,38 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     this.#rejectEnrollment = undefined;
   }
 
-  // 次の listMemos、getMemo、listTodos のどれか1回を失敗させる
+  // 次の listMemos と getMemo のどちらか1回を失敗させる
   failNextMemoRead(error: Error): void {
     this.#memoReadError = error;
   }
 
-  // 次の completeTodo を失敗させる
-  failNextComplete(error: Error): void {
-    this.#completeError = error;
+  // 次の askMemos を preparing のところで止め、finishAsk か cancelAsk まで待たせる
+  holdNextAsk(): void {
+    this.#holdsNextAsk = true;
+  }
+
+  // 止めておいた質問を進める。メモを探すところから続け、答えを返す
+  finishAsk(): void {
+    const finish = this.#finishAsk;
+    if (!finish) return;
+    this.#clearAsk();
+    this.reportAskProgress("searching");
+    finish();
+  }
+
+  // 質問の途中の段階を知らせる
+  reportAskProgress(phase: AskPhase): void {
+    this.#emit({ type: "ask-progress", phase });
+  }
+
+  // 次の askMemos を、実行基盤が動かなかった結果にする
+  failNextAsk(): void {
+    this.#failsNextAsk = true;
+  }
+
+  #clearAsk(): void {
+    this.#finishAsk = undefined;
+    this.#rejectAsk = undefined;
   }
 
   #readMemos<T>(read: () => T): Promise<T> {

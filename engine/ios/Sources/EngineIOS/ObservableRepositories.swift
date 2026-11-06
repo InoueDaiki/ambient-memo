@@ -2,7 +2,7 @@ import EngineDomain
 import Foundation
 
 /// 画面が取り直す対象。
-public enum MemoChange: Sendable { case memos, todos }
+public enum MemoChange: Sendable { case memos }
 
 /// 保存のたびに [onChanged] を呼ぶ。画面に一覧の取り直しを知らせるため。Android の ObservableUtteranceRepository と同じ。
 final class ObservableUtteranceRepository: UtteranceRepository {
@@ -57,10 +57,7 @@ final class ObservableMemoRepository: MemoRepository {
 
     func recordMemo(_ memo: NewMemo) async throws -> Memo? {
         let recorded = try await delegate.recordMemo(memo)
-        if recorded != nil {
-            onChanged(.memos)
-            if !memo.todos.isEmpty { onChanged(.todos) }
-        }
+        if recorded != nil { onChanged(.memos) }
         return recorded
     }
 
@@ -72,8 +69,6 @@ final class ObservableMemoRepository: MemoRepository {
 
     func listUtteranceIds(memoId: Int64) async throws -> [Int64] { try await delegate.listUtteranceIds(memoId: memoId) }
 
-    func listTodos(memoId: Int64) async throws -> [Todo] { try await delegate.listTodos(memoId: memoId) }
-
     func listRecentMemos(limit: Int) async throws -> [Memo] { try await delegate.listRecentMemos(limit: limit) }
 
     func findMemo(memoId: Int64) async throws -> Memo? { try await delegate.findMemo(memoId: memoId) }
@@ -82,11 +77,7 @@ final class ObservableMemoRepository: MemoRepository {
         try await delegate.listMemoUtterances(memoId: memoId)
     }
 
-    func listTodosByPriority(limit: Int) async throws -> [Todo] { try await delegate.listTodosByPriority(limit: limit) }
-
-    func completeTodo(todoId: Int64, completedAtMillis: Int64) async throws -> TodoCompletion {
-        let result = try await delegate.completeTodo(todoId: todoId, completedAtMillis: completedAtMillis)
-        if result == .COMPLETED { onChanged(.todos) }
-        return result
+    func searchMemos(term: String, fromMillis: Int64, toMillis: Int64, limit: Int) async throws -> [Memo] {
+        try await delegate.searchMemos(term: term, fromMillis: fromMillis, toMillis: toMillis, limit: limit)
     }
 }

@@ -234,7 +234,7 @@ public protocol MemoRepository: Sendable {
     func listUnorganizedUtterances() async throws -> [Utterance]
 
     /**
-     * メモ、ToDo、根拠の発話の処理済みの印を、1つのトランザクションで記録する。
+     * メモと根拠の発話の処理済みの印を、1つのトランザクションで記録する。
      * 根拠の発話に、存在しないものか処理済みのものがあれば、何も書かずに nil を返す。
      */
     func recordMemo(_ memo: NewMemo) async throws -> Memo?
@@ -248,9 +248,6 @@ public protocol MemoRepository: Sendable {
     /// [memoId] の根拠の発話の id を、開始時刻、id の順に返す。
     func listUtteranceIds(memoId: Int64) async throws -> [Int64]
 
-    /// [memoId] の ToDo を、記録した順に返す。
-    func listTodos(memoId: Int64) async throws -> [Todo]
-
     /// メモを開始時刻の新しい順に最大 [limit] 件返す。同時刻は後から記録したものを先にする。
     func listRecentMemos(limit: Int) async throws -> [Memo]
 
@@ -261,11 +258,9 @@ public protocol MemoRepository: Sendable {
     func listMemoUtterances(memoId: Int64) async throws -> [Utterance]
 
     /**
-     * 画面に出す順で ToDo を最大 [limit] 件返す。
-     * 未完了を先に、期限の早い順。期限がなければ後ろ、同じなら新しい順、それも同じなら記録した順。
+     * 開始が [toMillis] より前で、終了が [fromMillis] 以降のメモのうち、タイトル、要約、根拠の発話の本文のどれかに [term] を含むものを、
+     * 開始時刻の新しい順に最大 [limit] 件返す。同時刻は後から記録したものを先にする。
+     * 英字の大文字と小文字は区別しない。ほかの文字は区別する。[term] が空ならすべてのメモに当たる。
      */
-    func listTodosByPriority(limit: Int) async throws -> [Todo]
-
-    /// ToDo を完了にする。完了の前の状態は取り消しのために残す。すでに完了していれば何も変えない。
-    func completeTodo(todoId: Int64, completedAtMillis: Int64) async throws -> TodoCompletion
+    func searchMemos(term: String, fromMillis: Int64, toMillis: Int64, limit: Int) async throws -> [Memo]
 }

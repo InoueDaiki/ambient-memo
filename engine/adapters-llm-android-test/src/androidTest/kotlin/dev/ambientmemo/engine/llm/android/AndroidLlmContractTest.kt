@@ -7,14 +7,15 @@ import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.SqliteUtteranceRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
+import dev.ambientmemo.engine.domain.AnswerOutcome
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.LlmInputTooLongException
 import dev.ambientmemo.engine.domain.LlmRequest
+import dev.ambientmemo.engine.domain.MemoQuestionAnswerer
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
 import dev.ambientmemo.engine.domain.SystemClock
-import dev.ambientmemo.engine.domain.TodoExtraction
 import dev.ambientmemo.engine.domain.testing.LlmContract
 import dev.ambientmemo.engine.llm.LocalLlm
 import dev.ambientmemo.engine.sherpa.ModelCatalog
@@ -92,7 +93,7 @@ class AndroidLlmContractTest {
         }
     }
 
-    /** 架空の会話を、本物の SQLite、プロンプト、解析、モデルで通す。 */
+    /** 架空の会話を、本物の SQLite、プロンプト、解析、モデルで整理し、できたメモに質問する。 */
     @Test
     fun organizesFictionalConversation() = runBlocking<Unit> {
         val context = InstrumentationRegistry.getInstrumentation().targetContext
@@ -117,11 +118,15 @@ class AndroidLlmContractTest {
         assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
         val memo = memos.listMemos().single()
         Log.i(TAG, "要約: ${memo.summary}")
-        Log.i(TAG, "ToDo: ${memos.listTodos(memo.id).map { it.task to it.dueDate }}")
         assertTrue(memo.summary.orEmpty().contains("歯医者"))
-        assertEquals(TodoExtraction.COMPLETE, memo.todoExtraction)
-        assertTrue(memos.listTodos(memo.id).any { "歯医者" in it.task })
         assertEquals(llm.modelVersion, memo.modelVersion)
+
+        val asked = System.currentTimeMillis()
+        val answerer = MemoQuestionAnswerer(memos, SqliteSpeakerRepository(database), llm, SystemClock, TimeZone.getDefault())
+        val answer = answerer.answer("歯医者の予約は誰が入れる?")
+        Log.i(TAG, "質問: ${System.currentTimeMillis() - asked} ms 検索 ${answer.searchRounds} 回 答え: ${answer.text}")
+        assertEquals(AnswerOutcome.ANSWERED, answer.outcome)
+        assertEquals(listOf(memo.id), answer.sources.map { it.id })
     }
 
     @Test

@@ -8,16 +8,15 @@ import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import dev.ambientmemo.engine.android.AskCancelledException
 import dev.ambientmemo.engine.android.CaptureState
 import dev.ambientmemo.engine.android.Engine
 import dev.ambientmemo.engine.android.EngineStartException
 import dev.ambientmemo.engine.android.EnrollmentFailure
-import dev.ambientmemo.engine.android.MemoChange
 import dev.ambientmemo.engine.android.ModelGroup
 import dev.ambientmemo.engine.android.SelfEnrollmentException
 import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
-import dev.ambientmemo.engine.android.TodoNotFoundException
 import dev.ambientmemo.engine.android.TranscriptionMode
 import dev.ambientmemo.engine.android.parseSpeakerTarget
 import dev.ambientmemo.engine.android.toWire
@@ -84,9 +83,15 @@ private class DiagnosticsEmptyException : CodedException(
   cause = null,
 )
 
-private class TodoNotFoundCodedException : CodedException(
-  code = "todo-not-found",
-  message = "ToDo がありません",
+private class AskEmptyQuestionException : CodedException(
+  code = "ask-empty-question",
+  message = "質問が空です",
+  cause = null,
+)
+
+private class AskCancelledCodedException : CodedException(
+  code = "ask-cancelled",
+  message = "質問を止めました",
   cause = null,
 )
 
@@ -101,12 +106,8 @@ class EngineBridgeModule : Module() {
   private val publishLock = Any()
 
   // 書き込みが戻る前に呼ばれるので、完了の Promise より先にイベントが届く
-  private val memoListener: (MemoChange) -> Unit = { change ->
-    val type = when (change) {
-      MemoChange.MEMOS -> "memos-changed"
-      MemoChange.TODOS -> "todos-changed"
-    }
-    sendEvent(EVENT_ENGINE, mapOf("type" to type))
+  private val memoListener: () -> Unit = {
+    sendEvent(EVENT_ENGINE, mapOf("type" to "memos-changed"))
   }
   private var publishedStatus: String? = null
 
@@ -304,16 +305,20 @@ class EngineBridgeModule : Module() {
       engine.memoBridge.getMemo(id)
     }
 
-    AsyncFunction("listTodos") Coroutine { limit: Int ->
-      engine.memoBridge.listTodos(limit)
+    // 整理のモデルを読み込むので、数十秒から数分かかる
+    AsyncFunction("askMemos") Coroutine { question: String ->
+      if (question.isBlank()) throw AskEmptyQuestionException()
+      try {
+        engine.memoBridge.askMemos(question) { phase ->
+          sendEvent(EVENT_ENGINE, mapOf("type" to "ask-progress", "phase" to phase))
+        }
+      } catch (_: AskCancelledException) {
+        throw AskCancelledCodedException()
+      }
     }
 
-    AsyncFunction("completeTodo") Coroutine { id: String ->
-      try {
-        engine.memoBridge.completeTodo(id)
-      } catch (_: TodoNotFoundException) {
-        throw TodoNotFoundCodedException()
-      }
+    AsyncFunction("cancelAsk") {
+      engine.memoBridge.cancelAsk()
     }
 
     AsyncFunction("getOrganizeStatus") Coroutine { ->

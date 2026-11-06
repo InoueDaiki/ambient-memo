@@ -106,19 +106,21 @@ class Engine private constructor(context: Context) {
     private val speakerCorrections by lazy {
         SpeakerCorrections(speakerRepository, utteranceRepository, recentVoices, speakerModel.version, SystemClock)
     }
-    private val memoListeners = CopyOnWriteArraySet<(MemoChange) -> Unit>()
+    private val memoListeners = CopyOnWriteArraySet<() -> Unit>()
     private val diagnostics = DiagnosticsJournal(this.context.filesDir, DiagnosticProcess.MAIN, SystemClock)
     private var diagnosticsSampler: Job? = null
 
-    /** メモと ToDo の読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
+    /** メモの読み書きはすべてここを通す。整理ジョブも使い、書くと [addMemoListener] の相手に届く。 */
     internal val memoRepository: MemoRepository by lazy {
-        ObservableMemoRepository(SqliteMemoRepository(database)) { change ->
-            memoListeners.forEach { it(change) }
+        ObservableMemoRepository(SqliteMemoRepository(database)) {
+            memoListeners.forEach { it() }
         }
     }
 
-    /** JS が見るメモと ToDo。 */
-    val memoBridge by lazy { MemoBridge(memoRepository, ::speakers, SystemClock, organizeMonitor) }
+    /** JS が見るメモと質問。 */
+    val memoBridge by lazy {
+        MemoBridge(memoRepository, ::speakers, SystemClock, organizeMonitor, RemoteAsk(this.context))
+    }
 
     /** 手動の整理の入口と、`:organize` の見守り。LLM はこのプロセスに持たない。 */
     private val organizeMonitor by lazy {
@@ -146,20 +148,19 @@ class Engine private constructor(context: Context) {
         ModelDownloads(this.context, modelStore, ModelCatalog.DOWNLOADS, ModelCatalog.ORGANIZER_DOWNLOADS)
 
     /**
-     * メモか ToDo が変わると、書いたスレッドで呼ぶ。書き込みが戻る前に届くので、
-     * 完了の Promise を解決するより先に、画面へ知らせられる。
+     * メモが変わると、書いたスレッドで呼ぶ。別のプロセスの整理が書いたときは、メインのスレッドで呼ぶ。
      */
-    fun addMemoListener(listener: (MemoChange) -> Unit) {
+    fun addMemoListener(listener: () -> Unit) {
         memoListeners += listener
     }
 
-    fun removeMemoListener(listener: (MemoChange) -> Unit) {
+    fun removeMemoListener(listener: () -> Unit) {
         memoListeners -= listener
     }
 
     /** 別のプロセスの整理が書いた変更を、画面へ伝える。 */
-    internal fun notifyMemoChanged(change: MemoChange) {
-        memoListeners.forEach { it(change) }
+    internal fun notifyMemoChanged() {
+        memoListeners.forEach { it() }
     }
 
     val captureState: StateFlow<CaptureState> = runner.state
@@ -307,7 +308,7 @@ class Engine private constructor(context: Context) {
 
     private fun notifySpeakersChanged() {
         changes.tryEmit(Unit)
-        notifyMemoChanged(MemoChange.MEMOS)
+        notifyMemoChanged()
     }
 
     /** 話者を発話の数と一緒に返す。 */

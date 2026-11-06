@@ -124,8 +124,14 @@ private func event(_ json: SpecObject) throws -> any DiagnosticEvent {
         return OrganizeFinished(
             outcome: try json.enumValue("outcome"),
             memoCount: try json.int("memoCount"),
-            todoCount: try json.int("todoCount"),
             unreadableCount: try json.int("unreadableCount"),
+            totalMillis: try json.long("totalMillis")
+        )
+    case "ask":
+        return AskFinished(
+            outcome: try json.enumValue("outcome"),
+            searchRounds: try json.int("searchRounds"),
+            sourceCount: try json.int("sourceCount"),
             totalMillis: try json.long("totalMillis")
         )
     case "device":

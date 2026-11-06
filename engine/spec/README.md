@@ -49,18 +49,20 @@ Android(Kotlin)と iOS(Swift)のエンジンに、同じ入力を渡して同じ
 
 | ファイル | 対象 |
 |---|---|
-| `assessed-due.json` | ToDo の期限の確度 `assessDue` |
+| `ask-parsers.json` | 質問の検索の計画と答えを読む `parseSearchPlan`、`parseAnswer` |
+| `ask-prompts.json` | 質問のプロンプト `AskPrompts` |
 | `calendar-date.json` | 暦の日付 `CalendarDate` |
 | `capture-pipeline.json` | 音声から保存までの流れ `CapturePipeline` |
 | `diagnostics.json` | 動作の記録の書式と、記録を足す `TimedLlm`、`RecordingCaptureGaps` |
 | `engine-status.json` | エンジンの名前と API の版 |
-| `llm-output-parser.json` | LLM の出力から ToDo と要約を読む `parseTodos`、`parseSummary` |
+| `llm-output-parser.json` | LLM の出力から要約を読む `parseSummary` |
 | `llm-title-parser.json` | LLM の出力からタイトルを読む `parseTitle` |
+| `memo-question.json` | メモへの質問 `MemoQuestionAnswerer`。記録はメモリの Fake、LLM は依頼の種類ごとに決めた順で応答する Fake |
 | `model-validation.json` | 発話、欠落、文字起こし、聞き取りの設定の値の検査 |
 | `noise-text-filter.json` | 雑音の短い文字を除く `NoiseTextFilter` |
 | `organize-job.json` | 整理ジョブ `OrganizeJob` と、今整理できる量 `organizeBacklog`。話題の切れ目の読み取り `parseTopicStarts` もここで確かめる。記録はメモリの Fake、LLM は依頼の種類と本文で応答を決める Fake |
 | `organize-policy.json` | 整理を止める理由 `stopReason` |
-| `organize-prompts.json` | 整理のプロンプト `OrganizePrompts`。要約と ToDo の文面は検証のスクリプトの出力と一字一句同じ |
+| `organize-prompts.json` | 整理のプロンプト `OrganizePrompts`。要約の文面は検証のスクリプトの出力と一字一句同じ |
 | `quiet-gate.json` | 静かな間は VAD を動かさない `QuietGatedVoiceActivityDetector` |
 | `segment-backlog.json` | 文字起こし待ちの置き場所 `SegmentBacklog` |
 | `self-enrollment.json` | 自分の声の登録 `SelfEnrollment` |

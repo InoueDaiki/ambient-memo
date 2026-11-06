@@ -98,7 +98,7 @@ function organizerGuide(status: ModelDownloadStatus): string {
   if (status.downloadedBytes > 0) {
     return `${formatBytes(status.downloadedBytes)} / ${formatBytes(status.totalBytes)} まで取得済みです。続きから取得できます。`;
   }
-  return `発話をメモと ToDo に整理するには、別のモデルが必要です。約 ${formatBytes(status.totalBytes)} を通信するので、Wi-Fi をおすすめします。なくても聞き取りはできます。`;
+  return `発話をメモに整理したり、メモに質問したりするには、別のモデルが必要です。約 ${formatBytes(status.totalBytes)} を通信するので、Wi-Fi をおすすめします。なくても聞き取りはできます。`;
 }
 
 // 整理のモデルの案内。聞き取りとは別に、利用者が取得するかを選ぶ。取得済みなら何も出さない

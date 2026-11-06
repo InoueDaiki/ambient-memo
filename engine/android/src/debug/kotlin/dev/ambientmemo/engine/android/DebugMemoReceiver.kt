@@ -4,18 +4,12 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import dev.ambientmemo.engine.domain.CalendarDate
 import dev.ambientmemo.engine.domain.NewMemo
-import dev.ambientmemo.engine.domain.NewTodo
 import dev.ambientmemo.engine.domain.NewUtterance
 import dev.ambientmemo.engine.domain.SystemClock
-import dev.ambientmemo.engine.domain.TodoExtraction
-import dev.ambientmemo.engine.domain.TodoKind
-import dev.ambientmemo.engine.domain.TodoStatus
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import java.util.Calendar
 
 private const val TAG = "AmbientMemoDebug"
 private const val SEED_MODEL_VERSION = "debug-seed"
@@ -57,24 +51,10 @@ class DebugMemoReceiver : BroadcastReceiver() {
                 endedAtMillis = utterances.maxOf { it.endedAtMillis },
                 title = "開発用のメモ",
                 summary = "- 整理ジョブの代わりに adb から投入した",
-                todoExtraction = TodoExtraction.COMPLETE,
                 modelVersion = SEED_MODEL_VERSION,
                 createdAtMillis = now,
                 utteranceIds = utterances.map { it.id },
-                todos = listOf(
-                    NewTodo("開発用の確定した ToDo", TodoKind.REMINDER, tomorrow(), TodoStatus.OPEN),
-                    NewTodo("開発用の候補の ToDo", TodoKind.TODO, tomorrow(), TodoStatus.CANDIDATE),
-                ),
             ),
-        )
-    }
-
-    private fun tomorrow(): CalendarDate {
-        val calendar = Calendar.getInstance().apply { add(Calendar.DAY_OF_MONTH, 1) }
-        return CalendarDate(
-            calendar.get(Calendar.YEAR),
-            calendar.get(Calendar.MONTH) + 1,
-            calendar.get(Calendar.DAY_OF_MONTH),
         )
     }
 }

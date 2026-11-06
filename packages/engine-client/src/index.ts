@@ -1,8 +1,9 @@
-export { FakeEngineClient } from "./fake.ts";
+export { FAKE_ANSWER, FakeEngineClient } from "./fake.ts";
 export type { FakeEngineClientOptions } from "./fake.ts";
 export { sampleMemos } from "./sample-memos.ts";
 export { EngineStartError, MAX_PROVISIONAL_SPEAKERS, SelfEnrollmentError } from "./types.ts";
 export type {
+  AskPhase,
   DiagnosticsStatus,
   EngineClient,
   EngineEvent,
@@ -12,6 +13,8 @@ export type {
   EngineStatus,
   ListeningStatus,
   Memo,
+  MemoAnswer,
+  MemoAnswerOutcome,
   MemoDetail,
   MemoEngineClient,
   MemoMode,
@@ -31,10 +34,6 @@ export type {
   SpeakerKind,
   SpeakerScoreBand,
   SpeakerTarget,
-  Todo,
-  TodoExtraction,
-  TodoKind,
-  TodoStatus,
   TranscriptEngineClient,
   TranscriptionMode,
   Utterance,
