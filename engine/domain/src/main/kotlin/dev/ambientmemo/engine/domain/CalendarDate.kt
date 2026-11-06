@@ -23,6 +23,16 @@ data class CalendarDate(
     val weekdayIndex: Int
         get() = (utcCalendar().get(Calendar.DAY_OF_WEEK) + DAYS_FROM_SUNDAY_TO_SATURDAY) % DAYS_PER_WEEK
 
+    /** 曜日の 1 文字。「月」から「日」。 */
+    val weekdayName: String
+        get() = WEEKDAYS[weekdayIndex].toString()
+
+    /** [timeZone] での、この日が始まる時刻。 */
+    fun startOfDayMillis(timeZone: TimeZone): Long = strictCalendar(timeZone).apply {
+        clear()
+        set(year, month - 1, day)
+    }.timeInMillis
+
     fun plusDays(days: Int): CalendarDate = utcCalendar().apply { add(Calendar.DAY_OF_MONTH, days) }.toCalendarDate()
 
     override fun compareTo(other: CalendarDate): Int =
@@ -39,6 +49,7 @@ data class CalendarDate(
     companion object {
         private val ISO_DATE = Regex("""(\d{4})-(\d{2})-(\d{2})""")
         private val UTC: TimeZone = TimeZone.getTimeZone("UTC")
+        private const val WEEKDAYS = "月火水木金土日"
         private const val DAYS_PER_WEEK = 7
         private const val DAYS_FROM_SUNDAY_TO_SATURDAY = 5
 

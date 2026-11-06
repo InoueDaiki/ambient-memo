@@ -197,10 +197,10 @@ export type EngineEvent =
   | { type: "organizer-model-changed"; status: OrganizerModelStatus }
   // メモの追加のほか、根拠の発話の更新でも届く。受け取ったら listMemos と getMemo で取り直す
   | { type: "memos-changed" }
-  // ToDo の追加や完了で届く。受け取ったら listTodos と getMemo で取り直す
-  | { type: "todos-changed" }
   // 整理の開始、進み具合、終わりで届く。受け取ったら getOrganizeStatus で取り直す
-  | { type: "organize-changed" };
+  | { type: "organize-changed" }
+  // 質問の途中で、段階が変わると届く
+  | { type: "ask-progress"; phase: AskPhase };
 
 export type EngineListener = (event: EngineEvent) => void;
 
@@ -259,51 +259,22 @@ export interface TranscriptEngineClient extends EngineClient {
   subscribe(listener: EngineListener): () => void;
 }
 
-// メモと ToDo の実装の状態。意味は TranscriptionMode と同じ
+// メモの実装の状態。意味は TranscriptionMode と同じ
 export type MemoMode = "ready" | "development" | "unavailable";
-
-// ToDo を最後まで読み取れたか。incomplete のメモは ToDo が欠けているかもしれない
-export type TodoExtraction = "complete" | "incomplete";
 
 export interface Memo {
   id: string;
   // 要約に失敗すると null。根拠の発話は残る
   title: string | null;
   summary: string | null;
-  todoExtraction: TodoExtraction;
   // 最初の発話の開始時刻と、最後の発話の終了時刻(Unix 時間のミリ秒)
   startedAt: number;
   endedAt: number;
 }
 
-// - todo: 自分がこれからやること
-// - reminder: 自分が日時を覚えておくべき予定
-export type TodoKind = "todo" | "reminder";
-
-// - candidate: 期限の確度が低い。人が確かめるまでリマインドしない。日付を捨てた場合は dueDate が null
-// - open: 確定した ToDo。期限がないこともある
-// - done: 完了した
-export type TodoStatus = "candidate" | "open" | "done";
-
-export interface Todo {
-  id: string;
-  memoId: string;
-  task: string;
-  // 一覧に出す短い名前
-  title: string;
-  kind: TodoKind;
-  // 時差を持たない端末の日付(YYYY-MM-DD)
-  dueDate: string | null;
-  status: TodoStatus;
-  // 記録した時刻(Unix 時間のミリ秒)
-  createdAt: number;
-}
-
 export interface MemoDetail extends Memo {
   // 根拠の発話。古い順
   utterances: Utterance[];
-  // このメモから抽出した ToDo。記録した順
-  todos: Todo[];
 }
 
 // - idle: 動いていない
@@ -347,24 +318,45 @@ export type OrganizeStartResult =
   | "nothing-to-organize"
   | "failed";
 
-// メモと ToDo を扱う実装。engine-bridge にはまだなく、今は Fake だけが提供する
+// 質問の答え
+// - answered: メモを根拠に答えた
+// - not-found: 関係するメモが見つからなかった。answer は null
+// - model-unavailable: 整理のモデルがない
+// - busy: 整理か別の質問が動いている
+// - failed: 実行基盤が動かなかった
+export type MemoAnswerOutcome = "answered" | "not-found" | "model-unavailable" | "busy" | "failed";
+
+export interface MemoAnswer {
+  outcome: MemoAnswerOutcome;
+  answer: string | null;
+  // 答えの根拠にしたメモ。answer の中で挙げた順。answered 以外は空
+  sources: Memo[];
+}
+
+// 質問の進み具合
+// - preparing: モデルを読み込んでいる
+// - searching: メモを探している
+// - answering: 答えを作っている
+export type AskPhase = "preparing" | "searching" | "answering";
+
+// メモを扱う実装。本物は engine-bridge が提供する
 export interface MemoEngineClient {
   getMemoMode(): Promise<MemoMode>;
   // 開始時刻の新しい順に最大 limit 件を返す
   listMemos(options: { limit: number }): Promise<Memo[]>;
   // ないメモは null を返す
   getMemo(id: string): Promise<MemoDetail | null>;
-  // 未完了、期限の早い順、新しい順に最大 limit 件を返す。期限のない ToDo は同じ状態の中で最後にする
-  listTodos(options: { limit: number }): Promise<Todo[]>;
-  // すでに完了していれば何もせず成功する。ない ToDo は reject する。
-  // 状態が変わるときは todos-changed を届けてから解決する
-  completeTodo(id: string): Promise<void>;
   getOrganizeStatus(): Promise<OrganizeStatus>;
   // 充電を待たずに整理する。利用者の操作でだけ呼ぶ。終わるのを待たずに解決し、結果は organize-changed で届く。
   // 通知の許可がなければ OS の確認を出す
   startOrganize(): Promise<OrganizeStartResult>;
   // まとまりの区切りで止める。動いていなければ何もしない
   stopOrganize(): Promise<void>;
+  // 過去のメモを探して、質問に答える。前後の空白を除いて空なら reject する。
+  // 数十秒から数分かかる。進み具合は ask-progress で届く
+  askMemos(question: string): Promise<MemoAnswer>;
+  // 動いている質問を止める。askMemos は reject する。動いていなければ何もしない
+  cancelAsk(): Promise<void>;
   // 戻り値を呼ぶと購読をやめる
   subscribe(listener: EngineListener): () => void;
 }

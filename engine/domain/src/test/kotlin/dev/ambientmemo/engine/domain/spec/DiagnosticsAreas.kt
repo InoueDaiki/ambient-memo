@@ -1,5 +1,6 @@
 package dev.ambientmemo.engine.domain.spec
 
+import dev.ambientmemo.engine.domain.AskFinished
 import dev.ambientmemo.engine.domain.AudioFrame
 import dev.ambientmemo.engine.domain.AudioLevelCounter
 import dev.ambientmemo.engine.domain.AudioLevelSummary
@@ -122,10 +123,10 @@ private fun event(json: JsonObject): DiagnosticEvent = when (val type = json.str
     "organize" -> OrganizeFinished(
         json.enum("outcome"),
         json.int("memoCount"),
-        json.int("todoCount"),
         json.int("unreadableCount"),
         json.long("totalMillis"),
     )
+    "ask" -> AskFinished(json.enum("outcome"), json.int("searchRounds"), json.int("sourceCount"), json.long("totalMillis"))
     "device" -> deviceSample(json)
     "audio_level" -> AudioLevelSummary(
         json.int("frames"),

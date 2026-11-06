@@ -8,7 +8,6 @@ import type {
   MemoDetail,
   MemoEngineClient,
   OrganizerModelStatus,
-  Todo,
   Utterance,
 } from "./types.ts";
 
@@ -16,23 +15,9 @@ export const memo = (id: string, overrides: Partial<MemoDetail> = {}): MemoDetai
   id,
   title: `タイトル ${id}`,
   summary: `要約 ${id}`,
-  todoExtraction: "complete",
   startedAt: 1,
   endedAt: 2,
   utterances: [],
-  todos: [],
-  ...overrides,
-});
-
-export const todo = (id: string, overrides: Partial<Todo> = {}): Todo => ({
-  id,
-  memoId: "m",
-  task: `内容 ${id}`,
-  title: `題名 ${id}`,
-  kind: "todo",
-  dueDate: null,
-  status: "open",
-  createdAt: 1,
   ...overrides,
 });
 
@@ -47,7 +32,7 @@ export function runMemoClientContract(
   name: string,
   createClient: (memos: MemoDetail[], organize?: OrganizeSetup) => MemoEngineClient,
 ): void {
-  describe(`${name} のメモと ToDo`, () => {
+  describe(`${name} のメモ`, () => {
     it("メモは開始時刻の新しい順に limit 件まで返す", async () => {
       const client = createClient([
         memo("a", { startedAt: 1 }),
@@ -60,13 +45,10 @@ export function runMemoClientContract(
       expect(items.map((item) => item.id)).toEqual(["c", "b"]);
     });
 
-    it("一覧のメモには発話と ToDo を含めない", async () => {
-      const [item] = await createClient([memo("a", { todos: [todo("t")] })]).listMemos({
-        limit: 1,
-      });
+    it("一覧のメモには発話を含めない", async () => {
+      const [item] = await createClient([memo("a")]).listMemos({ limit: 1 });
 
       expect(item).not.toHaveProperty("utterances");
-      expect(item).not.toHaveProperty("todos");
     });
 
     it("要約に失敗したメモも一覧と詳細で返す", async () => {
@@ -76,76 +58,15 @@ export function runMemoClientContract(
       expect((await client.getMemo("a"))?.title).toBeNull();
     });
 
-    it("メモの詳細は根拠の発話と ToDo を返す", async () => {
+    it("メモの詳細は根拠の発話を返す", async () => {
       const utterances: Utterance[] = [{ id: "u", text: "発話", speaker: "self", startedAt: 1 }];
-      const detail = await createClient([memo("a", { utterances, todos: [todo("t")] })]).getMemo(
-        "a",
-      );
+      const detail = await createClient([memo("a", { utterances })]).getMemo("a");
 
       expect(detail?.utterances).toEqual(utterances);
-      expect(detail?.todos.map((item) => item.id)).toEqual(["t"]);
     });
 
     it("ないメモは null を返す", async () => {
       expect(await createClient([]).getMemo("none")).toBeNull();
-    });
-
-    it("ToDo は未完了、期限の早い順、新しい順に並べ、期限のないものは後ろにする", async () => {
-      const client = createClient([
-        memo("a", {
-          todos: [
-            todo("done", { status: "done", dueDate: "2026-01-01" }),
-            todo("no-due"),
-            todo("later", { dueDate: "2026-12-01" }),
-            todo("sooner-old", { dueDate: "2026-11-01", createdAt: 1 }),
-          ],
-        }),
-        memo("b", {
-          todos: [todo("sooner-new", { dueDate: "2026-11-01", createdAt: 2, status: "candidate" })],
-        }),
-      ]);
-
-      const items = await client.listTodos({ limit: 10 });
-
-      expect(items.map((item) => item.id)).toEqual([
-        "sooner-new",
-        "sooner-old",
-        "later",
-        "no-due",
-        "done",
-      ]);
-    });
-
-    it("ToDo は limit 件まで返す", async () => {
-      const client = createClient([memo("a", { todos: [todo("1"), todo("2"), todo("3")] })]);
-
-      expect(await client.listTodos({ limit: 2 })).toHaveLength(2);
-    });
-
-    it("完了すると状態が変わり、解決するまでにイベントが届く", async () => {
-      const client = createClient([memo("a", { todos: [todo("t", { status: "candidate" })] })]);
-      const events: EngineEvent[] = [];
-      client.subscribe((event) => events.push(event));
-
-      await client.completeTodo("t");
-
-      expect(events).toEqual([{ type: "todos-changed" }]);
-      expect((await client.listTodos({ limit: 1 }))[0]?.status).toBe("done");
-      expect((await client.getMemo("a"))?.todos[0]?.status).toBe("done");
-    });
-
-    it("完了済みの ToDo の完了は何もせず成功する", async () => {
-      const client = createClient([memo("a", { todos: [todo("t", { status: "done" })] })]);
-      const events: EngineEvent[] = [];
-      client.subscribe((event) => events.push(event));
-
-      await client.completeTodo("t");
-
-      expect(events).toEqual([]);
-    });
-
-    it("ない ToDo の完了は reject する", async () => {
-      await expect(createClient([]).completeTodo("none")).rejects.toThrow();
     });
 
     it("未処理がなければ整理を始めない", async () => {
@@ -207,6 +128,85 @@ export function runMemoClientContract(
       });
 
       expect(await client.startOrganize()).toBe("model-unavailable");
+    });
+  });
+
+  // 答えの文の中身は契約に入れない。Kotlin 側は本物の LLM の代わりに、決まった応答の Fake を使うため
+  describe(`${name} の質問`, () => {
+    const related = () => [
+      memo("old", { title: "読書会の日程", summary: "次の読書会は来月の第2日曜", startedAt: 1 }),
+      memo("new", { title: "読書会の本", summary: "課題の本を読んでおく", startedAt: 3 }),
+      memo("other", { title: "庭の手入れ", summary: "土曜に土を買う", startedAt: 2 }),
+    ];
+
+    it("空の質問は reject する", async () => {
+      const client = createClient(related());
+
+      await expect(client.askMemos("")).rejects.toThrow();
+      await expect(client.askMemos("  ")).rejects.toThrow();
+    });
+
+    it("関係するメモがなければ not-found で、答えも根拠もない", async () => {
+      const answer = await createClient(related()).askMemos("引っ越し");
+
+      expect(answer).toEqual({ outcome: "not-found", answer: null, sources: [] });
+    });
+
+    it("関係するメモがあれば answered で、答えと根拠のメモを返す", async () => {
+      const answer = await createClient(related()).askMemos("読書会");
+
+      expect(answer.outcome).toBe("answered");
+      expect(answer.answer?.length).toBeGreaterThan(0);
+      expect(answer.sources.length).toBeGreaterThan(0);
+      for (const source of answer.sources) {
+        expect(["old", "new"]).toContain(source.id);
+        expect(source).not.toHaveProperty("utterances");
+      }
+    });
+
+    it("解決するまでに進み具合が準備、検索、回答の順に届く", async () => {
+      const client = createClient(related());
+      const events: EngineEvent[] = [];
+      client.subscribe((event) => events.push(event));
+
+      await client.askMemos("読書会");
+
+      expect(events.filter((event) => event.type === "ask-progress")).toEqual([
+        { type: "ask-progress", phase: "preparing" },
+        { type: "ask-progress", phase: "searching" },
+        { type: "ask-progress", phase: "answering" },
+      ]);
+    });
+
+    it("整理のモデルがなければ model-unavailable を返す", async () => {
+      const client = createClient(related(), {
+        organizerModel: { state: "idle", downloadedBytes: 0, totalBytes: 1 },
+      });
+
+      expect(await client.askMemos("読書会")).toEqual({
+        outcome: "model-unavailable",
+        answer: null,
+        sources: [],
+      });
+    });
+
+    it("整理が動いている間は busy を返す", async () => {
+      const client = createClient(related(), { pendingChunks: 1 });
+      await client.startOrganize();
+
+      expect(await client.askMemos("読書会")).toEqual({
+        outcome: "busy",
+        answer: null,
+        sources: [],
+      });
+    });
+
+    it("質問が動いていないときに止めても何も起きない", async () => {
+      const client = createClient(related());
+
+      await client.cancelAsk();
+
+      expect((await client.askMemos("読書会")).outcome).toBe("answered");
     });
   });
 }

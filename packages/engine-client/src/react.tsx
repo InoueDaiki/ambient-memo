@@ -1,12 +1,22 @@
 // 画面からエンジンを使う hooks。engine-bridge と Fake のどちらの実装でも同じように動く
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 
 import {
   SelfEnrollmentError,
+  type AskPhase,
   type EngineEvent,
   type EnginePermissions,
   type ListeningStatus,
   type Memo,
+  type MemoAnswer,
   type MemoDetail,
   type MemoEngineClient,
   type MemoMode,
@@ -20,7 +30,6 @@ import {
   type SpeakerDiagnostics,
   type SpeakerInfo,
   type SpeakerTarget,
-  type Todo,
   type TranscriptEngineClient,
   type TranscriptionMode,
   type Utterance,
@@ -659,8 +668,6 @@ function useMemoQuery<T>(
 }
 
 const MEMO_EVENTS = ["memos-changed"] as const;
-const TODO_EVENTS = ["todos-changed"] as const;
-const MEMO_DETAIL_EVENTS = ["memos-changed", "todos-changed"] as const;
 // 未処理の量は発話が増えても、メモになっても変わる
 const ORGANIZE_EVENTS = ["organize-changed", "memos-changed", "utterances-changed"] as const;
 
@@ -707,21 +714,8 @@ export interface UseMemoDetailResult {
 export function useMemoDetail(id: string): UseMemoDetailResult {
   const client = useMemoClient();
   const load = useCallback(() => client.getMemo(id), [client, id]);
-  const { value, error } = useMemoQuery(load, MEMO_DETAIL_EVENTS);
+  const { value, error } = useMemoQuery(load, MEMO_EVENTS);
   return { memo: value, error };
-}
-
-export interface UseTodosResult {
-  // 未完了、期限の早い順。最初の取得が終わるまでは undefined
-  todos: Todo[] | undefined;
-  error: unknown;
-}
-
-export function useTodos({ limit }: { limit: number }): UseTodosResult {
-  const client = useMemoClient();
-  const load = useCallback(() => client.listTodos({ limit }), [client, limit]);
-  const { value, error } = useMemoQuery(load, TODO_EVENTS);
-  return { todos: value, error };
 }
 
 export interface UseOrganizeResult {
@@ -755,36 +749,88 @@ export function useOrganize(): UseOrganizeResult {
   return { status: value, startResult, start, stop };
 }
 
-export interface UseCompleteTodoResult {
-  complete: (id: string) => void;
-  // 結果を待っている ToDo の id
-  pendingIds: ReadonlySet<string>;
-  // 最後の完了の失敗。次の操作で消える
-  error: unknown;
+export interface AskedQuestion {
+  id: number;
+  question: string;
+  // 答えを待っている間は undefined
+  answer: MemoAnswer | undefined;
+  // askMemos が reject したとき。cancelled は利用者が止めた
+  failure: "cancelled" | "unknown" | undefined;
 }
 
-export function useCompleteTodo(): UseCompleteTodoResult {
-  const client = useMemoClient();
-  const [pendingIds, setPendingIds] = useState<ReadonlySet<string>>(new Set());
-  const [error, setError] = useState<unknown>();
+export interface UseAskMemosResult {
+  // この画面にいる間に聞いた質問。新しい順。保存しない
+  questions: AskedQuestion[];
+  // 答えを待っている間は true
+  isAsking: boolean;
+  // 動いている質問の段階。最初の ask-progress が届くまでは undefined
+  phase: AskPhase | undefined;
+  // 前後の空白を除いて空のときと、答えを待っている間は何もしない
+  ask: (question: string) => void;
+  cancel: () => void;
+}
 
-  const complete = useCallback(
-    (id: string) => {
-      setPendingIds((current) => new Set(current).add(id));
-      setError(undefined);
+// メモへの質問。答えを待っている間に画面を離れたら止める
+export function useAskMemos(): UseAskMemosResult {
+  const client = useMemoClient();
+  const [questions, setQuestions] = useState<AskedQuestion[]>([]);
+  const [phase, setPhase] = useState<AskPhase>();
+  // 動いている質問の id。イベントと結果を、どの質問のものか見分ける
+  const askingId = useRef<number | undefined>(undefined);
+  const isCancelling = useRef(false);
+  const nextId = useRef(0);
+  const [isAsking, setIsAsking] = useState(false);
+
+  useEffect(() => {
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "ask-progress" && askingId.current !== undefined) setPhase(event.phase);
+    });
+    return () => {
+      unsubscribe();
+      if (askingId.current === undefined) return;
+      askingId.current = undefined;
+      client.cancelAsk().catch(() => undefined);
+    };
+  }, [client]);
+
+  const ask = useCallback(
+    (question: string) => {
+      const trimmed = question.trim();
+      if (trimmed === "" || askingId.current !== undefined) return;
+      const id = ++nextId.current;
+      askingId.current = id;
+      isCancelling.current = false;
+      setIsAsking(true);
+      setPhase(undefined);
+      setQuestions((current) => [
+        { id, question: trimmed, answer: undefined, failure: undefined },
+        ...current,
+      ]);
+      const settle = (changes: Pick<AskedQuestion, "answer" | "failure">) => {
+        // 画面を離れて止めた質問の結果は捨てる
+        if (askingId.current !== id) return;
+        askingId.current = undefined;
+        setIsAsking(false);
+        setPhase(undefined);
+        setQuestions((current) =>
+          current.map((item) => (item.id === id ? { ...item, ...changes } : item)),
+        );
+      };
       client
-        .completeTodo(id)
-        .catch(setError)
-        .finally(() => {
-          setPendingIds((current) => {
-            const next = new Set(current);
-            next.delete(id);
-            return next;
-          });
-        });
+        .askMemos(trimmed)
+        .then((answer) => settle({ answer, failure: undefined }))
+        .catch(() =>
+          settle({ answer: undefined, failure: isCancelling.current ? "cancelled" : "unknown" }),
+        );
     },
     [client],
   );
 
-  return { complete, pendingIds, error };
+  const cancel = useCallback(() => {
+    if (askingId.current === undefined) return;
+    isCancelling.current = true;
+    client.cancelAsk().catch(() => undefined);
+  }, [client]);
+
+  return { questions, isAsking, phase, ask, cancel };
 }

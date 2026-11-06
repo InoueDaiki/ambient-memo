@@ -5,9 +5,9 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { useMemo } from "react";
 import { useColorScheme } from "react-native";
 
+import { AskScreen } from "../memo/AskScreen.tsx";
 import { MemoDetailScreen } from "../memo/MemoDetailScreen.tsx";
 import { MemoListScreen } from "../memo/MemoListScreen.tsx";
-import { TodoListScreen } from "../memo/TodoListScreen.tsx";
 import { DiagnosticsScreen } from "../transcript/DiagnosticsScreen.tsx";
 import { SelfEnrollmentScreen } from "../transcript/SelfEnrollmentScreen.tsx";
 import { SpeakersScreen } from "../transcript/SpeakersScreen.tsx";
@@ -20,7 +20,7 @@ const Tab = createBottomTabNavigator();
 const tabItems = [
   { key: "Transcript", label: "文字起こし" },
   { key: "Memos", label: "メモ" },
-  { key: "Todos", label: "ToDo" },
+  { key: "Ask", label: "質問" },
 ];
 
 function Tabs() {
@@ -37,13 +37,13 @@ function Tabs() {
     >
       <Tab.Screen name="Transcript" component={TranscriptScreen} />
       <Tab.Screen name="Memos" component={MemoListScreen} />
-      <Tab.Screen name="Todos" component={TodoListScreen} />
+      <Tab.Screen name="Ask" component={AskScreen} />
     </Tab.Navigator>
   );
 }
 
-// 下のタブで3つの一覧を切り替え、メモの詳細はその上に重ねる。
-// 戻る操作で、開いた元の一覧へ帰るため
+// 下のタブで3つの画面を切り替え、メモの詳細はその上に重ねる。
+// 戻る操作で、開いた元の画面へ帰るため
 export function AppNavigator() {
   const palette = useColors();
   const scheme = useColorScheme();

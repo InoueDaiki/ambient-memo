@@ -8,14 +8,14 @@ import java.util.TimeZone
 private const val MAX_TITLE_CHARS = 30
 
 /**
- * 未処理の発話をメモと ToDo に整理する。
+ * 未処理の発話をメモに整理する。
  *
  * 発話をまとまりに分け、まとまりを話題に分ける。
- * 話題ごとに、メモ、ToDo、発話の処理済みの印を1つのトランザクションで記録する。
+ * 話題ごとに、メモと発話の処理済みの印を1つのトランザクションで記録する。
  * 途中で止まっても、記録していないまとまりは未処理のまま残り、次回の実行が続きから処理する。
  *
  * [timeZone] は発話の日付を決める。「今日」は実行時ではなく、話した日にする。
- * 夜の充電中に整理するので、実行が日付をまたぐと「明日」がずれるため。
+ * 夜の充電中に整理するので、実行が日付をまたぐと要約の「明日」がずれるため。
  *
  * 失敗の回数は [attempts] に残す。アプリでは実行をまたいで残る実装を渡す。
  */
@@ -67,7 +67,7 @@ class OrganizeJob(
         }
         // 飛ばしたまとまりの後で LLM が動いたことを確かめられなかった。実行基盤の不調かもしれないので記録しない
         val finished = if (pass.suspects.isEmpty()) OrganizeOutcome.COMPLETED else OrganizeOutcome.LLM_FAILED
-        return OrganizeResult(stoppedBy ?: finished, pass.memoCount, pass.todoCount, pass.unreadableCount)
+        return OrganizeResult(stoppedBy ?: finished, pass.memoCount, pass.unreadableCount)
     }
 
     /** まとまりを1つ処理した結果。[carried] は、次のまとまりの頭に回した話題の最初の発話。 */
@@ -116,7 +116,6 @@ class OrganizeJob(
     private class Pass(
         val labels: SpeakerLabels,
         var memoCount: Int = 0,
-        var todoCount: Int = 0,
         var unreadableCount: Int = 0,
         val suspects: MutableList<UtteranceChunk> = mutableListOf(),
     )
@@ -167,10 +166,7 @@ class OrganizeJob(
     }
 
     private suspend fun record(memo: NewMemo, key: Long, pass: Pass) {
-        if (memos.recordMemo(memo) != null) {
-            pass.memoCount++
-            pass.todoCount += memo.todos.size
-        }
+        if (memos.recordMemo(memo) != null) pass.memoCount++
         attempts.clear(key)
     }
 
@@ -198,11 +194,9 @@ class OrganizeJob(
             endedAtMillis = chunk.endedAtMillis,
             title = null,
             summary = null,
-            todoExtraction = TodoExtraction.INCOMPLETE,
             modelVersion = llm.modelVersion,
             createdAtMillis = clock.nowMillis(),
             utteranceIds = chunk.utterances.map { it.id },
-            todos = emptyList(),
         )
         if (memos.recordMemo(memo) != null) {
             pass.memoCount++
@@ -234,27 +228,15 @@ class OrganizeJob(
 
     private suspend fun draft(chunk: UtteranceChunk, labels: SpeakerLabels): NewMemo {
         val transcript = chunk.toTranscript(timeZone, labels)
-        // 話者の名前は日付の手がかりにしない。「明日香」などを「明日」と読まないように、本文だけで確かめる
-        val spokenText = chunk.toTranscript(timeZone)
-        val spokenOn = CalendarDate.of(chunk.startedAtMillis, timeZone)
-        val endedOn = CalendarDate.of(chunk.endedAtMillis, timeZone)
-        val summary = summarize(spokenOn, transcript)
-        val parsed = extractTodos(spokenOn, transcript)
-        val title = summary?.let { titleOf(it) }
+        val summary = summarize(CalendarDate.of(chunk.startedAtMillis, timeZone), transcript)
         return NewMemo(
             startedAtMillis = chunk.startedAtMillis,
             endedAtMillis = chunk.endedAtMillis,
-            title = title,
+            title = summary?.let { titleOf(it) },
             summary = summary,
-            todoExtraction = if (parsed.isComplete) TodoExtraction.COMPLETE else TodoExtraction.INCOMPLETE,
             modelVersion = llm.modelVersion,
             createdAtMillis = clock.nowMillis(),
             utteranceIds = chunk.utterances.map { it.id },
-            todos = parsed.items
-                .distinctBy { item -> item.task.filterNot(Char::isWhitespace) }
-                .map { item ->
-                    item.toNewTodo(todoTitleOf(item.task), assessDue(item.due, spokenOn, endedOn, spokenText))
-                },
         )
     }
 
@@ -267,18 +249,6 @@ class OrganizeJob(
         return null
     }
 
-    /** 温度 0 では同じ入力に同じ出力が返るので、再試行では指示を足す。読めなければ空の不完全な結果を返す。 */
-    private suspend fun extractTodos(date: CalendarDate, transcript: String): ParsedTodos {
-        val request = OrganizePrompts.todo(date, transcript)
-        var best: ParsedTodos? = null
-        for (attempt in 0..config.maxRetries) {
-            val parsed = parseTodos(llm.generate(request.forAttempt(attempt, OrganizePrompts.TODO_RETRY_NOTE)))
-            if (parsed?.isComplete == true) return parsed
-            best = parsed ?: best
-        }
-        return best ?: ParsedTodos(emptyList(), isComplete = false)
-    }
-
     private fun LlmRequest.forAttempt(attempt: Int, retryNote: String) =
         if (attempt == 0) this else copy(user = user + retryNote)
 
@@ -289,18 +259,6 @@ class OrganizeJob(
         val title = generated ?: lines.firstOrNull { !isDateOnly(it) } ?: lines.first()
         return title.take(MAX_TITLE_CHARS)
     }
-
-    /** ToDo のタイトルは内容から別に作る。使えない出力なら、内容で代わりにする。 */
-    private suspend fun todoTitleOf(task: String): String =
-        (parseTitle(llm.generate(OrganizePrompts.todoTitle(task))) ?: task).take(MAX_TITLE_CHARS)
-
-    private fun RawTodo.toNewTodo(title: String, due: AssessedDue) = NewTodo(
-        task = task,
-        title = title,
-        kind = if (kind?.trim()?.lowercase() == "reminder") TodoKind.REMINDER else TodoKind.TODO,
-        dueDate = due.date,
-        status = if (due.isConfident) TodoStatus.OPEN else TodoStatus.CANDIDATE,
-    )
 }
 
 /** 今整理できる量を、LLM を使わずに数える。[OrganizeJob.run] と同じ分け方にする。本文が空のまとまりは数えない。 */

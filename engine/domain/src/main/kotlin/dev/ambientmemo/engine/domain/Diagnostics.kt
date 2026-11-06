@@ -43,7 +43,7 @@ data class LlmBackendChosen(val backend: LlmBackend) : DiagnosticEvent
 
 data class LlmLoaded(val loadMillis: Long, val isLoaded: Boolean) : DiagnosticEvent
 
-/** [maxOutputTokens] で要約や ToDo とタイトルを見分ける。 */
+/** [maxOutputTokens] で依頼の種類を見分ける。 */
 data class LlmGenerated(
     val inputChars: Int,
     val maxOutputTokens: Int,
@@ -55,8 +55,15 @@ data class LlmGenerated(
 data class OrganizeFinished(
     val outcome: OrganizeOutcome,
     val memoCount: Int,
-    val todoCount: Int,
     val unreadableCount: Int,
+    val totalMillis: Long,
+) : DiagnosticEvent
+
+/** 質問に 1 回答えた。[searchRounds] は検索の回数、[sourceCount] は答えの根拠にしたメモの数。 */
+data class AskFinished(
+    val outcome: AnswerOutcome,
+    val searchRounds: Int,
+    val sourceCount: Int,
     val totalMillis: Long,
 ) : DiagnosticEvent
 
@@ -149,6 +156,7 @@ private val DiagnosticEvent.name: String
         is LlmLoaded -> "llm_load"
         is LlmGenerated -> "llm_generate"
         is OrganizeFinished -> "organize"
+        is AskFinished -> "ask"
         is DeviceSample -> "device"
         is AudioLevelSummary -> "audio_level"
     }
@@ -177,8 +185,13 @@ private fun DiagnosticEvent.fields(): List<Pair<String, Any>> = when (this) {
     is OrganizeFinished -> listOf(
         "outcome" to outcome.name,
         "memos" to memoCount,
-        "todos" to todoCount,
         "unreadable" to unreadableCount,
+        "totalMs" to totalMillis,
+    )
+    is AskFinished -> listOf(
+        "outcome" to outcome.name,
+        "searchRounds" to searchRounds,
+        "sources" to sourceCount,
         "totalMs" to totalMillis,
     )
     is DeviceSample -> listOf(

@@ -1,6 +1,6 @@
 import { spacing } from "@ambient-memo/design-tokens";
 import type { MemoDetail } from "@ambient-memo/engine-client";
-import { useCompleteTodo, useMemoDetail } from "@ambient-memo/engine-client/react";
+import { useMemoDetail } from "@ambient-memo/engine-client/react";
 import {
   Button,
   Disclosure,
@@ -18,14 +18,12 @@ import type { RootNavigation, RootRoute } from "../navigation/types.ts";
 import { formatTime, speakerLabels } from "../transcript/format.ts";
 import { formatMemoPeriod, UNTITLED_MEMO } from "./format.ts";
 import { MemoModeBanner } from "./MemoModeBanner.tsx";
-import { TodoRow } from "./TodoRow.tsx";
 
 function Padded({ children }: { children: ReactNode }) {
   return <View style={{ paddingHorizontal: spacing.lg, gap: spacing.md }}>{children}</View>;
 }
 
 function MemoBody({ memo }: { memo: MemoDetail }) {
-  const { complete, pendingIds, error } = useCompleteTodo();
   return (
     <ScrollView>
       <Padded>
@@ -45,33 +43,7 @@ function MemoBody({ memo }: { memo: MemoDetail }) {
         ) : (
           <Text selectable>{memo.summary}</Text>
         )}
-        {memo.todoExtraction === "incomplete" && (
-          <StatusBanner
-            tone="neutral"
-            message="ToDo を最後まで読み取れませんでした。欠けているものがあるかもしれません。"
-          />
-        )}
-        {error !== undefined && (
-          <StatusBanner
-            tone="danger"
-            message="ToDo を完了にできませんでした。もう一度試してください。"
-          />
-        )}
       </Padded>
-
-      {memo.todos.length > 0 && (
-        <Disclosure title={`ToDo(${memo.todos.length} 件)`}>
-          {memo.todos.map((todo) => (
-            <TodoRow
-              key={todo.id}
-              todo={todo}
-              isCompleting={pendingIds.has(todo.id)}
-              onComplete={complete}
-              showsTask
-            />
-          ))}
-        </Disclosure>
-      )}
 
       {/* 要約がないと発話でしか内容が分からないので、開いておく */}
       <Disclosure

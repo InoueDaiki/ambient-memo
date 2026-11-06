@@ -43,7 +43,6 @@ export function MemoListScreen() {
               <ListItem
                 text={item.title ?? UNTITLED_MEMO}
                 label={formatMemoPeriod(item)}
-                tag={item.todoExtraction === "incomplete" ? "ToDo が欠けているかも" : undefined}
                 onPress={() => navigation.navigate("MemoDetail", { memoId: item.id })}
               />
             )}

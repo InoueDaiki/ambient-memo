@@ -1,7 +1,8 @@
-// メモと ToDo の境界。ネイティブの形は engine/android の MemoBridge と合わせる。
+// メモと質問の境界。ネイティブの形は engine/android の MemoBridge と合わせる。
 // expo に依存させず、Vitest で契約テストを流す
 import type {
   EngineEvent,
+  MemoAnswer,
   MemoDetail,
   MemoEngineClient,
   OrganizeStartResult,
@@ -18,16 +19,15 @@ export type NativeUtterance = Omit<Utterance, "speakerId" | "speakerName"> & {
 export type NativeMemoDetail = Omit<MemoDetail, "utterances"> & { utterances: NativeUtterance[] };
 
 type MemoList = Awaited<ReturnType<MemoEngineClient["listMemos"]>>;
-type TodoList = Awaited<ReturnType<MemoEngineClient["listTodos"]>>;
 
 export interface MemoNativeModule {
   listMemos(limit: number): Promise<MemoList>;
   getMemo(id: string): Promise<NativeMemoDetail | null>;
-  listTodos(limit: number): Promise<TodoList>;
-  completeTodo(id: string): Promise<void>;
   getOrganizeStatus(): Promise<OrganizeStatus>;
   startOrganize(): Promise<OrganizeStartResult>;
   stopOrganize(): Promise<void>;
+  askMemos(question: string): Promise<MemoAnswer>;
+  cancelAsk(): Promise<void>;
   addListener(eventName: "engine", listener: (event: EngineEvent) => void): { remove(): void };
 }
 
@@ -49,11 +49,14 @@ export function createMemoClient(native: MemoNativeModule): MemoEngineClient {
     getMemoMode: () => Promise.resolve("ready"),
     listMemos: ({ limit }) => native.listMemos(limit),
     getMemo: (id) => native.getMemo(id).then((detail) => detail && toMemoDetail(detail)),
-    listTodos: ({ limit }) => native.listTodos(limit),
-    completeTodo: (id) => native.completeTodo(id),
     getOrganizeStatus: () => native.getOrganizeStatus(),
     startOrganize: () => native.startOrganize(),
     stopOrganize: () => native.stopOrganize(),
+    askMemos: (question) => native.askMemos(question),
+    // 値を返さない関数でも、Expo は null で解決する。境界では何も返さない
+    cancelAsk: async () => {
+      await native.cancelAsk();
+    },
     subscribe: (listener) => {
       const subscription = native.addListener("engine", listener);
       return () => subscription.remove();
