@@ -112,7 +112,8 @@ class SchemaMigrationTest {
                     runTest {
                         val memos = repository.listMemos()
                         assertTrue(memos.isNotEmpty())
-                        assertEquals(memos.map { it.id }.reversed(), repository.searchMemos("", 0, Long.MAX_VALUE, 10).map { it.id })
+                        val found = repository.searchMemos("", 0, Long.MAX_VALUE, 10)
+                        assertEquals(memos.map { it.id }.reversed(), found.map { it.id })
                     }
                 }
             }

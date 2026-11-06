@@ -7,22 +7,15 @@ import dev.ambientmemo.engine.domain.Speaker
 import dev.ambientmemo.engine.domain.SpeakerDiagnostics
 import dev.ambientmemo.engine.domain.SpeakerNameSource
 import dev.ambientmemo.engine.domain.SpeakerTarget
-import dev.ambientmemo.engine.domain.Todo
-import dev.ambientmemo.engine.domain.TodoCompletion
-import dev.ambientmemo.engine.domain.TodoExtraction
-import dev.ambientmemo.engine.domain.TodoKind
-import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.domain.organizeBacklog
 import java.util.TimeZone
-
-class TodoNotFoundException : Exception()
 
 /** JS が読む形。engine-bridge はここの結果をそのまま渡す。 */
 typealias WireObject = Map<String, Any?>
 
 /**
- * メモと ToDo の JS への境界。形は `modules/engine-bridge/src/memo-client.ts` の Native の型と合わせる。
+ * メモと質問の JS への境界。形は `modules/engine-bridge/src/memo-client.ts` の Native の型と合わせる。
  *
  * Expo に依存しない部分をここに置き、JVM のテストで本物の SQLite を通す。
  * id は JS では文字列なので、数でない id は「ない」ものとして扱う。
@@ -32,26 +25,59 @@ class MemoBridge internal constructor(
     private val speakers: suspend () -> Map<Long, Speaker>,
     private val clock: Clock,
     private val organize: OrganizeControl,
+    private val asks: AskControl,
     private val timeZone: TimeZone = TimeZone.getDefault(),
 ) {
     suspend fun listMemos(limit: Int): List<WireObject> = memos.listRecentMemos(limit).map { it.toWire() }
-
-    suspend fun listTodos(limit: Int): List<WireObject> = memos.listTodosByPriority(limit).map { it.toWire() }
 
     suspend fun getMemo(id: String): WireObject? {
         val memo = id.toLongOrNull()?.let { memos.findMemo(it) } ?: return null
         val speakersById = speakers()
         return memo.toWire() + mapOf(
             "utterances" to memos.listMemoUtterances(memo.id).map { it.toWire(speakersById) },
-            "todos" to memos.listTodos(memo.id).map { it.toWire() },
         )
     }
 
-    /** @throws TodoNotFoundException ToDo がないとき。完了済みなら何もせず戻る */
-    suspend fun completeTodo(id: String) {
-        val todoId = id.toLongOrNull() ?: throw TodoNotFoundException()
-        if (memos.completeTodo(todoId, clock.nowMillis()) == TodoCompletion.NOT_FOUND) throw TodoNotFoundException()
+    /**
+     * 過去のメモを探して答える。[onProgress] には JS の進み具合の名前を渡す。
+     * 整理のモデルを使うので、整理が動いている間は動かさない。
+     *
+     * @throws IllegalArgumentException 質問が空のとき
+     * @throws AskCancelledException [cancelAsk] で止めたとき
+     */
+    suspend fun askMemos(question: String, onProgress: (String) -> Unit): WireObject {
+        require(question.isNotBlank()) { "質問が空です" }
+        val reply = when {
+            !organize.isModelReady() -> AskReply(AskEnding.MODEL_MISSING)
+            organize.status.isRunning -> AskReply(AskEnding.BUSY)
+            else -> asks.ask(question.trim()) { step ->
+                onProgress(
+                    when (step) {
+                        AskStep.PREPARING -> "preparing"
+                        AskStep.SEARCHING -> "searching"
+                        AskStep.ANSWERING -> "answering"
+                    },
+                )
+            }
+        }
+        val isAnswered = reply.ending == AskEnding.ANSWERED
+        // 答えを作っている間に消えたメモは挙げない
+        val sources = if (isAnswered) reply.sourceIds.mapNotNull { memos.findMemo(it) } else emptyList()
+        return mapOf(
+            "outcome" to when (reply.ending) {
+                AskEnding.ANSWERED -> "answered"
+                AskEnding.NOT_FOUND -> "not-found"
+                AskEnding.MODEL_MISSING -> "model-unavailable"
+                AskEnding.BUSY -> "busy"
+                AskEnding.FAILED -> "failed"
+            },
+            "answer" to reply.text?.takeIf { isAnswered },
+            "sources" to sources.map { it.toWire() },
+        )
     }
+
+    /** 動いていなければ何もしない。 */
+    fun cancelAsk() = asks.cancel()
 
     suspend fun organizeStatus(): WireObject {
         val backlog = backlog()
@@ -171,28 +197,6 @@ private fun Memo.toWire(): WireObject = mapOf(
     "id" to id.toString(),
     "title" to title,
     "summary" to summary,
-    "todoExtraction" to when (todoExtraction) {
-        TodoExtraction.COMPLETE -> "complete"
-        TodoExtraction.INCOMPLETE -> "incomplete"
-    },
     "startedAt" to startedAtMillis.toDouble(),
     "endedAt" to endedAtMillis.toDouble(),
-)
-
-private fun Todo.toWire(): WireObject = mapOf(
-    "id" to id.toString(),
-    "memoId" to memoId.toString(),
-    "task" to task,
-    "title" to title,
-    "kind" to when (kind) {
-        TodoKind.TODO -> "todo"
-        TodoKind.REMINDER -> "reminder"
-    },
-    "dueDate" to dueDate?.toString(),
-    "status" to when (status) {
-        TodoStatus.CANDIDATE -> "candidate"
-        TodoStatus.OPEN -> "open"
-        TodoStatus.DONE -> "done"
-    },
-    "createdAt" to createdAtMillis.toDouble(),
 )

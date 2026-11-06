@@ -23,6 +23,7 @@ import dev.ambientmemo.engine.adapters.openAndroidDatabase
 import dev.ambientmemo.engine.domain.DiagnosticProcess
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.LlmBackendChosen
+import dev.ambientmemo.engine.domain.MemoQuestionAnswerer
 import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.OrganizeTrigger
@@ -33,9 +34,11 @@ import dev.ambientmemo.engine.sherpa.ModelCatalog
 import dev.ambientmemo.engine.sherpa.ModelStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.io.File
 import java.util.TimeZone
 import java.util.concurrent.CopyOnWriteArraySet
@@ -58,6 +61,10 @@ private const val STATUS_DELIVERY_MILLIS = 500L
 /**
  * 別のプロセス(`:organize`)で LLM を動かす。定期実行では [OrganizeWorker] が bind して使う。
  * 手動の実行では、画面の操作から dataSync 型の Foreground Service として開始し、アプリを離れても完了まで動く。
+ * メモへの質問も、[RemoteAsk] が bind している間だけここで動かす。
+ *
+ * モデルを 2 つ読み込むとメモリが足りないので、整理と質問は同時に動かさない。整理の間の質問は断り、
+ * 質問の間の定期実行は次の回に回す。手動の整理は、利用者が選んだので質問を止めてから始める。
  *
  * 聞き取りはバックグラウンドから再開できないので、数 GB のモデルとネイティブのクラッシュを聞き取りのプロセスから離す。
  * [Engine] はこのプロセスでは作らない。ここで使うのは DB とモデルのファイルだけ。
@@ -92,6 +99,8 @@ class OrganizeService : Service() {
                 MESSAGE_STOP -> runner.requestSchedulerStop()
                 MESSAGE_STOP_BY_USER -> stopByUser()
                 MESSAGE_SUBSCRIBE -> subscribe(message.replyTo)
+                MESSAGE_ASK -> ask(message.data.question(), message.replyTo)
+                MESSAGE_ASK_CANCEL -> asking?.cancel()
             }
             true
         },
@@ -99,6 +108,11 @@ class OrganizeService : Service() {
     private val journal by lazy { DiagnosticsJournal(filesDir, DiagnosticProcess.ORGANIZE, SystemClock) }
     private var wakeLock: PowerManager.WakeLock? = null
     private var lastStartId = 0
+
+    /** メインのスレッドだけで読み書きする。 */
+    private var asking: Job? = null
+
+    private val isAsking: Boolean get() = asking?.isActive == true
 
     @Volatile
     private var client: Messenger? = null
@@ -135,7 +149,7 @@ class OrganizeService : Service() {
     }
 
     private fun startScheduled(replyTo: Messenger?) {
-        if (runner.isRunning) {
+        if (runner.isRunning || isAsking) {
             send(MESSAGE_FINISHED, OrganizeRunResult.COMPLETED.ordinal, replyTo)
             return
         }
@@ -161,7 +175,28 @@ class OrganizeService : Service() {
         }
         isForeground = true
         acquireWakeLock()
-        runner.start(OrganizeTrigger.MANUAL)
+        val question = asking?.takeIf { it.isActive }
+        if (question == null) {
+            runner.start(OrganizeTrigger.MANUAL)
+        } else {
+            // 質問のモデルを解放してから読み込む
+            question.cancel()
+            question.invokeOnCompletion { main.post { runner.start(OrganizeTrigger.MANUAL) } }
+        }
+    }
+
+    private fun ask(question: String, replyTo: Messenger?) {
+        replyTo ?: return
+        if (runner.isRunning || isAsking) {
+            send(replyTo, AskReply(AskEnding.BUSY).toMessage())
+            return
+        }
+        asking = scope.launch {
+            val reply = askSession().run(question) { step ->
+                send(replyTo, Message.obtain(null, MESSAGE_ASK_STEP, step.ordinal, 0))
+            }
+            send(replyTo, reply.toMessage())
+        }
     }
 
     /** 1 日の dataSync の上限を使い切ると、ここで ForegroundServiceStartNotAllowedException になる。 */
@@ -228,16 +263,9 @@ class OrganizeService : Service() {
     private fun session(onProgress: (OrganizeProgress) -> Unit): OrganizeSession {
         // 読み込みが終わらないときも、始めたことと、その時の端末の状態を残す
         journal.record(deviceSample(this))
-        val store = ModelStore(File(filesDir, MODELS_DIRECTORY))
-        val model = ModelCatalog.ACTIVE_LLM
         return OrganizeSession(
-            isModelReady = { store.verify(model.modelPackage) },
-            openLlm = {
-                val cache = File(cacheDir, LLM_CACHE_DIRECTORY).apply { mkdirs() }
-                val path = store.pathOf(model.modelPackage, model.model)
-                val loader = LiteRtLlmLoader(path, cache.path) { journal.record(LlmBackendChosen(it)) }
-                LocalLlm(model.version, loader, dispatcher)
-            },
+            isModelReady = ::isModelReady,
+            openLlm = ::openLlm,
             jobFor = ::jobFor,
             onFailure = { Log.e(TAG, "モデルを読み込めません: ${it.javaClass.simpleName}") },
             onResult = {
@@ -249,11 +277,42 @@ class OrganizeService : Service() {
         )
     }
 
+    private fun askSession(): AskSession {
+        journal.record(deviceSample(this))
+        return AskSession(
+            isModelReady = ::isModelReady,
+            openLlm = ::openLlm,
+            answererFor = { llm ->
+                MemoQuestionAnswerer(
+                    SqliteMemoRepository(database),
+                    SqliteSpeakerRepository(database),
+                    llm,
+                    SystemClock,
+                    TimeZone.getDefault(),
+                )
+            },
+            onFailure = { Log.e(TAG, "質問に答えられません: ${it.javaClass.simpleName}") },
+            diagnostics = journal,
+        )
+    }
+
+    private val modelStore by lazy { ModelStore(File(filesDir, MODELS_DIRECTORY)) }
+
+    private fun isModelReady() = modelStore.verify(ModelCatalog.ACTIVE_LLM.modelPackage)
+
+    private fun openLlm(): LocalLlm {
+        val model = ModelCatalog.ACTIVE_LLM
+        val cache = File(cacheDir, LLM_CACHE_DIRECTORY).apply { mkdirs() }
+        val path = modelStore.pathOf(model.modelPackage, model.model)
+        val loader = LiteRtLlmLoader(path, cache.path) { journal.record(LlmBackendChosen(it)) }
+        return LocalLlm(model.version, loader, dispatcher)
+    }
+
     private fun jobFor(llm: Llm) = OrganizeJob(
         // 画面はメインのプロセスにあるので、変更は bind を通して知らせる
-        memos = ObservableMemoRepository(SqliteMemoRepository(database)) { change ->
+        memos = ObservableMemoRepository(SqliteMemoRepository(database)) {
             // 見守りがいないときは、定期実行の Worker が受け取る
-            observers.ifEmpty { listOfNotNull(client) }.forEach { send(MESSAGE_MEMO_CHANGED, change.ordinal, it) }
+            observers.ifEmpty { listOfNotNull(client) }.forEach { send(MESSAGE_MEMO_CHANGED, 0, it) }
         },
         speakers = SqliteSpeakerRepository(database),
         llm = llm,
@@ -303,6 +362,10 @@ class OrganizeService : Service() {
         const val MESSAGE_STOP_BY_USER = 5
         const val MESSAGE_SUBSCRIBE = 6
         const val MESSAGE_STATUS = 7
+        const val MESSAGE_ASK = 8
+        const val MESSAGE_ASK_STEP = 9
+        const val MESSAGE_ASK_FINISHED = 10
+        const val MESSAGE_ASK_CANCEL = 11
 
         private const val ACTION_START = "dev.ambientmemo.engine.action.START_ORGANIZE"
         private const val ACTION_STOP = "dev.ambientmemo.engine.action.STOP_ORGANIZE"

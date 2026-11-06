@@ -747,7 +747,8 @@ abstract class MemoRepositoryContract {
         val stores = stores()
         val before = stores.memos.recordMemo(memo(stores.said(1, "a")).copy(startedAtMillis = 0, endedAtMillis = 99))!!
         val edge = stores.memos.recordMemo(memo(stores.said(2, "b")).copy(startedAtMillis = 50, endedAtMillis = 100))!!
-        val inside = stores.memos.recordMemo(memo(stores.said(3, "c")).copy(startedAtMillis = 150, endedAtMillis = 160))!!
+        val inside =
+            stores.memos.recordMemo(memo(stores.said(3, "c")).copy(startedAtMillis = 150, endedAtMillis = 160))!!
         stores.memos.recordMemo(memo(stores.said(4, "d")).copy(startedAtMillis = 200, endedAtMillis = 250))
 
         assertEquals(listOf(inside, edge), stores.memos.searchMemos("", 100, 200, 10))

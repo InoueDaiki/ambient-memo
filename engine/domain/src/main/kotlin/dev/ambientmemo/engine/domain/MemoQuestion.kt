@@ -84,12 +84,21 @@ class MemoQuestionAnswerer(
         val today = CalendarDate.of(clock.nowMillis(), timeZone)
         onPhase(AskPhase.SEARCHING)
         val search = search(question, today)
-        if (search.memos.isEmpty()) return MemoAnswer(AnswerOutcome.NOT_FOUND, null, emptyList(), search.rounds)
+        val answered = if (search.memos.isEmpty()) null else answerFrom(question, today, search, onPhase)
+        return answered ?: MemoAnswer(AnswerOutcome.NOT_FOUND, null, emptyList(), search.rounds)
+    }
+
+    /** メモから答えが分からなければ null。 */
+    private suspend fun answerFrom(
+        question: String,
+        today: CalendarDate,
+        search: Search,
+        onPhase: (AskPhase) -> Unit,
+    ): MemoAnswer? {
         onPhase(AskPhase.ANSWERING)
-        val labels = SpeakerLabels(speakers.listSpeakers())
-        val context = contextOf(search.memos, search.terms, labels)
+        val context = contextOf(search.memos, search.terms, SpeakerLabels(speakers.listSpeakers()))
         val parsed = parseAnswer(llm.generate(AskPrompts.answer(question, today, context.text)), context.memos.size)
-            ?: return MemoAnswer(AnswerOutcome.NOT_FOUND, null, emptyList(), search.rounds)
+            ?: return null
         val sources = parsed.citations.map { context.memos[it - 1] }.ifEmpty { context.memos }
         return MemoAnswer(AnswerOutcome.ANSWERED, parsed.text, sources, search.rounds)
     }
@@ -105,9 +114,9 @@ class MemoQuestionAnswerer(
                 ?: SearchPlan(emptyList(), null, null)
             if (plan.from != null) lastRange = plan
             val found = find(plan.terms, plan)
-            if (found.isNotEmpty()) return Search(found, plan.terms, round)
-            // 期間だけの計画は、語を変えても同じ結果になる
-            if (plan.terms.isEmpty() && plan.from != null) return Search(emptyList(), emptyList(), round)
+            // 期間だけの計画は、語を変えても同じ結果になるので、見つからなくても終える
+            val isRangeOnly = plan.terms.isEmpty() && plan.from != null
+            if (found.isNotEmpty() || isRangeOnly) return Search(found, plan.terms, round)
             tried += plan.terms.filterNot { it in tried }
         }
         val inRange = lastRange?.let { find(emptyList(), it) }.orEmpty()

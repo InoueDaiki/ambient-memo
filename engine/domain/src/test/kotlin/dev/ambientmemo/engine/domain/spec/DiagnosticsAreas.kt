@@ -126,7 +126,12 @@ private fun event(json: JsonObject): DiagnosticEvent = when (val type = json.str
         json.int("unreadableCount"),
         json.long("totalMillis"),
     )
-    "ask" -> AskFinished(json.enum("outcome"), json.int("searchRounds"), json.int("sourceCount"), json.long("totalMillis"))
+    "ask" -> AskFinished(
+        json.enum("outcome"),
+        json.int("searchRounds"),
+        json.int("sourceCount"),
+        json.long("totalMillis"),
+    )
     "device" -> deviceSample(json)
     "audio_level" -> AudioLevelSummary(
         json.int("frames"),
