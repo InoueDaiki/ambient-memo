@@ -6,7 +6,6 @@ import app.cash.sqldelight.db.SqlDriver
 import app.cash.sqldelight.db.SqlSchema
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.ambientmemo.engine.adapters.db.AmbientMemoDatabase
-import dev.ambientmemo.engine.domain.TodoStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -98,10 +97,10 @@ class SchemaMigrationTest {
         }
 
     @TestFactory
-    fun `移行した ToDo は未完了のまま読めて、完了できる`(): List<DynamicTest> =
-        (2L..3L).map { version ->
+    fun `移行したメモは読めて、検索できる`(): List<DynamicTest> =
+        (2L..schema.version).map { version ->
             dynamicTest("版 $version から") {
-                val path = dir.resolve("todo-$version.db")
+                val path = dir.resolve("memo-$version.db")
                 Files.copy(snapshot(version), path)
                 JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
                     seedStatements(seed(version)!!).forEach { driver.execute(null, it, 0) }
@@ -111,54 +110,13 @@ class SchemaMigrationTest {
                 openTestDriver(path).use { driver ->
                     val repository = SqliteMemoRepository(AmbientMemoDatabase(driver), Dispatchers.Unconfined)
                     runTest {
-                        val todos = repository.listTodos(memoId = 1)
-                        assertTrue(todos.isNotEmpty())
-                        assertTrue(todos.all { it.status != TodoStatus.DONE && it.completedAtMillis == null })
-
-                        repository.completeTodo(todos.first().id, 10_000)
-
-                        val completed = repository.listTodos(memoId = 1).first()
-                        assertEquals(TodoStatus.DONE, completed.status)
-                        assertEquals(10_000L, completed.completedAtMillis)
+                        val memos = repository.listMemos()
+                        assertTrue(memos.isNotEmpty())
+                        assertEquals(memos.map { it.id }.reversed(), repository.searchMemos("", 0, Long.MAX_VALUE, 10).map { it.id })
                     }
                 }
             }
         }
-
-    @Test
-    fun `移行した ToDo は内容をタイトルにする`() {
-        val path = dir.resolve("todo-title.db")
-        Files.copy(snapshot(5), path)
-        JdbcSqliteDriver("jdbc:sqlite:$path").use { driver ->
-            seedStatements(seed(5)!!).forEach { driver.execute(null, it, 0) }
-            driver.execute(null, "PRAGMA user_version = 5", 0)
-        }
-
-        openTestDriver(path).use { driver ->
-            val repository = SqliteMemoRepository(AmbientMemoDatabase(driver), Dispatchers.Unconfined)
-            runTest {
-                val todos = repository.listTodos(memoId = 1)
-                assertTrue(todos.isNotEmpty())
-                assertEquals(todos.map { it.task }, todos.map { it.title })
-            }
-        }
-    }
-
-    @Test
-    fun `完了の前の状態を、取り消しのために残す`() {
-        openTestDriver(dir.resolve("from-status.db")).use { driver ->
-            val database = AmbientMemoDatabase(driver)
-            database.memoQueries.insert(1, 2, null, null, "complete", "fake-1", 3)
-            database.todoQueries.insert(1, "作業", "作業", "todo", null, "candidate", 3)
-
-            database.todoQueries.complete(4, 1)
-
-            val row = database.todoQueries.listByMemo(1).executeAsOne()
-            assertEquals("done", row.status)
-            assertEquals("candidate", row.completed_from_status)
-            assertEquals(4L, row.completed_at_ms)
-        }
-    }
 
     // ここから下は、チェック自体が壊れていないことを、次の版があるものとして確かめる
 

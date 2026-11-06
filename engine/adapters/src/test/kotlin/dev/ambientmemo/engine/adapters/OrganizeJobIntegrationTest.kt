@@ -2,7 +2,6 @@ package dev.ambientmemo.engine.adapters
 
 import app.cash.sqldelight.driver.jdbc.sqlite.JdbcSqliteDriver
 import dev.ambientmemo.engine.adapters.db.AmbientMemoDatabase
-import dev.ambientmemo.engine.domain.CalendarDate
 import dev.ambientmemo.engine.domain.InMemoryOrganizeAttempts
 import dev.ambientmemo.engine.domain.Llm
 import dev.ambientmemo.engine.domain.LlmInputTooLongException
@@ -15,14 +14,10 @@ import dev.ambientmemo.engine.domain.OrganizeJob
 import dev.ambientmemo.engine.domain.OrganizeOutcome
 import dev.ambientmemo.engine.domain.OrganizeProgress
 import dev.ambientmemo.engine.domain.SpeakerEmbedding
-import dev.ambientmemo.engine.domain.TodoExtraction
-import dev.ambientmemo.engine.domain.TodoKind
-import dev.ambientmemo.engine.domain.TodoStatus
 import dev.ambientmemo.engine.domain.organizeBacklog
 import dev.ambientmemo.engine.domain.testing.FakeClock
 import dev.ambientmemo.engine.domain.testing.FakeLlm
 import dev.ambientmemo.engine.domain.testing.isTitleRequest
-import dev.ambientmemo.engine.domain.testing.isTodoRequest
 import dev.ambientmemo.engine.domain.testing.isTopicRequest
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
@@ -57,8 +52,6 @@ class OrganizeJobIntegrationTest {
     private val minute = 60_000L
     private val hour = 60 * minute
     private val afterLastTalk = evening + 12 * hour
-
-    private val todoJson = """{"items": [{"task": "歯医者に行く", "kind": "reminder", "due": "2026-11-04"}]}"""
 
     private inner class Harness(val driver: JdbcSqliteDriver) {
         val database = AmbientMemoDatabase(driver)
@@ -102,12 +95,11 @@ class OrganizeJobIntegrationTest {
     }
 
     @Test
-    fun `発話からメモと ToDo と根拠を作り、発話を処理済みにする`() = withDatabase { db ->
+    fun `発話からメモと根拠を作り、発話を処理済みにする`() = withDatabase { db ->
         val first = db.say(evening, "歯医者の予約、あさっての十時に取れたって")
         val second = db.say(evening + minute, "よかったね")
         val llm = FakeLlm.organizing(
             summary = "歯医者の予約です\n- 歯医者はあさって十時\n- 保険証を持っていく",
-            todos = todoJson,
             title = "歯医者の予約",
         )
 
@@ -115,20 +107,13 @@ class OrganizeJobIntegrationTest {
 
         assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
         assertEquals(1, result.memoCount)
-        assertEquals(1, result.todoCount)
         val memo = db.memos.listMemos().single()
         assertEquals("歯医者の予約", memo.title)
         assertEquals("- 歯医者はあさって十時\n- 保険証を持っていく", memo.summary)
-        assertEquals(TodoExtraction.COMPLETE, memo.todoExtraction)
         assertEquals("fake-1", memo.modelVersion)
         assertEquals(evening, memo.startedAtMillis)
         assertEquals(evening + minute + 2_000, memo.endedAtMillis)
         assertEquals(listOf(first, second), db.memos.listUtteranceIds(memo.id))
-        val todo = db.memos.listTodos(memo.id).single()
-        assertEquals("歯医者に行く", todo.task)
-        assertEquals(TodoKind.REMINDER, todo.kind)
-        assertEquals(CalendarDate(2026, 11, 4), todo.dueDate)
-        assertEquals(TodoStatus.OPEN, todo.status)
         assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
         assertEquals(listOf(afterLastTalk, afterLastTalk), db.column("SELECT organized_at_ms FROM utterance"))
     }
@@ -161,7 +146,7 @@ class OrganizeJobIntegrationTest {
 
         db.job(llm).run()
 
-        assertEquals(3, llm.received.size)
+        assertEquals(2, llm.received.size)
         llm.received.filterNot { it.isTitleRequest }.forEach { request ->
             assertTrue("今日は 2026-11-02(月曜日) です" in request.user)
             assertTrue(request.user.endsWith("[18:00] 明日までに請求書を送る"))
@@ -190,8 +175,8 @@ class OrganizeJobIntegrationTest {
         assertEquals(3, result.memoCount)
         val memos = db.memos.listMemos()
         assertEquals(conversations, memos.map { db.memos.listUtteranceIds(it.id) })
-        // まとまりごとに、話題の切れ目、要約、ToDo、タイトル
-        assertEquals(12, llm.received.size)
+        // まとまりごとに、話題の切れ目、要約、タイトル
+        assertEquals(9, llm.received.size)
     }
 
     @Test
@@ -226,7 +211,7 @@ class OrganizeJobIntegrationTest {
     @Test
     fun `もう一度実行しても重複せず、LLM も呼ばない`() = withDatabase { db ->
         db.sayConversations(2)
-        val llm = FakeLlm.organizing(todos = todoJson)
+        val llm = FakeLlm.organizing()
         db.job(llm).run()
         val calls = llm.received.size
 
@@ -235,14 +220,13 @@ class OrganizeJobIntegrationTest {
         assertEquals(0, second.memoCount)
         assertEquals(calls, llm.received.size)
         assertEquals(2, db.memos.listMemos().size)
-        assertEquals(2L, db.count("todo"))
         assertEquals(4L, db.count("memo_utterance"))
     }
 
     @Test
     fun `途中で止めると区切りまで記録し、次回は続きから処理して重複しない`() = withDatabase { db ->
         val conversations = db.sayConversations(3)
-        val llm = FakeLlm.organizing(todos = todoJson)
+        val llm = FakeLlm.organizing()
         var checks = 0
 
         val stopped = db.job(llm).run(shouldContinue = { ++checks <= 1 })
@@ -256,7 +240,6 @@ class OrganizeJobIntegrationTest {
         assertEquals(OrganizeOutcome.COMPLETED, resumed.outcome)
         assertEquals(2, resumed.memoCount)
         assertEquals(conversations, db.memos.listMemos().map { db.memos.listUtteranceIds(it.id) })
-        assertEquals(3L, db.count("todo"))
     }
 
     @Test
@@ -283,10 +266,10 @@ class OrganizeJobIntegrationTest {
         val conversations = db.sayConversations(2)
         db.driver.execute(
             null,
-            "CREATE TRIGGER fail_todo BEFORE INSERT ON todo BEGIN SELECT RAISE(ABORT, '失敗'); END",
+            "CREATE TRIGGER fail_link BEFORE INSERT ON memo_utterance BEGIN SELECT RAISE(ABORT, '失敗'); END",
             0,
         )
-        val llm = FakeLlm.organizing(todos = todoJson)
+        val llm = FakeLlm.organizing()
 
         val failure = runCatching { db.job(llm).run() }
 
@@ -295,7 +278,7 @@ class OrganizeJobIntegrationTest {
         assertEquals(conversations.flatten(), db.memos.listUnorganizedUtterances().map { it.id })
         assertEquals(0L, db.count("memo_utterance"))
 
-        db.driver.execute(null, "DROP TRIGGER fail_todo", 0)
+        db.driver.execute(null, "DROP TRIGGER fail_link", 0)
 
         assertEquals(2, db.job(llm).run().memoCount)
     }
@@ -305,16 +288,15 @@ class OrganizeJobIntegrationTest {
         db.say(evening, "一言目")
         val competing = FakeLlm.organizing()
         val llm = FakeLlm { index, request ->
-            // 自分の ToDo の抽出の間に、別のジョブが同じまとまりを記録する
-            if (request.isTodoRequest && index == 1) db.job(competing).run()
-            if (request.isTodoRequest) todoJson else "- 要約"
+            // 自分のタイトルの依頼の間に、別のジョブが同じまとまりを記録する
+            if (request.isTitleRequest && index == 1) db.job(competing).run()
+            "- 要約"
         }
 
         val result = db.job(llm).run()
 
         assertEquals(0, result.memoCount)
         assertEquals(1, db.memos.listMemos().size)
-        assertEquals(0L, db.count("todo"))
     }
 
     @Test
@@ -323,10 +305,10 @@ class OrganizeJobIntegrationTest {
         var isBroken = false
         var calls = 0
         val llm = FakeLlm { _, request ->
-            // 話題の切れ目の依頼は数えない。5 回目は 2 つ目のまとまりの要約
-            if (!request.isTopicRequest && ++calls == 5) isBroken = true
+            // 話題の切れ目の依頼は数えない。3 回目は 2 つ目のまとまりの要約
+            if (!request.isTopicRequest && ++calls == 3) isBroken = true
             if (isBroken) throw IOException("メモリ不足")
-            if (request.isTodoRequest) todoJson else "- 要約"
+            "- 要約"
         }
 
         val failed = db.job(llm).run()
@@ -375,140 +357,18 @@ class OrganizeJobIntegrationTest {
     }
 
     @Test
-    fun `JSON が読めなければ指示を足して再試行する`() = withDatabase { db ->
+    fun `要約が空でも、根拠の発話は残す`() = withDatabase { db ->
         db.say(evening, "あさって十時に歯医者")
-        var todoCalls = 0
-        val llm = FakeLlm { _, request ->
-            when {
-                !request.isTodoRequest -> "- 要約"
-                ++todoCalls == 1 -> "すみません、抽出できません"
-                else -> todoJson
-            }
-        }
-
-        db.job(llm).run()
-
-        val memo = db.memos.listMemos().single()
-        assertEquals(TodoExtraction.COMPLETE, memo.todoExtraction)
-        assertEquals(1, db.memos.listTodos(memo.id).size)
-        val todoRequests = llm.received.filter { it.isTodoRequest }
-        assertEquals(2, todoRequests.size)
-        assertFalse("前回の出力" in todoRequests[0].user)
-        assertTrue("前回の出力" in todoRequests[1].user)
-    }
-
-    @Test
-    fun `何度やっても読めないまとまりは、抽出の失敗を残して先へ進む`() = withDatabase { db ->
-        val conversations = db.sayConversations(2)
-        val llm = FakeLlm { _, request ->
-            when {
-                !request.isTodoRequest -> "- 要約"
-                "話題0" in request.user -> "壊れた出力 {"
-                else -> todoJson
-            }
-        }
-
-        val result = db.job(llm).run()
-
-        assertEquals(OrganizeOutcome.COMPLETED, result.outcome)
-        val (broken, fine) = db.memos.listMemos()
-        assertEquals(TodoExtraction.INCOMPLETE, broken.todoExtraction)
-        assertEquals("- 要約", broken.summary)
-        assertTrue(db.memos.listTodos(broken.id).isEmpty())
-        assertEquals(conversations[0], db.memos.listUtteranceIds(broken.id))
-        assertEquals(TodoExtraction.COMPLETE, fine.todoExtraction)
-        assertEquals(1, db.memos.listTodos(fine.id).size)
-    }
-
-    @Test
-    fun `要約が空でも、根拠の発話と ToDo は残す`() = withDatabase { db ->
-        db.say(evening, "あさって十時に歯医者")
-        val llm = FakeLlm.organizing(summary = "  ", todos = todoJson)
+        val llm = FakeLlm.organizing(summary = "  ")
 
         db.job(llm).run()
 
         val memo = db.memos.listMemos().single()
         assertNull(memo.title)
         assertNull(memo.summary)
-        assertEquals(1, db.memos.listTodos(memo.id).size)
         assertEquals(1, db.memos.listUtteranceIds(memo.id).size)
-        assertEquals(4, llm.received.size)
-    }
-
-    @Test
-    fun `ToDo のタイトルは内容から別に作り、使えない出力なら内容で代わりにする`() = withDatabase { db ->
-        db.say(evening, "予定をいくつか片付ける")
-        val long = "あ".repeat(40)
-        val todos = """
-            {"items": [
-              {"task": "来週の会議の資料を部長に送る", "kind": "todo", "due": null},
-              {"task": "日付だけの出力", "kind": "todo", "due": null},
-              {"task": "$long", "kind": "todo", "due": null}
-            ]}
-        """.trimIndent()
-        val llm = FakeLlm.organizing(todos = todos) { task ->
-            when (task) {
-                "来週の会議の資料を部長に送る" -> "タイトル: 「資料を送る」"
-                "日付だけの出力" -> "2026年11月1日"
-                else -> ""
-            }
-        }
-
-        db.job(llm).run()
-
-        val read = db.memos.listTodos(db.memos.listMemos().single().id).associateBy { it.task }
-        assertEquals("資料を送る", read.getValue("来週の会議の資料を部長に送る").title)
-        assertEquals("日付だけの出力", read.getValue("日付だけの出力").title)
-        assertEquals("あ".repeat(30), read.getValue(long).title)
-    }
-
-    @Test
-    fun `打ち切られた出力は読めた分を残し、不完全として記録する`() = withDatabase { db ->
-        db.say(evening, "明日までに二つ片付ける")
-        val truncated = """{"items": [{"task": "一つ目", "kind": "todo", "due": null}, {"task": "二つ"""
-        val llm = FakeLlm.organizing(todos = truncated)
-
-        db.job(llm).run()
-
-        val memo = db.memos.listMemos().single()
-        assertEquals(TodoExtraction.INCOMPLETE, memo.todoExtraction)
-        assertEquals(listOf("一つ目"), db.memos.listTodos(memo.id).map { it.task })
-    }
-
-    @Test
-    fun `確度の低い期限は候補として記録し、確かな期限と区別する`() = withDatabase { db ->
-        db.say(evening, "あさって歯医者、来年の春に車検、請求書も送る")
-        val todos = """
-            {"items": [
-              {"task": "確かな期限", "kind": "reminder", "due": "2026-11-04"},
-              {"task": "遠い期限", "kind": "todo", "due": "2027-04-01"},
-              {"task": "過去の期限", "kind": "todo", "due": "2026-10-30"},
-              {"task": "読めない期限", "kind": "todo", "due": "来週"},
-              {"task": "期限なし", "kind": "unknown", "due": null}
-            ]}
-        """.trimIndent()
-
-        db.job(FakeLlm.organizing(todos = todos)).run()
-
-        val read = db.memos.listTodos(db.memos.listMemos().single().id).associateBy { it.task }
-        assertEquals(TodoStatus.OPEN, read.getValue("確かな期限").status)
-        assertEquals(TodoStatus.CANDIDATE, read.getValue("遠い期限").status)
-        assertEquals(CalendarDate(2027, 4, 1), read.getValue("遠い期限").dueDate)
-        assertEquals(TodoStatus.CANDIDATE, read.getValue("過去の期限").status)
-        assertEquals(TodoStatus.CANDIDATE, read.getValue("読めない期限").status)
-        assertNull(read.getValue("読めない期限").dueDate)
-        assertEquals(TodoStatus.OPEN, read.getValue("期限なし").status)
-        assertEquals(TodoKind.TODO, read.getValue("期限なし").kind)
-    }
-
-    @Test
-    fun `同じ ToDo が重なっていれば1件にする`() = withDatabase { db ->
-        db.say(evening, "牛乳を買う")
-        val todos = """{"items": [{"task": "牛乳を買う"}, {"task": " 牛乳を 買う "}]}"""
-
-        val result = db.job(FakeLlm.organizing(todos = todos)).run()
-
-        assertEquals(1, result.todoCount)
+        // 要約と、指示を足した要約の再試行
+        assertEquals(2, llm.received.size)
     }
 
     @Test
@@ -537,7 +397,7 @@ class OrganizeJobIntegrationTest {
 
     private fun FakeLlm.Companion.failingOn(word: String, failure: () -> Exception) = FakeLlm { _, request ->
         if (word in request.user) throw failure()
-        if (request.isTodoRequest) """{"items": []}""" else "- 要約"
+        "- 要約"
     }
 
     private fun Harness.unreadableMemos() = column("SELECT id FROM memo WHERE summary IS NULL")
@@ -550,7 +410,7 @@ class OrganizeJobIntegrationTest {
         // 3 発話がそろっているときだけ長すぎる
         val llm = FakeLlm { _, request ->
             if ("前半" in request.user && "続き" in request.user) throw LlmInputTooLongException()
-            if (request.isTodoRequest) """{"items": []}""" else "- 要約"
+            "- 要約"
         }
 
         val result = db.job(llm).run()
@@ -574,7 +434,6 @@ class OrganizeJobIntegrationTest {
         assertEquals(1, result.unreadableCount)
         val memo = db.memos.listMemos().first()
         assertNull(memo.summary)
-        assertEquals(TodoExtraction.INCOMPLETE, memo.todoExtraction)
         assertEquals(listOf(tooLong), db.memos.listUtteranceIds(memo.id))
         assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
     }
@@ -714,26 +573,11 @@ class OrganizeJobIntegrationTest {
             harness.job(llm).run()
 
             val expected = "[18:00] 話者1: 請求書、明日までに送ってくれる?\n[18:01] 自分: はい、送ります。\n[18:02] うん"
-            assertEquals(4, llm.received.size)
+            assertEquals(3, llm.received.size)
             val (topics, others) = llm.received.filterNot { it.isTitleRequest }.partition { it.isTopicRequest }
             val numbered = "1 [18:00] 話者1: 請求書、明日までに送ってくれる?\n2 [18:01] 自分: はい、送ります。\n3 [18:02] うん"
             assertTrue(topics.single().user.endsWith(numbered), topics.single().user)
             others.forEach { assertTrue(it.user.endsWith(expected), it.user) }
-        }
-    }
-
-    @Test
-    fun `話者の名前は期限の手がかりにしない`() = runTest {
-        openTestDriver(dir.resolve("names.db")).use { driver ->
-            val harness = Harness(driver)
-            val other = harness.speakers.createProvisionalSpeaker(SpeakerEmbedding(floatArrayOf(0f, 1f), "m"), evening)
-            harness.speakers.setManualName(other.id, "明日香")
-            harness.utterances.insert(NewUtterance(evening, evening + 1_000, "歯医者に行くよ", null, evening, other.id, 0.8))
-
-            harness.job(FakeLlm.organizing(todos = todoJson)).run()
-
-            val memo = harness.memos.listMemos().single()
-            assertEquals(TodoStatus.CANDIDATE, harness.memos.listTodos(memo.id).single().status)
         }
     }
 

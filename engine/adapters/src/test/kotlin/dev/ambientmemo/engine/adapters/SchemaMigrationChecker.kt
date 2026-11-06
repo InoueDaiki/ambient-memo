@@ -18,7 +18,7 @@ internal typealias Row = Map<String, Any?>
  * - できた構造が、新規に作った DB と同じ
  * - 移行前の行と列の値がすべて残っている
  *
- * 列を意図して消す移行を足すときは、残す列の扱いをこの確認に足す。
+ * 意図して消したテーブルと列は [DROPPED_TABLES] と [DROPPED_COLUMNS] に書き、比べない。
  */
 internal class SchemaMigrationChecker(
     private val schema: SqlSchema<QueryResult.Value<Unit>>,
@@ -38,9 +38,11 @@ internal class SchemaMigrationChecker(
             schema.migrate(driver, fromVersion, schema.version).value
 
             assertEquals(freshStructure(), structure(driver), "版 $fromVersion から移行した構造が新規の DB と違います")
-            before.forEach { (table, rows) ->
-                val after = readRows(driver, table).map { row -> row.filterKeys { it in rows.first().keys } }
-                assertEquals(rows, after, "版 $fromVersion から移行すると $table の行が変わります")
+            before.filterKeys { it !in DROPPED_TABLES }.forEach { (table, rows) ->
+                val dropped = DROPPED_COLUMNS[table].orEmpty()
+                val kept = rows.map { row -> row.filterKeys { it !in dropped } }
+                val after = readRows(driver, table).map { row -> row.filterKeys { it in kept.first().keys } }
+                assertEquals(kept, after, "版 $fromVersion から移行すると $table の行が変わります")
             }
         }
     }
@@ -55,6 +57,10 @@ internal class SchemaMigrationChecker(
     }
 }
 
+/** 版 7 で ToDo をなくした。 */
+private val DROPPED_TABLES = setOf("todo")
+private val DROPPED_COLUMNS = mapOf("memo" to setOf("todo_extraction"))
+
 internal fun seedStatements(sql: String): List<String> = sql
     .lineSequence()
     .filterNot { it.trimStart().startsWith("--") }
@@ -63,7 +69,7 @@ internal fun seedStatements(sql: String): List<String> = sql
     .map { it.trim() }
     .filter { it.isNotEmpty() }
 
-/** テーブルとインデックスの定義。空白の違いでは差にしない。 */
+/** テーブルとインデックスの定義。空白と、名前を変えたテーブルに付く引用符の違いでは差にしない。 */
 internal fun structure(driver: SqlDriver): Map<String, String> =
     query(
         driver,
@@ -72,7 +78,7 @@ internal fun structure(driver: SqlDriver): Map<String, String> =
     ).associate { row -> row["object"] as String to normalize(row["sql"] as String) }
 
 private fun normalize(sql: String) =
-    sql.replace(Regex("\\s+"), " ").replace("( ", "(").replace(" )", ")").replace(" ,", ",")
+    sql.replace("\"", "").replace(Regex("\\s+"), " ").replace("( ", "(").replace(" )", ")").replace(" ,", ",")
 
 internal fun tables(driver: SqlDriver): List<String> =
     query(driver, "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name")
