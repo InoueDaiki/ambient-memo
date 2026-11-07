@@ -57,11 +57,12 @@ func utterance(_ json: SpecObject) throws -> Utterance {
 func organizeConfig(_ json: SpecObject?) throws -> OrganizeConfig {
     let defaults = OrganizeConfig.default
     let values = json ?? [:]
-    try values.requireKeys(["minSilenceGapMillis", "maxChunkChars", "maxRetries", "maxChunkAttempts"], "config")
+    try values.requireKeys(["minSilenceGapMillis", "maxChunkChars", "maxRetries", "maxChunkAttempts", "minTopicLines"], "config")
     return try OrganizeConfig(
         minSilenceGapMillis: try values.longOr("minSilenceGapMillis", defaults.minSilenceGapMillis),
         maxChunkChars: try values.intOr("maxChunkChars", defaults.maxChunkChars),
         maxRetries: try values.intOr("maxRetries", defaults.maxRetries),
-        maxChunkAttempts: try values.intOr("maxChunkAttempts", defaults.maxChunkAttempts)
+        maxChunkAttempts: try values.intOr("maxChunkAttempts", defaults.maxChunkAttempts),
+        minTopicLines: try values.intOr("minTopicLines", defaults.minTopicLines)
     )
 }

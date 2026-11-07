@@ -10,21 +10,26 @@ public struct OrganizeConfig: Sendable, Hashable {
     public let maxRetries: Int
     /// 同じまとまりの処理がこの回数失敗したら、そのまとまりを飛ばして先を試す。
     public let maxChunkAttempts: Int
+    /// LLM が分けた話題がこの行数より短ければ、前の話題に戻す。メモが細切れにならないようにする。1 なら戻さない。
+    public let minTopicLines: Int
 
     public init(
         minSilenceGapMillis: Int64 = DEFAULT_MIN_SILENCE_GAP_MILLIS,
         maxChunkChars: Int = DEFAULT_MAX_CHUNK_CHARS,
         maxRetries: Int = DEFAULT_MAX_RETRIES,
-        maxChunkAttempts: Int = DEFAULT_MAX_CHUNK_ATTEMPTS
+        maxChunkAttempts: Int = DEFAULT_MAX_CHUNK_ATTEMPTS,
+        minTopicLines: Int = DEFAULT_MIN_TOPIC_LINES
     ) throws {
         try require(minSilenceGapMillis > 0, "minSilenceGapMillis は正の値です")
         try require(maxChunkChars > 0, "maxChunkChars は正の値です")
         try require(maxRetries >= 0, "maxRetries は 0 以上です")
         try require(maxChunkAttempts > 0, "maxChunkAttempts は正の値です")
+        try require(minTopicLines > 0, "minTopicLines は正の値です")
         self.minSilenceGapMillis = minSilenceGapMillis
         self.maxChunkChars = maxChunkChars
         self.maxRetries = maxRetries
         self.maxChunkAttempts = maxChunkAttempts
+        self.minTopicLines = minTopicLines
     }
 
     /// Kotlin の `OrganizeConfig()`。
@@ -36,6 +41,9 @@ public struct OrganizeConfig: Sendable, Hashable {
     @usableFromInline static let DEFAULT_MAX_CHUNK_CHARS = 1_800
     @usableFromInline static let DEFAULT_MAX_RETRIES = 1
     @usableFromInline static let DEFAULT_MAX_CHUNK_ATTEMPTS = 3
+
+    // docs/検証-話題の切れ目.md で、5 行にすると混ざったメモが大きく増えた
+    @usableFromInline static let DEFAULT_MIN_TOPIC_LINES = 4
 }
 
 public struct LlmRequest: Sendable, Hashable {

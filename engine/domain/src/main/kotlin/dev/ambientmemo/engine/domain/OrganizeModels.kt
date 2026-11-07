@@ -10,12 +10,15 @@ data class OrganizeConfig(
     val maxRetries: Int = DEFAULT_MAX_RETRIES,
     /** 同じまとまりの処理がこの回数失敗したら、そのまとまりを飛ばして先を試す。 */
     val maxChunkAttempts: Int = DEFAULT_MAX_CHUNK_ATTEMPTS,
+    /** LLM が分けた話題がこの行数より短ければ、前の話題に戻す。メモが細切れにならないようにする。1 なら戻さない。 */
+    val minTopicLines: Int = DEFAULT_MIN_TOPIC_LINES,
 ) {
     init {
         require(minSilenceGapMillis > 0) { "minSilenceGapMillis は正の値です" }
         require(maxChunkChars > 0) { "maxChunkChars は正の値です" }
         require(maxRetries >= 0) { "maxRetries は 0 以上です" }
         require(maxChunkAttempts > 0) { "maxChunkAttempts は正の値です" }
+        require(minTopicLines > 0) { "minTopicLines は正の値です" }
     }
 
     private companion object {
@@ -25,6 +28,9 @@ data class OrganizeConfig(
         const val DEFAULT_MAX_CHUNK_CHARS = 1_800
         const val DEFAULT_MAX_RETRIES = 1
         const val DEFAULT_MAX_CHUNK_ATTEMPTS = 3
+
+        // docs/検証-話題の切れ目.md で、5 行にすると混ざったメモが大きく増えた
+        const val DEFAULT_MIN_TOPIC_LINES = 4
     }
 }
 
