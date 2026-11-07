@@ -1,3 +1,5 @@
+export { Avatar } from "./Avatar.tsx";
+export type { AvatarProps } from "./Avatar.tsx";
 export { Button } from "./Button.tsx";
 export type { ButtonProps, ButtonVariant } from "./Button.tsx";
 export { CheckItem } from "./CheckItem.tsx";
