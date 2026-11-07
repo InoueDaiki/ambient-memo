@@ -29,9 +29,16 @@ async function openAsk(client: FakeEngineClient) {
   await screen.findByRole("header", { name: "質問" });
 }
 
+// 質問すると詳細が開く
 async function askQuestion(question: string) {
   await userEvent.type(screen.getByLabelText("メモへの質問"), question);
   await userEvent.press(screen.getByRole("button", { name: "質問する" }));
+  await screen.findByRole("header", { name: question });
+}
+
+async function backToList() {
+  await userEvent.press(screen.getByRole("button", { name: "戻る" }));
+  await screen.findByRole("header", { name: "質問" });
 }
 
 const sendButton = () => screen.getByRole("button", { name: "質問する" });
@@ -47,7 +54,7 @@ describe("メモへの質問", () => {
     expect(sendButton()).toBeDisabled();
   });
 
-  it("答えと根拠のメモを出し、入力欄を空にする", async () => {
+  it("質問すると詳細を開き、答えと根拠のメモを出す", async () => {
     await openAsk(new FakeEngineClient({ memos }));
 
     await askQuestion("読書会");
@@ -57,10 +64,23 @@ describe("メモへの質問", () => {
     const sources = screen.getAllByText(/^読書会の(日程|本)$/);
     expect(sources.map((node) => node.props.children)).toEqual(["読書会の本", "読書会の日程"]);
     expect(screen.queryByText("庭の手入れ")).toBeNull();
-    expect(screen.getByLabelText("メモへの質問").props.value).toBe("");
   });
 
-  it("根拠のメモを押すと詳細を開き、戻ると質問へ帰る。答えは残る", async () => {
+  it("戻ると一覧に質問と状態が並び、入力欄は空になる。押すと詳細を開き直す", async () => {
+    await openAsk(new FakeEngineClient({ memos }));
+    await askQuestion("読書会");
+    await screen.findByText(FAKE_ANSWER);
+
+    await backToList();
+
+    expect(screen.getByLabelText("メモへの質問").props.value).toBe("");
+    expect(screen.queryByText(FAKE_ANSWER)).toBeNull();
+    await userEvent.press(screen.getByRole("button", { name: /答えました.*読書会/ }));
+    await screen.findByRole("header", { name: "読書会" });
+    screen.getByText(FAKE_ANSWER);
+  });
+
+  it("根拠のメモを押すとメモの詳細を開き、戻ると質問の詳細へ帰る。答えは残る", async () => {
     await openAsk(new FakeEngineClient({ memos }));
     await askQuestion("課題");
 
@@ -69,8 +89,10 @@ describe("メモへの質問", () => {
     await screen.findByText("課題の本を読んでおく。");
     await userEvent.press(screen.getByRole("button", { name: "戻る" }));
     await waitFor(() => expect(screen.queryByText("課題の本を読んでおく。")).toBeNull());
-    screen.getByRole("tab", { name: "質問", selected: true });
+    screen.getByRole("header", { name: "課題" });
     screen.getByText(FAKE_ANSWER);
+    await backToList();
+    screen.getByRole("tab", { name: "質問", selected: true });
   });
 
   it("質問と答えは新しい順に並べる", async () => {
@@ -78,9 +100,12 @@ describe("メモへの質問", () => {
 
     await askQuestion("読書会");
     await screen.findByText(FAKE_ANSWER);
+    await backToList();
     await askQuestion("引っ越し");
     await screen.findByText(/関係するメモが見つかりませんでした/);
+    await backToList();
 
+    screen.getByRole("button", { name: /見つかりませんでした.*引っ越し/ });
     const asked = screen.getAllByText(/^(読書会|引っ越し)$/);
     expect(asked.map((node) => node.props.children)).toEqual(["引っ越し", "読書会"]);
   });
@@ -102,7 +127,6 @@ describe("メモへの質問", () => {
     await askQuestion("読書会");
 
     await screen.findByText("モデルを読み込んでいます");
-    expect(sendButton()).toBeDisabled();
     await act(async () => client.reportAskProgress("searching"));
     await screen.findByText("メモを探しています");
     await act(async () => client.reportAskProgress("answering"));
@@ -112,6 +136,23 @@ describe("メモへの質問", () => {
 
     await screen.findByText(FAKE_ANSWER);
     expect(screen.queryByRole("button", { name: "止める" })).toBeNull();
+  });
+
+  it("答えを待つ間に一覧へ戻ると、進み具合を出し、送れない。答えが届くと状態が変わる", async () => {
+    const client = new FakeEngineClient({ memos });
+    client.holdNextAsk();
+    await openAsk(client);
+    await askQuestion("読書会");
+    await act(async () => client.reportAskProgress("searching"));
+
+    await backToList();
+
+    screen.getByRole("button", { name: /メモを探しています.*読書会/ });
+    await userEvent.type(screen.getByLabelText("メモへの質問"), "庭");
+    expect(sendButton()).toBeDisabled();
+    await act(async () => client.finishAsk());
+    await screen.findByRole("button", { name: /答えました.*読書会/ });
+    expect(sendButton()).toBeEnabled();
   });
 
   it("止めると、止めたことを出して、また質問できる", async () => {
@@ -124,6 +165,8 @@ describe("メモへの質問", () => {
 
     await screen.findByText("質問を止めました。");
     expect(screen.queryByText("モデルを読み込んでいます")).toBeNull();
+    await backToList();
+    screen.getByRole("button", { name: /止めました.*読書会/ });
     await askQuestion("読書会");
     await screen.findByText(FAKE_ANSWER);
   });
