@@ -1,6 +1,7 @@
 import { spacing } from "@ambient-memo/design-tokens";
 import { Pressable, View } from "react-native";
 
+import { Avatar } from "./Avatar.tsx";
 import { Tag } from "./Tag.tsx";
 import { Text } from "./Text.tsx";
 import { useColors } from "./theme.ts";
@@ -16,19 +17,33 @@ export interface ListItemProps {
   tag?: string;
   // 済んだ項目など、本文を控えめに出す
   muted?: boolean;
+  // 行の頭に添える丸い印(話者など)
+  avatar?: string;
+  // 右に寄せる(自分の発話など)。印は右端に置く
+  alignEnd?: boolean;
   // 渡すと行全体がボタンになる
   onPress?: () => void;
 }
 
 // 読むための行。枠や線を持たず、余白で区切る
-export function ListItem({ text, label, meta, tag, muted = false, onPress }: ListItemProps) {
+export function ListItem({
+  text,
+  label,
+  meta,
+  tag,
+  muted = false,
+  avatar,
+  alignEnd = false,
+  onPress,
+}: ListItemProps) {
   const palette = useColors();
   const style = { paddingHorizontal: spacing.lg, paddingVertical: spacing.md - spacing.xs };
-  const content = (
-    <>
+  const body = (
+    // 右に寄せるときは、短い発話が右端に付くよう幅を文に合わせる。折り返す行は左揃えのまま読む
+    <View style={{ flexShrink: 1, alignItems: alignEnd ? "flex-end" : "stretch" }}>
       <View
         style={{
-          flexDirection: "row",
+          flexDirection: alignEnd ? "row-reverse" : "row",
           flexWrap: "wrap",
           alignItems: "center",
           gap: spacing.sm,
@@ -49,8 +64,23 @@ export function ListItem({ text, label, meta, tag, muted = false, onPress }: Lis
       <Text selectable={onPress === undefined} color={muted ? "fgMuted" : "fg"}>
         {text}
       </Text>
-    </>
+    </View>
   );
+  const content =
+    avatar === undefined && !alignEnd ? (
+      body
+    ) : (
+      <View
+        style={{
+          flexDirection: alignEnd ? "row-reverse" : "row",
+          alignItems: "flex-start",
+          gap: spacing.sm,
+        }}
+      >
+        {avatar !== undefined && <Avatar label={avatar} />}
+        {body}
+      </View>
+    );
 
   if (onPress === undefined) {
     return (

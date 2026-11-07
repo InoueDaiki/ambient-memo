@@ -26,7 +26,7 @@ import { useState } from "react";
 import { FlatList, View } from "react-native";
 
 import type { RootNavigation } from "../navigation/types.ts";
-import { formatDay, formatTime, speakerLabels } from "./format.ts";
+import { formatDay, formatTime, speakerAvatar, speakerLabel } from "./format.ts";
 import {
   ModelDownloadButton,
   ModelDownloadNotice,
@@ -95,8 +95,10 @@ function UtteranceRow({
       )}
       <ListItem
         text={item.text}
-        label={item.speakerName ?? speakerLabels[item.speaker]}
+        label={speakerLabel(item)}
         meta={formatTime(item.startedAt)}
+        avatar={speakerAvatar(item)}
+        alignEnd={item.speaker === "self"}
         onPress={onPress}
       />
     </View>
