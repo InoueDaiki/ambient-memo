@@ -8,6 +8,7 @@ import { useColorScheme } from "react-native";
 import { AskScreen } from "../memo/AskScreen.tsx";
 import { MemoDetailScreen } from "../memo/MemoDetailScreen.tsx";
 import { MemoListScreen } from "../memo/MemoListScreen.tsx";
+import { QuestionDetailScreen } from "../memo/QuestionDetailScreen.tsx";
 import { DiagnosticsScreen } from "../transcript/DiagnosticsScreen.tsx";
 import { SelfEnrollmentScreen } from "../transcript/SelfEnrollmentScreen.tsx";
 import { SpeakersScreen } from "../transcript/SpeakersScreen.tsx";
@@ -42,7 +43,7 @@ function Tabs() {
   );
 }
 
-// 下のタブで3つの画面を切り替え、メモの詳細はその上に重ねる。
+// 下のタブで3つの画面を切り替え、メモや質問の詳細はその上に重ねる。
 // 戻る操作で、開いた元の画面へ帰るため
 export function AppNavigator() {
   const palette = useColors();
@@ -57,6 +58,7 @@ export function AppNavigator() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Tabs" component={Tabs} />
         <Stack.Screen name="MemoDetail" component={MemoDetailScreen} />
+        <Stack.Screen name="QuestionDetail" component={QuestionDetailScreen} />
         <Stack.Screen name="Speakers" component={SpeakersScreen} />
         <Stack.Screen name="SelfEnrollment" component={SelfEnrollmentScreen} />
         <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />

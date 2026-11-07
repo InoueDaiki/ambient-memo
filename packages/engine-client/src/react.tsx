@@ -759,18 +759,18 @@ export interface AskedQuestion {
 }
 
 export interface UseAskMemosResult {
-  // この画面にいる間に聞いた質問。新しい順。保存しない
+  // フックが生きている間に聞いた質問。新しい順。保存しない
   questions: AskedQuestion[];
   // 答えを待っている間は true
   isAsking: boolean;
   // 動いている質問の段階。最初の ask-progress が届くまでは undefined
   phase: AskPhase | undefined;
-  // 前後の空白を除いて空のときと、答えを待っている間は何もしない
-  ask: (question: string) => void;
+  // 聞いた質問の id を返す。前後の空白を除いて空のときと、答えを待っている間は何もせず undefined
+  ask: (question: string) => number | undefined;
   cancel: () => void;
 }
 
-// メモへの質問。答えを待っている間に画面を離れたら止める
+// メモへの質問。答えを待っている間にフックが外れたら止める
 export function useAskMemos(): UseAskMemosResult {
   const client = useMemoClient();
   const [questions, setQuestions] = useState<AskedQuestion[]>([]);
@@ -796,7 +796,7 @@ export function useAskMemos(): UseAskMemosResult {
   const ask = useCallback(
     (question: string) => {
       const trimmed = question.trim();
-      if (trimmed === "" || askingId.current !== undefined) return;
+      if (trimmed === "" || askingId.current !== undefined) return undefined;
       const id = ++nextId.current;
       askingId.current = id;
       isCancelling.current = false;
@@ -822,6 +822,7 @@ export function useAskMemos(): UseAskMemosResult {
         .catch(() =>
           settle({ answer: undefined, failure: isCancelling.current ? "cancelled" : "unknown" }),
         );
+      return id;
     },
     [client],
   );
