@@ -15,7 +15,7 @@ import type { ReactNode } from "react";
 import { ScrollView, View } from "react-native";
 
 import type { RootNavigation, RootRoute } from "../navigation/types.ts";
-import { formatTime, speakerLabels } from "../transcript/format.ts";
+import { formatTime, speakerAvatar, speakerLabel } from "../transcript/format.ts";
 import { formatMemoPeriod, UNTITLED_MEMO } from "./format.ts";
 import { MemoModeBanner } from "./MemoModeBanner.tsx";
 
@@ -54,8 +54,10 @@ function MemoBody({ memo }: { memo: MemoDetail }) {
           <ListItem
             key={utterance.id}
             text={utterance.text}
-            label={utterance.speakerName ?? speakerLabels[utterance.speaker]}
+            label={speakerLabel(utterance)}
             meta={formatTime(utterance.startedAt)}
+            avatar={speakerAvatar(utterance)}
+            alignEnd={utterance.speaker === "self"}
           />
         ))}
       </Disclosure>
