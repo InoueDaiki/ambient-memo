@@ -4,6 +4,7 @@ import type { NativeStackNavigationProp } from "@react-navigation/native-stack";
 export type RootStackParamList = {
   Tabs: undefined;
   MemoDetail: { memoId: string };
+  QuestionDetail: { questionId: number };
   Speakers: undefined;
   SelfEnrollment: undefined;
   Diagnostics: undefined;

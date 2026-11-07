@@ -4,6 +4,7 @@ import { useState } from "react";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { createAppEngineClient, createAppMemoClient } from "./engine.ts";
+import { AskProvider } from "./memo/AskContext.tsx";
 import { AppNavigator } from "./navigation/AppNavigator.tsx";
 
 // テストは client と memoClient に Fake を渡す
@@ -20,7 +21,9 @@ export function App({
     <SafeAreaProvider>
       <EngineClientProvider client={engineClient}>
         <MemoClientProvider client={appMemoClient}>
-          <AppNavigator />
+          <AskProvider>
+            <AppNavigator />
+          </AskProvider>
         </MemoClientProvider>
       </EngineClientProvider>
     </SafeAreaProvider>
