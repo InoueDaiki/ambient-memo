@@ -39,8 +39,15 @@ export function ListItem({
   const palette = useColors();
   const style = { paddingHorizontal: spacing.lg, paddingVertical: spacing.md - spacing.xs };
   const body = (
-    // 右に寄せるときは、短い発話が右端に付くよう幅を文に合わせる。折り返す行は左揃えのまま読む
-    <View style={{ flexShrink: 1, alignItems: alignEnd ? "flex-end" : "stretch" }}>
+    // 右に寄せるときは、短い発話が右端に付くよう幅を文に合わせる。折り返す行は左揃えのまま読み、
+    // 左を空けて長い発話もほかの行と見分けられるようにする
+    <View
+      style={{
+        flexShrink: 1,
+        alignItems: alignEnd ? "flex-end" : "stretch",
+        marginLeft: alignEnd ? spacing.xxl : 0,
+      }}
+    >
       <View
         style={{
           flexDirection: alignEnd ? "row-reverse" : "row",
