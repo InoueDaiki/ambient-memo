@@ -214,5 +214,77 @@
     "pk": 0.153,
     "pkWindow": 4,
     "meanWallSeconds": 3.31
+  },
+  "gemma-e4b.gpu.v6/concat": {
+    "examples": 120,
+    "goldBoundaries": 180,
+    "predBoundaries": 196,
+    "unreadable": 0.0,
+    "exact": {
+      "precision": 0.526,
+      "recall": 0.572,
+      "f1": 0.548
+    },
+    "within1": {
+      "precision": 0.668,
+      "recall": 0.728,
+      "f1": 0.697
+    },
+    "mixedMemos": 0.228,
+    "memos": 316,
+    "splitTopics": 0.257,
+    "singleTopicSplit": 0.12,
+    "exactExamples": 0.375,
+    "pk": 0.209,
+    "pkWindow": 4,
+    "meanWallSeconds": 2.33
+  },
+  "gemma-e4b.gpu.v6/natural": {
+    "examples": 120,
+    "goldBoundaries": 134,
+    "predBoundaries": 128,
+    "unreadable": 0.0,
+    "exact": {
+      "precision": 0.875,
+      "recall": 0.836,
+      "f1": 0.855
+    },
+    "within1": {
+      "precision": 0.875,
+      "recall": 0.836,
+      "f1": 0.855
+    },
+    "mixedMemos": 0.089,
+    "memos": 248,
+    "splitTopics": 0.063,
+    "singleTopicSplit": 0.033,
+    "exactExamples": 0.717,
+    "pk": 0.097,
+    "pkWindow": 4,
+    "meanWallSeconds": 2.21
+  },
+  "gemma-e4b.gpu.v6/all": {
+    "examples": 240,
+    "goldBoundaries": 314,
+    "predBoundaries": 324,
+    "unreadable": 0.0,
+    "exact": {
+      "precision": 0.664,
+      "recall": 0.685,
+      "f1": 0.674
+    },
+    "within1": {
+      "precision": 0.75,
+      "recall": 0.774,
+      "f1": 0.762
+    },
+    "mixedMemos": 0.167,
+    "memos": 564,
+    "splitTopics": 0.168,
+    "singleTopicSplit": 0.073,
+    "exactExamples": 0.546,
+    "pk": 0.161,
+    "pkWindow": 4,
+    "meanWallSeconds": 2.27
   }
 }

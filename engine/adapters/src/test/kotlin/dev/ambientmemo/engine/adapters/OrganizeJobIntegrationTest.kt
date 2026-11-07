@@ -181,12 +181,13 @@ class OrganizeJobIntegrationTest {
 
     @Test
     fun `1 つのまとまりの中の話題を別のメモにする`() = withDatabase { db ->
-        val ids = (0 until 4).map { db.say(evening + it * minute, "発話$it") }
-        val llm = FakeLlm.organizing(topics = "1, 3")
+        // 既定の minTopicLines より短い話題は前に戻るので、4 行ずつにする
+        val ids = (0 until 8).map { db.say(evening + it * minute, "発話$it") }
+        val llm = FakeLlm.organizing(topics = "1, 5")
 
         assertEquals(2, db.job(llm).run().memoCount)
 
-        assertEquals(listOf(ids.take(2), ids.drop(2)), db.memos.listMemos().map { db.memos.listUtteranceIds(it.id) })
+        assertEquals(listOf(ids.take(4), ids.drop(4)), db.memos.listMemos().map { db.memos.listUtteranceIds(it.id) })
         assertTrue(db.memos.listUnorganizedUtterances().isEmpty())
     }
 

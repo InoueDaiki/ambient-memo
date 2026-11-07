@@ -91,7 +91,7 @@ class OrganizeJob(
     }
 
     /**
-     * 話題の切れ目を LLM に頼む。読めないか失敗したら、まとまり全体を1つの話題にする。
+     * 話題の切れ目を LLM に頼み、短すぎる話題は前の話題に戻す。読めないか失敗したら、まとまり全体を1つの話題にする。
      * 実行基盤の失敗は、続く要約の依頼でも起きて、そこで数える。
      */
     // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
@@ -105,6 +105,7 @@ class OrganizeJob(
         attempts.set(key, attempted + 1)
         val starts = try {
             parseTopicStarts(llm.generate(OrganizePrompts.topics(lines)), lines.size)
+                ?.let { mergeShortTopics(it, lines.size, config.minTopicLines) }
         } catch (e: Exception) {
             ensureNotCancelled(key, attempted)
             null

@@ -33,3 +33,17 @@ func parseTopicStarts(_ text: String, _ lineCount: Int) -> [Int]? {
     }
     return Array(Set(starts + [1])).sorted()
 }
+
+/**
+ * [minLines] 行より短い話題を、前の話題に戻す。最初の話題が短ければ、次の話題とつなぐ。
+ * [starts] は [parseTopicStarts] の結果で、1 を含み小さい順に並んでいること。
+ */
+func mergeShortTopics(_ starts: [Int], _ lineCount: Int, _ minLines: Int) -> [Int] {
+    var kept = [1]
+    for index in starts.indices.dropFirst() {
+        let end = index + 1 < starts.count ? starts[index + 1] : lineCount + 1
+        if end - starts[index] >= minLines { kept.append(starts[index]) }
+    }
+    if kept.count > 1 && kept[1] - 1 < minLines { kept.remove(at: 1) }
+    return kept
+}

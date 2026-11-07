@@ -15,3 +15,17 @@ internal fun parseTopicStarts(text: String, lineCount: Int): List<Int>? {
     val starts = NUMBER.findAll(line).mapNotNull { it.value.toIntOrNull() }.filter { it in 1..lineCount }
     return (starts + 1).distinct().sorted().toList()
 }
+
+/**
+ * [minLines] 行より短い話題を、前の話題に戻す。最初の話題が短ければ、次の話題とつなぐ。
+ * [starts] は [parseTopicStarts] の結果で、1 を含み小さい順に並んでいること。
+ */
+internal fun mergeShortTopics(starts: List<Int>, lineCount: Int, minLines: Int): List<Int> {
+    val kept = mutableListOf(1)
+    for ((index, start) in starts.withIndex().drop(1)) {
+        val end = starts.getOrElse(index + 1) { lineCount + 1 }
+        if (end - start >= minLines) kept += start
+    }
+    if (kept.size > 1 && kept[1] - 1 < minLines) kept.removeAt(1)
+    return kept
+}

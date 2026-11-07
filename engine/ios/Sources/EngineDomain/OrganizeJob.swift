@@ -111,7 +111,7 @@ public final class OrganizeJob: Sendable {
     }
 
     /**
-     * 話題の切れ目を LLM に頼む。読めないか失敗したら、まとまり全体を1つの話題にする。
+     * 話題の切れ目を LLM に頼み、短すぎる話題は前の話題に戻す。読めないか失敗したら、まとまり全体を1つの話題にする。
      * 実行基盤の失敗は、続く要約の依頼でも起きて、そこで数える。
      */
     // 実行基盤の失敗は型で絞れない。例外の中身は文字起こしを含みうるので、外へ渡さない
@@ -125,6 +125,7 @@ public final class OrganizeJob: Sendable {
         var starts: [Int]?
         do {
             starts = parseTopicStarts(try await llm.generate(OrganizePrompts.topics(lines)), lines.count)
+                .map { mergeShortTopics($0, lines.count, config.minTopicLines) }
         } catch {
             try ensureNotCancelled(key, attempted)
         }
