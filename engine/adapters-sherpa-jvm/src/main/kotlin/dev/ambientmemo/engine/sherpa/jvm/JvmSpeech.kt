@@ -12,6 +12,7 @@ import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor
 import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import dev.ambientmemo.engine.domain.Tuning
 import dev.ambientmemo.engine.sherpa.AsrModel
 import dev.ambientmemo.engine.sherpa.ModelFile
 import dev.ambientmemo.engine.sherpa.ModelStore
@@ -28,8 +29,13 @@ import dev.ambientmemo.engine.sherpa.SpeechModels
 
 private val nativeLibrary by lazy { LibraryUtils.load() }
 
-fun jvmVoiceActivityDetector(store: ModelStore, models: SpeechModels): SherpaVoiceActivityDetector =
-    SherpaVoiceActivityDetector(JvmVad(store.pathOf(models.vad.modelPackage, models.vad.model)))
+/** VAD のしきい値と区切りの無音は [tuning] から取る。 */
+fun jvmVoiceActivityDetector(
+    store: ModelStore,
+    models: SpeechModels,
+    tuning: Tuning = Tuning.DEFAULT,
+): SherpaVoiceActivityDetector =
+    SherpaVoiceActivityDetector(JvmVad(store.pathOf(models.vad.modelPackage, models.vad.model), tuning))
 
 fun jvmTranscriber(store: ModelStore, models: SpeechModels): SherpaTranscriber =
     SherpaTranscriber { JvmRecognizer(store, models.asr) }
@@ -37,7 +43,7 @@ fun jvmTranscriber(store: ModelStore, models: SpeechModels): SherpaTranscriber =
 fun jvmSpeakerEmbedder(store: ModelStore, model: SpeakerModel): SherpaSpeakerEmbedder =
     SherpaSpeakerEmbedder(model.version) { JvmSpeakerExtractor(store.pathOf(model.modelPackage, model.model)) }
 
-private class JvmVad(model: String) : NativeVad {
+private class JvmVad(model: String, tuning: Tuning) : NativeVad {
     private val vad: Vad
 
     init {
@@ -47,8 +53,8 @@ private class JvmVad(model: String) : NativeVad {
                 .setSileroVadModelConfig(
                     SileroVadModelConfig.builder()
                         .setModel(model)
-                        .setThreshold(SherpaSettings.VAD_THRESHOLD)
-                        .setMinSilenceDuration(SherpaSettings.VAD_MIN_SILENCE_SECONDS)
+                        .setThreshold(tuning.vadThreshold)
+                        .setMinSilenceDuration(tuning.vadMinSilenceSeconds)
                         .setMinSpeechDuration(SherpaSettings.VAD_MIN_SPEECH_SECONDS)
                         .setMaxSpeechDuration(SherpaSettings.VAD_MAX_SPEECH_SECONDS)
                         .setWindowSize(SherpaSettings.VAD_WINDOW_SAMPLES)

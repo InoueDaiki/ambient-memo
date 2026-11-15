@@ -7,6 +7,11 @@ import dev.ambientmemo.engine.domain.CaptureConfig
  */
 object SherpaSettings {
     const val SAMPLE_RATE_HZ = 16_000
+
+    /**
+     * VAD のしきい値の既定値。画面から変えられるので、使う値は `Tuning.vadThreshold` から取る。
+     * `TuningKey.VAD_THRESHOLD` の既定値と同じにする(`SherpaSettingsTest`)。
+     */
     const val VAD_THRESHOLD = 0.5f
 
     /** 発話の判定が出るまでに要る長さ。これより短い音は発話にしない。 */
@@ -17,6 +22,7 @@ object SherpaSettings {
      *
      * 区切りは domain の `minSilenceMillis` ではなく、ここで決める。短くして domain に任せると、
      * 発話の途中の小さな音が最短の発話の長さに届かず、無音扱いになって語が落ちた。
+     * 画面から変えられるので、使う値は `Tuning.vadMinSilenceSeconds` から取る。`TuningKey.VAD_MIN_SILENCE` の既定値と同じにする。
      */
     const val VAD_MIN_SILENCE_SECONDS = 0.8f
     const val VAD_MAX_SPEECH_SECONDS = 20f

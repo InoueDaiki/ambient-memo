@@ -32,12 +32,13 @@ public final class SherpaVoiceActivityDetector: VoiceActivityDetector, @unchecke
     private let lock = NSLock()
     private var vad: OpaquePointer?
 
-    public init(modelPath: String) throws {
+    /// しきい値と区切りの無音は [tuning] から取る。
+    public init(modelPath: String, tuning: Tuning = .DEFAULT) throws {
         let strings = CStrings()
         var config = SherpaOnnxVadModelConfig()
         config.silero_vad.model = strings.make(modelPath)
-        config.silero_vad.threshold = SherpaSettings.VAD_THRESHOLD
-        config.silero_vad.min_silence_duration = SherpaSettings.VAD_MIN_SILENCE_SECONDS
+        config.silero_vad.threshold = tuning.vadThreshold
+        config.silero_vad.min_silence_duration = tuning.vadMinSilenceSeconds
         config.silero_vad.min_speech_duration = SherpaSettings.VAD_MIN_SPEECH_SECONDS
         config.silero_vad.window_size = SherpaSettings.VAD_WINDOW_SAMPLES
         config.silero_vad.max_speech_duration = SherpaSettings.VAD_MAX_SPEECH_SECONDS

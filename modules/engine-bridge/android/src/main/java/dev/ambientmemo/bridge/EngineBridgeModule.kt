@@ -19,7 +19,9 @@ import dev.ambientmemo.engine.android.SelfEnrollmentStatus
 import dev.ambientmemo.engine.android.StartFailure
 import dev.ambientmemo.engine.android.TranscriptionMode
 import dev.ambientmemo.engine.android.parseSpeakerTarget
+import dev.ambientmemo.engine.android.parseTuning
 import dev.ambientmemo.engine.android.toWire
+import dev.ambientmemo.engine.domain.InvalidTuningException
 import dev.ambientmemo.engine.domain.ModelDownloadFailure
 import dev.ambientmemo.engine.domain.ModelDownloadPhase
 import dev.ambientmemo.engine.domain.ModelDownloadState
@@ -80,6 +82,12 @@ private class SpeakerResetBusyException : CodedException(
 private class DiagnosticsEmptyException : CodedException(
   code = "diagnostics-empty",
   message = "書き出す記録がありません",
+  cause = null,
+)
+
+private class TuningRejectedException(error: InvalidTuningException) : CodedException(
+  code = "tuning-${error.problem.toWire()}",
+  message = "調整の値を受け付けません",
   cause = null,
 )
 
@@ -265,6 +273,29 @@ class EngineBridgeModule : Module() {
 
     AsyncFunction("getSpeakerDiagnostics") Coroutine { ->
       engine.speakerDiagnostics().toWire()
+    }
+
+    AsyncFunction("getTuning") Coroutine { ->
+      engine.tuning().toWire()
+    }
+
+    // 聞き取り中なら始め直して、新しい値で聞く。整理の値は次の整理から使う
+    AsyncFunction("saveTuning") Coroutine { values: Map<String, Any?> ->
+      val tuning = try {
+        parseTuning(values)
+      } catch (e: InvalidTuningException) {
+        throw TuningRejectedException(e)
+      }
+      try {
+        engine.saveTuning(tuning)
+      } catch (e: EngineStartException) {
+        // 値は保存した。始め直せなかったことを、開始の失敗と同じ形で伝える
+        throw StartFailedException(e.failure)
+      } finally {
+        publish(engine.captureState.value)
+        sendEvent(EVENT_ENGINE, mapOf("type" to "tuning-changed"))
+      }
+      engine.tuning().toWire()
     }
 
     AsyncFunction("getDiagnosticsStatus") {

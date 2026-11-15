@@ -120,6 +120,15 @@ public final class EngineBridgeModule: Module {
       try await call { try await engine.speakerDiagnostics() }
     }
 
+    AsyncFunction("getTuning") { () -> WireObject in
+      engine.tuning()
+    }
+
+    // 聞き取り中なら始め直して、新しい値で聞く。整理の値は次の整理から使う
+    AsyncFunction("saveTuning") { (values: [String: Any]) async throws -> WireObject in
+      try await call { try await engine.saveTuning(values: values) }
+    }
+
     AsyncFunction("getDiagnosticsStatus") { () -> WireObject in
       engine.diagnosticsStatus()
     }

@@ -28,6 +28,11 @@ struct BridgeEngineError: Error {
   static let listening = BridgeEngineError(code: "listening", message: "LISTENING")
   static let notEnoughSpeech = BridgeEngineError(code: "not-enough-speech", message: "NOT_ENOUGH_SPEECH")
   static let cancelled = BridgeEngineError(code: "cancelled", message: "CANCELLED")
+
+  /// 調整の値を断ったとき。理由は Android の `TuningProblem.toWire` と同じ綴りにする
+  static func tuningRejected(_ problem: String) -> BridgeEngineError {
+    BridgeEngineError(code: "tuning-\(problem)", message: "調整の値を受け付けません")
+  }
 }
 
 /// モジュールが呼ぶエンジンの窓口。本物は NativeBridgeEngine.swift の NativeBridgeEngine。
@@ -59,6 +64,11 @@ protocol BridgeEngine: AnyObject {
   func resetSpeakers() async throws
   func renameSpeaker(speakerId: String, name: String) async throws
   func speakerDiagnostics() async throws -> WireObject
+
+  func tuning() -> WireObject
+  /// 受け付けなければ tuning- の code で投げる。聞き取りを始め直せなければ開始の失敗と同じ code で投げる。
+  /// 保存したら、成否にかかわらず tuning-changed を届けてから戻る
+  func saveTuning(values: [String: Any]) async throws -> WireObject
 
   func diagnosticsStatus() -> WireObject
   func startDiagnostics() throws -> WireObject

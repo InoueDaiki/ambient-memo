@@ -71,6 +71,7 @@ Android(Kotlin)と iOS(Swift)のエンジンに、同じ入力を渡して同じ
 | `speaker-identifier.json` | 話者の判定 `SpeakerIdentifier` |
 | `speaker-long-conversation.json` | 既定の設定での長い聞き取りの話者の増え方と育てた声 |
 | `speaker-turns.json` | 聞き取りを通した、区間の中の話者の交代と行の分割 |
+| `tuning.json` | 画面から変えられる調整の値 `Tuning` |
 | `utterance-chunk.json` | 整理のまとまりと文字起こしの行 `splitIntoChunks`、`toTranscriptLine` |
 | `utterance-segmenter.json` | 発話区間の切り出し `UtteranceSegmenter` |
 

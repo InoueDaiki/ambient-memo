@@ -17,6 +17,7 @@ import android.os.Process
 import android.os.RemoteException
 import android.util.Log
 import dev.ambientmemo.engine.adapters.FileOrganizeAttempts
+import dev.ambientmemo.engine.adapters.FileTuningStore
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
 import dev.ambientmemo.engine.adapters.openAndroidDatabase
@@ -321,6 +322,8 @@ class OrganizeService : Service() {
         llm = llm,
         clock = SystemClock,
         timeZone = TimeZone.getDefault(),
+        // 画面の調整はメインのプロセスが書く。整理を始めるたびに読み直す
+        config = FileTuningStore(File(filesDir, TUNING_FILE)).load().organizeConfig(),
         attempts = FileOrganizeAttempts(File(filesDir, ATTEMPTS_FILE)),
     )
 

@@ -115,6 +115,7 @@ enum SpecAreas {
         "speaker-identifier": speakerWorld,
         "speaker-long-conversation": speakerWorld,
         "speaker-turns": capturePipeline,
+        "tuning": tuning,
         "utterance-chunk": utteranceChunk,
         "utterance-segmenter": utteranceSegmenter,
     ]

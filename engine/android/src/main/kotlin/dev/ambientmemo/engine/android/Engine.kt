@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
 import android.util.Log
+import dev.ambientmemo.engine.adapters.FileTuningStore
 import dev.ambientmemo.engine.adapters.SqliteCaptureGapRepository
 import dev.ambientmemo.engine.adapters.SqliteMemoRepository
 import dev.ambientmemo.engine.adapters.SqliteSpeakerRepository
@@ -32,6 +33,7 @@ import dev.ambientmemo.engine.domain.SpeakerDiagnosticsReader
 import dev.ambientmemo.engine.domain.SpeakerIdentifier
 import dev.ambientmemo.engine.domain.SpeakerTarget
 import dev.ambientmemo.engine.domain.SystemClock
+import dev.ambientmemo.engine.domain.Tuning
 import dev.ambientmemo.engine.domain.Utterance
 import dev.ambientmemo.engine.sherpa.ModelCatalog
 import dev.ambientmemo.engine.sherpa.ModelStore
@@ -64,6 +66,9 @@ import java.util.concurrent.CopyOnWriteArraySet
 private const val TAG = "AmbientMemoEngine"
 private const val START_TIMEOUT_MILLIS = 5_000L
 private const val MODELS_DIRECTORY = "models"
+
+/** 調整の値のファイル。`:organize` のプロセスも読む。 */
+internal const val TUNING_FILE = "tuning.txt"
 private const val ENROLLMENT_PROGRESS_BUFFER = 8
 private const val STAT_RETENTION_MILLIS = 30L * 24 * 60 * 60 * 1_000
 private const val DIAGNOSTICS_SAMPLE_MILLIS = 5L * 60 * 1_000
@@ -103,9 +108,7 @@ class Engine private constructor(context: Context) {
 
     /** 聞き取りの音の大きさの分布。記録の間だけ、端末の状態と一緒に残す。 */
     private val audioLevels = AudioLevelCounter()
-    private val speakerCorrections by lazy {
-        SpeakerCorrections(speakerRepository, utteranceRepository, recentVoices, speakerModel.version, SystemClock)
-    }
+    private val tuningStore = FileTuningStore(File(this.context.filesDir, TUNING_FILE))
     private val memoListeners = CopyOnWriteArraySet<() -> Unit>()
     private val diagnostics = DiagnosticsJournal(this.context.filesDir, DiagnosticProcess.MAIN, SystemClock)
     private var diagnosticsSampler: Job? = null
@@ -119,7 +122,14 @@ class Engine private constructor(context: Context) {
 
     /** JS が見るメモと質問。 */
     val memoBridge by lazy {
-        MemoBridge(memoRepository, ::speakers, SystemClock, organizeMonitor, RemoteAsk(this.context))
+        MemoBridge(
+            memoRepository,
+            ::speakers,
+            SystemClock,
+            organizeMonitor,
+            RemoteAsk(this.context),
+            organizeConfig = { tuning().organizeConfig() },
+        )
     }
 
     /** 手動の整理の入口と、`:organize` の見守り。LLM はこのプロセスに持たない。 */
@@ -258,14 +268,17 @@ class Engine private constructor(context: Context) {
     private suspend fun capture(audioSource: AudioSource) {
         ensureDiagnosticsSampler()
         val canIdentifySpeakers = withContext(Dispatchers.IO) { modelStore.verify(speakerModel) }
+        // 聞き取りの間は同じ値を使う。変えると聞き取りを始め直す(saveTuning)
+        val tuning = tuning()
         consolidateSpeakers()
-        androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
+        androidVoiceActivityDetector(modelStore, models, tuning).use { voiceActivityDetector ->
             androidTranscriber(modelStore, models).use { transcriber ->
                 androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
                     CapturePipeline(
                         audioSource = audioSource,
                         voiceActivityDetector = QuietGatedVoiceActivityDetector(
                             voiceActivityDetector,
+                            quietDbfs = tuning.quietGateDbfs,
                             levels = audioLevels,
                         ),
                         transcriber = transcriber,
@@ -276,7 +289,13 @@ class Engine private constructor(context: Context) {
                         processingContext = Dispatchers.Default,
                         transcriptionFilter = NoiseTextFilter(),
                         speakerIdentifier = if (canIdentifySpeakers) {
-                            SpeakerIdentifier(embedder, speakerRepository, SystemClock, decisionLog = speakerRepository)
+                            SpeakerIdentifier(
+                                embedder,
+                                speakerRepository,
+                                SystemClock,
+                                config = tuning.speakerConfig(),
+                                decisionLog = speakerRepository,
+                            )
                         } else {
                             null
                         },
@@ -296,9 +315,10 @@ class Engine private constructor(context: Context) {
     @Suppress("TooGenericExceptionCaught") // まとめ直しの失敗で文字起こしを止めない
     suspend fun consolidateSpeakers() {
         try {
+            val config = tuning().speakerConfig()
             val merged = speakerLock.withLock {
                 speakerRepository.prune(SystemClock.nowMillis() - STAT_RETENTION_MILLIS)
-                SpeakerConsolidation(speakerRepository, speakerModel.version, SystemClock).run()
+                SpeakerConsolidation(speakerRepository, speakerModel.version, SystemClock, config).run()
             }
             if (merged > 0) notifySpeakersChanged()
         } catch (e: Exception) {
@@ -319,11 +339,11 @@ class Engine private constructor(context: Context) {
 
     /** 発話の話者を手で直す。発話や話者がなければ false を返す。 */
     suspend fun reassignUtterance(utteranceId: Long, target: SpeakerTarget): Boolean =
-        speakerLock.withLock { speakerCorrections.reassign(utteranceId, target) }
+        speakerCorrections().let { corrections -> speakerLock.withLock { corrections.reassign(utteranceId, target) } }
             .also { if (it) notifySpeakersChanged() }
 
     suspend fun mergeSpeakers(fromId: Long, intoId: Long): Boolean =
-        speakerLock.withLock { speakerCorrections.merge(fromId, intoId) }
+        speakerCorrections().let { corrections -> speakerLock.withLock { corrections.merge(fromId, intoId) } }
             .also { if (it) notifySpeakersChanged() }
 
     /** 自分の声も消すので、登録し直すまで「自分」の判定はしない。聞き取りや登録の途中は false を返す。 */
@@ -339,12 +359,44 @@ class Engine private constructor(context: Context) {
     }
 
     suspend fun renameSpeaker(speakerId: Long, name: String): Boolean =
-        speakerLock.withLock { speakerCorrections.rename(speakerId, name) }
+        speakerCorrections().let { corrections -> speakerLock.withLock { corrections.rename(speakerId, name) } }
             .also { if (it) notifySpeakersChanged() }
 
     /** 端末の中で話者の判定を確かめる値。音声も特徴量も含まない。 */
-    suspend fun speakerDiagnostics(): SpeakerDiagnostics =
-        SpeakerDiagnosticsReader(speakerRepository, speakerRepository, speakerModel.version, SystemClock).read()
+    suspend fun speakerDiagnostics(): SpeakerDiagnostics = SpeakerDiagnosticsReader(
+        speakerRepository,
+        speakerRepository,
+        speakerModel.version,
+        SystemClock,
+        tuning().speakerConfig(),
+    ).read()
+
+    /** 手の修正は、仮の話者の上限などに今の調整の値を使う。声は [recentVoices] にあるので、作り直してよい。 */
+    private suspend fun speakerCorrections() = SpeakerCorrections(
+        speakerRepository,
+        utteranceRepository,
+        recentVoices,
+        speakerModel.version,
+        SystemClock,
+        tuning().speakerConfig(),
+    )
+
+    /** 今の調整の値。保存がなければ既定値。 */
+    suspend fun tuning(): Tuning = withContext(Dispatchers.IO) { tuningStore.load() }
+
+    /**
+     * 調整の値を保存する。聞き取り中なら始め直して、新しい値で聞く。整理の値は次の整理から使う。
+     * 仮の話者の上限を下げると、聞き取りを始めるときのまとめ直しで、上限を超えた仮の話者が統合される。
+     */
+    suspend fun saveTuning(tuning: Tuning) {
+        withContext(Dispatchers.IO) { tuningStore.save(tuning) }
+        if (captureState.value is CaptureState.Listening) {
+            stopCapture()
+            startCapture()
+        } else {
+            consolidateSpeakers()
+        }
+    }
 
     suspend fun selfEnrollmentStatus(): SelfEnrollmentStatus = when {
         !modelStore.isInstalled(speakerModel) -> SelfEnrollmentStatus.UNAVAILABLE
@@ -377,7 +429,7 @@ class Engine private constructor(context: Context) {
     }
 
     private suspend fun runEnrollment(): EnrollmentOutcome =
-        androidVoiceActivityDetector(modelStore, models).use { voiceActivityDetector ->
+        androidVoiceActivityDetector(modelStore, models, tuning()).use { voiceActivityDetector ->
             androidSpeakerEmbedder(modelStore, speakerModel).use { embedder ->
                 SelfEnrollment(
                     audioSource = developmentAudioSource(context) ?: microphoneAudioSource(),

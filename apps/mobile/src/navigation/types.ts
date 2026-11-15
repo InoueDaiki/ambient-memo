@@ -8,6 +8,7 @@ export type RootStackParamList = {
   Speakers: undefined;
   SelfEnrollment: undefined;
   Diagnostics: undefined;
+  Tuning: undefined;
 };
 
 export type RootNavigation = NativeStackNavigationProp<RootStackParamList>;

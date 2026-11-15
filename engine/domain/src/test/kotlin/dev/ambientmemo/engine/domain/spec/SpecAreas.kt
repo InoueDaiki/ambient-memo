@@ -28,6 +28,7 @@ internal object SpecAreas {
         "speaker-identifier" to ::speakerWorld,
         "speaker-long-conversation" to ::speakerWorld,
         "speaker-turns" to ::capturePipeline,
+        "tuning" to ::tuning,
         "utterance-chunk" to ::utteranceChunk,
         "utterance-segmenter" to ::utteranceSegmenter,
     )

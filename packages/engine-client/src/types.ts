@@ -53,9 +53,6 @@ export interface SpeakerInfo {
 // - それ以外: 話者の id
 export type SpeakerTarget = "self" | "unknown" | "new" | (string & {});
 
-// 仮の話者の上限。画面が「新しい話者」を出すかどうかに使う。値はエンジンの既定値と揃える
-export const MAX_PROVISIONAL_SPEAKERS = 3;
-
 // 類似度の帯ごとの判定の数。floor は帯の下端
 export interface SpeakerScoreBand {
   floor: number;
@@ -78,6 +75,67 @@ export interface SpeakerDiagnostics {
   hasAdaptedVoice: boolean;
   selfThreshold: number;
   unknownFloor: number;
+}
+
+// 画面から変えられる調整の値の名前
+// - selfThreshold: 自分に入る類似度。不明の帯の上端も兼ねる
+// - selfExitThreshold: これ未満で自分から出る類似度。selfThreshold 以下
+// - unknownFloor: 不明の帯の下端。selfExitThreshold 以下
+// - provisionalThreshold: 知っている他人と同じ人とみなす類似度。まとめ直しにも使う
+// - maxProvisionalSpeakers: 仮の話者の上限
+// - quietGateDbfs: これより静かな音は発話の検知に回さない(dBFS)
+// - vadThreshold: 発話の検知のしきい値。高いほど発話とみなしにくい
+// - vadMinSilenceMillis: 発話を区切る無音の長さ
+// - minTopicLines: これより短い話題は前の話題に戻す行数
+// - chunkGapMinutes: これだけ会話がとぎれたら、整理のまとまりを分ける(分)
+export type TuningKey =
+  | "selfThreshold"
+  | "selfExitThreshold"
+  | "unknownFloor"
+  | "provisionalThreshold"
+  | "maxProvisionalSpeakers"
+  | "quietGateDbfs"
+  | "vadThreshold"
+  | "vadMinSilenceMillis"
+  | "minTopicLines"
+  | "chunkGapMinutes";
+
+// 範囲、刻み、既定値はエンジンが決める。画面はここから取り、自分では持たない
+export interface TuningItem {
+  key: TuningKey;
+  value: number;
+  defaultValue: number;
+  min: number;
+  max: number;
+  step: number;
+}
+
+export interface Tuning {
+  // エンジンの決めた順
+  items: TuningItem[];
+}
+
+export type TuningValues = Partial<Record<TuningKey, number>>;
+
+export type TuningProblem =
+  // 知らない名前
+  | "unknown-key"
+  // 範囲の外か、数でない
+  | "out-of-range"
+  // 自分から出る類似度が、自分に入る類似度より高い
+  | "self-exit-above-self"
+  // 不明の帯の下端が、自分から出る類似度より高い
+  | "unknown-floor-above-self-exit";
+
+// saveTuning の reject で、値を受け付けなかったときに使う
+export class TuningError extends Error {
+  readonly problem: TuningProblem;
+
+  constructor(problem: TuningProblem) {
+    super(problem);
+    this.name = "TuningError";
+    this.problem = problem;
+  }
 }
 
 // 実機の確認のための記録。数値だけを持ち、発話の本文や音声は含まない
@@ -199,6 +257,8 @@ export type EngineEvent =
   | { type: "memos-changed" }
   // 整理の開始、進み具合、終わりで届く。受け取ったら getOrganizeStatus で取り直す
   | { type: "organize-changed" }
+  // 調整の値を保存すると届く。受け付けなかったときは届かない
+  | { type: "tuning-changed" }
   // 質問の途中で、段階が変わると届く
   | { type: "ask-progress"; phase: AskPhase };
 
@@ -230,6 +290,12 @@ export interface TranscriptEngineClient extends EngineClient {
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   // 直近の話者の判定の集計を返す
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
+  getTuning(): Promise<Tuning>;
+  // 書かない項目は既定値にする。値は刻みに丸める。受け付けなければ TuningError で reject し、何も変えない。
+  // 保存すると tuning-changed を届けてから解決する。聞き取り中なら始め直してから解決し、
+  // 始め直せなければ値は保存したまま EngineStartError で reject する。整理の値は次の整理から使う。
+  // 仮の話者の上限を下げると、上限を超えた仮の話者を統合する。取り消せない
+  saveTuning(values: TuningValues): Promise<Tuning>;
   getDiagnosticsStatus(): Promise<DiagnosticsStatus>;
   // 前の記録を消して始める。止めなくても 7 日で止まる
   startDiagnostics(): Promise<DiagnosticsStatus>;

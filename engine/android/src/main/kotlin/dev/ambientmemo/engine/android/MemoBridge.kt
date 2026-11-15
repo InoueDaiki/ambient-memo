@@ -3,6 +3,7 @@ package dev.ambientmemo.engine.android
 import dev.ambientmemo.engine.domain.Clock
 import dev.ambientmemo.engine.domain.Memo
 import dev.ambientmemo.engine.domain.MemoRepository
+import dev.ambientmemo.engine.domain.OrganizeConfig
 import dev.ambientmemo.engine.domain.Speaker
 import dev.ambientmemo.engine.domain.SpeakerDiagnostics
 import dev.ambientmemo.engine.domain.SpeakerNameSource
@@ -20,6 +21,7 @@ typealias WireObject = Map<String, Any?>
  * Expo に依存しない部分をここに置き、JVM のテストで本物の SQLite を通す。
  * id は JS では文字列なので、数でない id は「ない」ものとして扱う。
  */
+@Suppress("LongParameterList") // テストで時計、時刻帯、整理の値を差し替える
 class MemoBridge internal constructor(
     private val memos: MemoRepository,
     private val speakers: suspend () -> Map<Long, Speaker>,
@@ -27,6 +29,8 @@ class MemoBridge internal constructor(
     private val organize: OrganizeControl,
     private val asks: AskControl,
     private val timeZone: TimeZone = TimeZone.getDefault(),
+    /** 整理の値。画面の調整で変わるので、数えるたびに読む。 */
+    private val organizeConfig: suspend () -> OrganizeConfig = { OrganizeConfig() },
 ) {
     suspend fun listMemos(limit: Int): List<WireObject> = memos.listRecentMemos(limit).map { it.toWire() }
 
@@ -124,7 +128,8 @@ class MemoBridge internal constructor(
         if (organize.status.isRunning) organize.stop()
     }
 
-    private suspend fun backlog() = organizeBacklog(memos, speakers().values.toList(), clock, timeZone)
+    private suspend fun backlog() =
+        organizeBacklog(memos, speakers().values.toList(), clock, timeZone, organizeConfig())
 }
 
 /** 特徴量は JS へ渡さない。JS が知るのは表示に使う名前だけ。 */

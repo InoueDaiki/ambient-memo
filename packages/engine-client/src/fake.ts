@@ -1,4 +1,4 @@
-import { SelfEnrollmentError } from "./types.ts";
+import { SelfEnrollmentError, TuningError } from "./types.ts";
 import type {
   AskPhase,
   EngineEvent,
@@ -23,6 +23,10 @@ import type {
   SpeakerInfo,
   SpeakerTarget,
   TranscriptEngineClient,
+  Tuning,
+  TuningItem,
+  TuningKey,
+  TuningValues,
   Utterance,
 } from "./types.ts";
 
@@ -39,6 +43,57 @@ export interface FakeEngineClientOptions {
   memos?: MemoDetail[];
   // 今整理できるまとまりの数と、話が途切れるのを待っている発話の有無
   organizeBacklog?: { pendingChunks: number; isWaitingForSilence?: boolean };
+  // 既定値と違う調整の値
+  tuning?: TuningValues;
+}
+
+// 調整の値の範囲と既定値。エンジンの TuningKey と同じにする
+const TUNING_SPECS: readonly Omit<TuningItem, "value">[] = [
+  { key: "selfThreshold", min: 0.3, max: 0.8, step: 0.01, defaultValue: 0.5 },
+  { key: "selfExitThreshold", min: 0.2, max: 0.8, step: 0.01, defaultValue: 0.45 },
+  { key: "unknownFloor", min: 0.1, max: 0.8, step: 0.01, defaultValue: 0.4 },
+  { key: "provisionalThreshold", min: 0.3, max: 0.8, step: 0.01, defaultValue: 0.45 },
+  { key: "maxProvisionalSpeakers", min: 1, max: 10, step: 1, defaultValue: 3 },
+  { key: "quietGateDbfs", min: -70, max: -30, step: 1, defaultValue: -55 },
+  { key: "vadThreshold", min: 0.2, max: 0.9, step: 0.05, defaultValue: 0.5 },
+  { key: "vadMinSilenceMillis", min: 300, max: 2000, step: 100, defaultValue: 800 },
+  { key: "minTopicLines", min: 1, max: 10, step: 1, defaultValue: 4 },
+  { key: "chunkGapMinutes", min: 1, max: 30, step: 1, defaultValue: 5 },
+];
+
+const TUNING_TOLERANCE = 1e-9;
+
+function tuningSpec(key: string): Omit<TuningItem, "value"> | undefined {
+  return TUNING_SPECS.find((item) => item.key === key);
+}
+
+// 刻みに丸め、範囲と値どうしの関係を確かめる。エンジンの Tuning.of と同じ判定
+function checkedTuning(values: TuningValues): TuningValues {
+  const result: TuningValues = {};
+  for (const name of Object.keys(values).sort()) {
+    const spec = tuningSpec(name);
+    if (spec === undefined) throw new TuningError("unknown-key");
+    const value = values[spec.key];
+    if (
+      typeof value !== "number" ||
+      !Number.isFinite(value) ||
+      value < spec.min - TUNING_TOLERANCE ||
+      value > spec.max + TUNING_TOLERANCE
+    ) {
+      throw new TuningError("out-of-range");
+    }
+    const steps = Math.round((value - spec.min) / spec.step);
+    const snapped = Math.round((spec.min + steps * spec.step) * 1_000_000) / 1_000_000;
+    result[spec.key] = Math.min(Math.max(snapped, spec.min), spec.max);
+  }
+  const valueOf = (key: TuningKey) => result[key] ?? tuningSpec(key)?.defaultValue ?? 0;
+  if (valueOf("selfExitThreshold") > valueOf("selfThreshold") + TUNING_TOLERANCE) {
+    throw new TuningError("self-exit-above-self");
+  }
+  if (valueOf("unknownFloor") > valueOf("selfExitThreshold") + TUNING_TOLERANCE) {
+    throw new TuningError("unknown-floor-above-self-exit");
+  }
+  return result;
 }
 
 function toMemo(detail: MemoDetail): Memo {
@@ -66,6 +121,8 @@ const unanswered = (outcome: MemoAnswer["outcome"]): MemoAnswer => ({
 // エンジンなしで画面を開発・テストするための実装
 export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClient {
   #diagnostics: DiagnosticsStatus = { isRecording: false, sizeBytes: 0, isFull: false };
+  #tuning: TuningValues;
+  #tuningSaves = 0;
   #status: EngineStatus;
   readonly #listeners = new Set<EngineListener>();
   #listeningStatus: ListeningStatus;
@@ -104,7 +161,9 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     memoMode = "ready",
     memos = [],
     organizeBacklog = { pendingChunks: 0 },
+    tuning = {},
   }: FakeEngineClientOptions = {}) {
+    this.#tuning = checkedTuning(tuning);
     this.#organizerModel = organizerModel;
     this.#status = status;
     this.#listeningStatus = listeningStatus;
@@ -200,6 +259,7 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
   #resolveTarget(target: SpeakerTarget): SpeakerInfo | undefined {
     if (target === "self") return this.#speakers.find((item) => item.kind === "self");
     if (target === "new") {
+      if (this.#provisionalCount() >= this.#tuningValue("maxProvisionalSpeakers")) return undefined;
       const id = String(Math.max(0, ...this.#speakers.map((item) => Number(item.id))) + 1);
       const provisional = this.#speakers.filter((item) => item.kind === "provisional").length;
       const created: SpeakerInfo = {
@@ -267,6 +327,39 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
     return Promise.resolve();
   }
 
+  getTuning(): Promise<Tuning> {
+    return Promise.resolve({
+      items: TUNING_SPECS.map((spec) => ({ ...spec, value: this.#tuningValue(spec.key) })),
+    });
+  }
+
+  saveTuning(values: TuningValues): Promise<Tuning> {
+    let checked: TuningValues;
+    try {
+      checked = checkedTuning(values);
+    } catch (error) {
+      return Promise.reject(error);
+    }
+    this.#tuning = checked;
+    this.#tuningSaves += 1;
+    // 本物は上限を超えた仮の話者を統合するが、Fake は統合しない
+    this.#emit({ type: "tuning-changed" });
+    return this.getTuning();
+  }
+
+  // テストで、保存した回数を確かめる
+  get tuningSaves(): number {
+    return this.#tuningSaves;
+  }
+
+  #tuningValue(key: TuningKey): number {
+    return this.#tuning[key] ?? tuningSpec(key)?.defaultValue ?? 0;
+  }
+
+  #provisionalCount(): number {
+    return this.#speakers.filter((item) => item.kind === "provisional").length;
+  }
+
   getDiagnosticsStatus(): Promise<DiagnosticsStatus> {
     return Promise.resolve(this.#diagnostics);
   }
@@ -322,8 +415,8 @@ export class FakeEngineClient implements TranscriptEngineClient, MemoEngineClien
       ],
       provisionalSpeakers: this.#speakers.filter((item) => item.kind === "provisional").length,
       hasAdaptedVoice: false,
-      selfThreshold: 0.45,
-      unknownFloor: 0.35,
+      selfThreshold: this.#tuningValue("selfThreshold"),
+      unknownFloor: this.#tuningValue("unknownFloor"),
     });
   }
 
