@@ -56,6 +56,11 @@ public enum TuningProblem: String, Sendable {
 public struct InvalidTuningException: Error, Equatable {
     public let problem: TuningProblem
     public let key: String?
+
+    public init(problem: TuningProblem, key: String?) {
+        self.problem = problem
+        self.key = key
+    }
 }
 
 /// 調整の値の組。Kotlin の `Tuning`。既定値と違う値だけを持つ。
