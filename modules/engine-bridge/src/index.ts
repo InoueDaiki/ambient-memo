@@ -1,6 +1,7 @@
 import {
   EngineStartError,
   SelfEnrollmentError,
+  TuningError,
   type DiagnosticsStatus,
   type EngineEvent,
   type EngineListener,
@@ -16,6 +17,9 @@ import {
   type SpeakerDiagnostics,
   type SpeakerInfo,
   type TranscriptEngineClient,
+  type Tuning,
+  type TuningProblem,
+  type TuningValues,
 } from "@ambient-memo/engine-client";
 import { requireNativeModule, type EventSubscription } from "expo";
 
@@ -40,6 +44,8 @@ interface EngineBridgeNativeModule extends MemoNativeModule {
   resetSpeakers(): Promise<void>;
   renameSpeaker(speakerId: string, name: string): Promise<void>;
   getSpeakerDiagnostics(): Promise<SpeakerDiagnostics>;
+  getTuning(): Promise<Tuning>;
+  saveTuning(values: TuningValues): Promise<Tuning>;
   getDiagnosticsStatus(): Promise<DiagnosticsStatus>;
   startDiagnostics(): Promise<DiagnosticsStatus>;
   stopDiagnostics(): Promise<DiagnosticsStatus>;
@@ -85,6 +91,20 @@ function toEnrollmentError(error: unknown): unknown {
   return failure === undefined ? error : new SelfEnrollmentError(failure);
 }
 
+const TUNING_PROBLEMS: readonly TuningProblem[] = [
+  "out-of-range",
+  "self-exit-above-self",
+  "unknown-floor-above-self-exit",
+  "unknown-key",
+];
+
+// 値を断ったときのコードは tuning- に理由を付けたもの。聞き取りを始め直せなかったときは開始の失敗と同じ
+function toTuningError(error: unknown): unknown {
+  const code = (error as { code?: unknown } | undefined)?.code;
+  const problem = TUNING_PROBLEMS.find((item) => code === `tuning-${item}`);
+  return problem === undefined ? toStartError(error) : new TuningError(problem);
+}
+
 export function createEngineClient(): TranscriptEngineClient {
   const native = requireNativeModule<EngineBridgeNativeModule>("EngineBridge");
   return {
@@ -105,6 +125,11 @@ export function createEngineClient(): TranscriptEngineClient {
     resetSpeakers: () => native.resetSpeakers(),
     renameSpeaker: (speakerId, name) => native.renameSpeaker(speakerId, name),
     getSpeakerDiagnostics: () => native.getSpeakerDiagnostics(),
+    getTuning: () => native.getTuning(),
+    saveTuning: (values) =>
+      native.saveTuning(values).catch((error: unknown) => {
+        throw toTuningError(error);
+      }),
     getDiagnosticsStatus: () => native.getDiagnosticsStatus(),
     startDiagnostics: () => native.startDiagnostics(),
     stopDiagnostics: () => native.stopDiagnostics(),

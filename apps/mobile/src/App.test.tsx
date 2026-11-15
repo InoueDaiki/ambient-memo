@@ -624,6 +624,19 @@ describe("話者を手で直す", () => {
     expect(screen.queryByRole("button", { name: "他の話者(新しく作る)" })).toBeNull();
   });
 
+  it("調整で上限を上げると、新しい話者を出す", async () => {
+    const client = new FakeEngineClient({
+      speakers: [...speakers, { id: "4", name: "話者3", kind: "provisional", utteranceCount: 0 }],
+      utterances: [utterance({ id: "10", text: "本文の行", speaker: "unknown" })],
+      tuning: { maxProvisionalSpeakers: 4 },
+    });
+    await renderApp(client);
+
+    await userEvent.press(await screen.findByText("本文の行"));
+
+    await screen.findByRole("button", { name: "他の話者(新しく作る)" });
+  });
+
   it("話者の画面で統合すると、発話が移り、話者が減る", async () => {
     const client = withRows();
     await renderApp(client);
@@ -677,5 +690,88 @@ describe("話者を手で直す", () => {
 
     await screen.findByText("判定の記録(直近 7 日)");
     screen.getByText(/判定 10 回: 自分 6 \/ 他の人 3 \/ 不明 1\(10%\)/);
+  });
+});
+
+describe("調整", () => {
+  async function openTuning(client: FakeEngineClient) {
+    await renderApp(client);
+    await press("調整");
+    await screen.findByText("仮の話者の上限");
+  }
+
+  const valueOf = async (client: FakeEngineClient, key: string) =>
+    (await client.getTuning()).items.find((item) => item.key === key)?.value;
+
+  it("値を上げ下げして保存すると、エンジンに保存する", async () => {
+    const client = new FakeEngineClient();
+    await openTuning(client);
+    expect(
+      screen.getByRole("button", { name: "保存する" }).props.accessibilityState?.disabled,
+    ).toBe(true);
+
+    await press("仮の話者の上限を上げる");
+    await press("自分と判定する類似度を上げる");
+    screen.getByText("4 人");
+    screen.getByText("既定値は 3 人");
+    screen.getByText("0.51");
+    await press("保存する");
+
+    await screen.findByText("保存しました");
+    expect(await valueOf(client, "maxProvisionalSpeakers")).toBe(4);
+    expect(await valueOf(client, "selfThreshold")).toBeCloseTo(0.51, 9);
+  });
+
+  it("受け付けない組み合わせは理由を出し、保存しない", async () => {
+    const client = new FakeEngineClient();
+    await openTuning(client);
+
+    await press("自分と判定する類似度を下げる");
+    await press("自分と判定する類似度を下げる");
+    await press("自分と判定する類似度を下げる");
+    screen.getByText("0.47");
+    await press("自分と判定する類似度を下げる");
+    await press("自分と判定する類似度を下げる");
+    await press("自分と判定する類似度を下げる");
+    await press("保存する");
+
+    await screen.findByText("自分から外れる類似度は、自分と判定する類似度以下にしてください。");
+    expect(client.tuningSaves).toBe(0);
+  });
+
+  it("仮の話者より上限を下げるときは、統合を確かめてから保存する", async () => {
+    const client = new FakeEngineClient({
+      speakers: [
+        { id: "1", name: "自分", kind: "self", utteranceCount: 0 },
+        { id: "2", name: "話者1", kind: "provisional", utteranceCount: 0 },
+        { id: "3", name: "話者2", kind: "provisional", utteranceCount: 0 },
+      ],
+    });
+    await openTuning(client);
+
+    await press("仮の話者の上限を下げる");
+    await press("仮の話者の上限を下げる");
+    await press("保存する");
+
+    await screen.findByText(/仮の話者が 2 人います。上限を 1/);
+    expect(client.tuningSaves).toBe(0);
+    await press("統合して保存する");
+
+    await screen.findByText("保存しました");
+    expect(await valueOf(client, "maxProvisionalSpeakers")).toBe(1);
+  });
+
+  it("すべて既定値に戻して保存できる", async () => {
+    const client = new FakeEngineClient({ tuning: { minTopicLines: 2, quietGateDbfs: -60 } });
+    await openTuning(client);
+    await screen.findByText("2 行");
+
+    await press("すべて既定値に戻す");
+    screen.getByText("4 行");
+    await press("保存する");
+
+    await screen.findByText("保存しました");
+    const { items } = await client.getTuning();
+    expect(items.every((item) => item.value === item.defaultValue)).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { spacing } from "@ambient-memo/design-tokens";
-import { MAX_PROVISIONAL_SPEAKERS, type Utterance } from "@ambient-memo/engine-client";
-import { useSpeakerActions, useSpeakers } from "@ambient-memo/engine-client/react";
+import type { Utterance } from "@ambient-memo/engine-client";
+import { useSpeakerActions, useSpeakers, useTuning } from "@ambient-memo/engine-client/react";
 import { Button, StatusBanner, Text, useColors } from "@ambient-memo/ui-native";
 import { Modal, ScrollView, View } from "react-native";
 
@@ -18,6 +18,10 @@ export function SpeakerSheet({
   const self = speakers?.find((speaker) => speaker.kind === "self");
   const others = speakers?.filter((speaker) => speaker.kind !== "self") ?? [];
   const provisional = others.filter((speaker) => speaker.kind === "provisional").length;
+  // 上限は調整で変わる。分かるまでは出さない
+  const limit = useTuning().tuning?.items.find(
+    (item) => item.key === "maxProvisionalSpeakers",
+  )?.value;
 
   const choose = (target: string) => {
     void setUtteranceSpeaker(utterance.id, target).then((done) => {
@@ -56,7 +60,7 @@ export function SpeakerSheet({
                 onPress={() => choose(speaker.id)}
               />
             ))}
-            {provisional < MAX_PROVISIONAL_SPEAKERS && (
+            {limit !== undefined && provisional < limit && (
               <Button
                 label="他の話者(新しく作る)"
                 variant="secondary"

@@ -144,6 +144,7 @@ export function TranscriptScreen() {
               onPress={() => navigation.navigate("Diagnostics")}
             />
             <Button label="話者" variant="ghost" onPress={() => navigation.navigate("Speakers")} />
+            <Button label="調整" variant="ghost" onPress={() => navigation.navigate("Tuning")} />
           </View>
         </View>
         <SelfEnrollmentCard isListening={isListening} />

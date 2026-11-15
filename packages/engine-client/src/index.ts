@@ -1,7 +1,7 @@
 export { FAKE_ANSWER, FakeEngineClient } from "./fake.ts";
 export type { FakeEngineClientOptions } from "./fake.ts";
 export { sampleMemos } from "./sample-memos.ts";
-export { EngineStartError, MAX_PROVISIONAL_SPEAKERS, SelfEnrollmentError } from "./types.ts";
+export { EngineStartError, SelfEnrollmentError, TuningError } from "./types.ts";
 export type {
   AskPhase,
   DiagnosticsStatus,
@@ -36,5 +36,10 @@ export type {
   SpeakerTarget,
   TranscriptEngineClient,
   TranscriptionMode,
+  Tuning,
+  TuningItem,
+  TuningKey,
+  TuningProblem,
+  TuningValues,
   Utterance,
 } from "./types.ts";

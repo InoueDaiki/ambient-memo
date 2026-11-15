@@ -226,6 +226,68 @@ final class NativeBridgeEngine: BridgeEngine, @unchecked Sendable {
     ]
   }
 
+  // MARK: - 調整の値
+
+  func tuning() -> WireObject {
+    tuningWire(engine.tuning())
+  }
+
+  func saveTuning(values: [String: Any]) async throws -> WireObject {
+    let tuning: Tuning
+    do {
+      var numbers: [String: Double] = [:]
+      for (name, value) in values {
+        // JS の数は NSNumber で届く。真偽も NSNumber なので、数の型だけを受け付ける
+        guard let number = value as? NSNumber, CFGetTypeID(number) != CFBooleanGetTypeID() else {
+          throw InvalidTuningException(problem: .OUT_OF_RANGE, key: name)
+        }
+        numbers[name] = number.doubleValue
+      }
+      tuning = try Tuning.of(numbers)
+    } catch let error as InvalidTuningException {
+      throw BridgeEngineError.tuningRejected(problemWire(error.problem))
+    }
+    defer {
+      publish(engine.captureState)
+      send(["type": "tuning-changed"])
+    }
+    do {
+      try await engine.saveTuning(tuning)
+    } catch let failure as StartFailure {
+      // 値は保存した。始め直せなかったことを、開始の失敗と同じ形で伝える
+      switch failure {
+      case .MICROPHONE_PERMISSION: throw BridgeEngineError.microphonePermission
+      case .MICROPHONE_UNAVAILABLE: throw BridgeEngineError.microphoneUnavailable
+      case .TRANSCRIPTION_UNAVAILABLE: throw BridgeEngineError.transcriptionUnavailable
+      }
+    }
+    return tuningWire(engine.tuning())
+  }
+
+  private func tuningWire(_ tuning: Tuning) -> WireObject {
+    [
+      "items": TuningKey.allCases.map { key -> WireObject in
+        [
+          "key": key.wireName,
+          "value": tuning[key],
+          "defaultValue": key.defaultValue,
+          "min": key.min,
+          "max": key.max,
+          "step": key.step,
+        ]
+      },
+    ]
+  }
+
+  private func problemWire(_ problem: TuningProblem) -> String {
+    switch problem {
+    case .UNKNOWN_KEY: "unknown-key"
+    case .OUT_OF_RANGE: "out-of-range"
+    case .SELF_EXIT_ABOVE_SELF: "self-exit-above-self"
+    case .UNKNOWN_FLOOR_ABOVE_SELF_EXIT: "unknown-floor-above-self-exit"
+    }
+  }
+
   private func parseTarget(_ target: String) -> SpeakerTarget? {
     switch target {
     case "self": return .Myself

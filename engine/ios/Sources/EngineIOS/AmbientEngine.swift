@@ -122,6 +122,7 @@ public final class AmbientEngine: @unchecked Sendable {
         let utterances: ObservableUtteranceRepository
         let memos: ObservableMemoRepository
         let attempts: FileOrganizeAttempts
+        let tuning: FileTuningStore
     }
 
     private init() {
@@ -154,7 +155,8 @@ public final class AmbientEngine: @unchecked Sendable {
                 memos: ObservableMemoRepository(store.memos) { change in
                     listeners.current.values.forEach { $0(.memo(change)) }
                 },
-                attempts: FileOrganizeAttempts(url: directory.appendingPathComponent("organize-attempts.json"))
+                attempts: FileOrganizeAttempts(url: directory.appendingPathComponent("organize-attempts.json")),
+                tuning: FileTuningStore(url: directory.appendingPathComponent("tuning.txt"))
             )
         }
         captureRunner = CaptureRunner(
@@ -256,8 +258,13 @@ public final class AmbientEngine: @unchecked Sendable {
         ensureDiagnosticsSampler()
         let opened = try opened()
         let canIdentifySpeakers = modelStore.verify(speakerModel)
+        // 聞き取りの間は同じ値を使う。変えると聞き取りを始め直す(saveTuning)
+        let tuning = tuning()
         await consolidateSpeakers()
-        let vad = try SherpaVoiceActivityDetector(modelPath: modelStore.pathOf(models.vad.modelPackage, models.vad.model))
+        let vad = try SherpaVoiceActivityDetector(
+            modelPath: modelStore.pathOf(models.vad.modelPackage, models.vad.model),
+            tuning: tuning
+        )
         let transcriber = SherpaTranscriber(store: modelStore, models: models)
         let embedder = SherpaSpeakerEmbedder(store: modelStore, model: speakerModel)
         defer {
@@ -268,7 +275,7 @@ public final class AmbientEngine: @unchecked Sendable {
         let speakers = opened.store.speakers
         let pipeline = CapturePipeline(
             audioSource: audioSource,
-            voiceActivityDetector: QuietGatedVoiceActivityDetector(vad, levels: audioLevels),
+            voiceActivityDetector: QuietGatedVoiceActivityDetector(vad, quietDbfs: tuning.quietGateDbfs, levels: audioLevels),
             transcriber: transcriber,
             utterances: opened.utterances,
             captureGaps: RecordingCaptureGaps(opened.store.captureGaps, journal),
@@ -276,7 +283,13 @@ public final class AmbientEngine: @unchecked Sendable {
             config: SherpaSettings.captureConfig(),
             transcriptionFilter: NoiseTextFilter(),
             speakerIdentifier: canIdentifySpeakers
-                ? SpeakerIdentifier(embedder: embedder, speakers: speakers, clock: clock, decisionLog: speakers)
+                ? SpeakerIdentifier(
+                    embedder: embedder,
+                    speakers: speakers,
+                    clock: clock,
+                    config: tuning.speakerConfig(),
+                    decisionLog: speakers
+                )
                 : nil,
             recentVoices: recentVoices,
             speakerLock: speakerLock,
@@ -300,9 +313,15 @@ public final class AmbientEngine: @unchecked Sendable {
     public func consolidateSpeakers() async {
         do {
             let speakers = try opened().store.speakers
+            let config = tuning().speakerConfig()
             let merged = try await speakerLock.withLock {
                 try await speakers.prune(beforeMillis: clock.nowMillis() - STAT_RETENTION_MILLIS)
-                return try await SpeakerConsolidation(speakers: speakers, modelVersion: speakerModel.version, clock: clock).run()
+                return try await SpeakerConsolidation(
+                    speakers: speakers,
+                    modelVersion: speakerModel.version,
+                    clock: clock,
+                    config: config
+                ).run()
             }
             if merged > 0 { notifySpeakersChanged() }
         } catch {
@@ -322,7 +341,8 @@ public final class AmbientEngine: @unchecked Sendable {
             utterances: opened.utterances,
             voices: recentVoices,
             modelVersion: speakerModel.version,
-            clock: clock
+            clock: clock,
+            config: tuning().speakerConfig()
         )
     }
 
@@ -368,7 +388,34 @@ public final class AmbientEngine: @unchecked Sendable {
 
     public func speakerDiagnostics() async throws -> SpeakerDiagnostics {
         let speakers = try opened().store.speakers
-        return try await SpeakerDiagnosticsReader(log: speakers, speakers: speakers, modelVersion: speakerModel.version, clock: clock).read()
+        return try await SpeakerDiagnosticsReader(
+            log: speakers,
+            speakers: speakers,
+            modelVersion: speakerModel.version,
+            clock: clock,
+            config: tuning().speakerConfig()
+        ).read()
+    }
+
+    // MARK: - 調整の値
+
+    /// 今の調整の値。保存がなければ既定値。
+    public func tuning() -> Tuning {
+        (try? opened().tuning.load()) ?? Tuning.DEFAULT
+    }
+
+    /**
+     * 調整の値を保存する。聞き取り中なら始め直して、新しい値で聞く。整理の値は次の整理から使う。
+     * 仮の話者の上限を下げると、聞き取りを始めるときのまとめ直しで、上限を超えた仮の話者が統合される。
+     */
+    public func saveTuning(_ tuning: Tuning) async throws {
+        try opened().tuning.save(tuning)
+        if captureState == .listening {
+            await stopCapture()
+            try await startCapture()
+        } else {
+            await consolidateSpeakers()
+        }
     }
 
     // MARK: - 自分の声の登録
@@ -401,7 +448,10 @@ public final class AmbientEngine: @unchecked Sendable {
     }
 
     private func runEnrollment() async throws -> EnrollmentOutcome {
-        let vad = try SherpaVoiceActivityDetector(modelPath: modelStore.pathOf(models.vad.modelPackage, models.vad.model))
+        let vad = try SherpaVoiceActivityDetector(
+            modelPath: modelStore.pathOf(models.vad.modelPackage, models.vad.model),
+            tuning: tuning()
+        )
         let embedder = SherpaSpeakerEmbedder(store: modelStore, model: speakerModel)
         defer {
             vad.close()
@@ -536,7 +586,8 @@ public final class AmbientEngine: @unchecked Sendable {
             memos: opened.memos,
             speakers: Array(try await speakers().values),
             clock: clock,
-            timeZone: TimeZone.current
+            timeZone: TimeZone.current,
+            config: tuning().organizeConfig()
         )
     }
 
@@ -651,6 +702,7 @@ public final class AmbientEngine: @unchecked Sendable {
                 llm: TimedLlm(llm, organizeLog),
                 clock: clock,
                 timeZone: TimeZone.current,
+                config: opened.tuning.load().organizeConfig(),
                 attempts: opened.attempts
             )
             let result = try await job.run(shouldContinue: shouldContinue, onProgress: onProgress)
@@ -782,7 +834,8 @@ private func EngineDomain_organizeBacklog(
     memos: any MemoRepository,
     speakers: [Speaker],
     clock: any Clock,
-    timeZone: TimeZone
+    timeZone: TimeZone,
+    config: OrganizeConfig
 ) async throws -> OrganizeBacklog {
-    try await organizeBacklog(memos: memos, speakers: speakers, clock: clock, timeZone: timeZone)
+    try await organizeBacklog(memos: memos, speakers: speakers, clock: clock, timeZone: timeZone, config: config)
 }

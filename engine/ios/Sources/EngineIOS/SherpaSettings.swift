@@ -7,12 +7,14 @@ import Foundation
  */
 public enum SherpaSettings {
     public static let SAMPLE_RATE_HZ = 16_000
+    /// VAD のしきい値の既定値。画面から変えられるので、使う値は `Tuning.vadThreshold` から取る。`TuningKey` の既定値と同じにする。
     public static let VAD_THRESHOLD: Float = 0.5
 
     /// 発話の判定が出るまでに要る長さ。これより短い音は発話にしない。
     public static let VAD_MIN_SPEECH_SECONDS: Float = 0.25
 
     /// 発話を区切る無音の長さ。区切りは domain の `minSilenceMillis` ではなく、ここで決める(Android と同じ理由)。
+    /// 画面から変えられるので、使う値は `Tuning.vadMinSilenceSeconds` から取る。`TuningKey` の既定値と同じにする。
     public static let VAD_MIN_SILENCE_SECONDS: Float = 0.8
     public static let VAD_MAX_SPEECH_SECONDS: Float = 20
     public static let VAD_WINDOW_SAMPLES: Int32 = 512

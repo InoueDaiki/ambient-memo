@@ -1,0 +1,539 @@
+{
+  "area": "tuning",
+  "description": "画面から変えられる調整の値 Tuning。範囲、刻み、既定値、値どうしの関係、保存の形、各設定への写し方",
+  "inputSchema": "op: keys(項目の一覧)、defaults(既定値の組と各設定の既定値の比較)、of(values の名前と値から作る)、decode(text の保存の形から読む)",
+  "expectedSchema": "keys は項目の配列(name、min、max、step、defaultValue)。defaults は speakerMatchesDefault と organizeMatchesDefault。of と decode は changed(既定値と違う値)、encoded(保存の形)、speaker(SpeakerConfig の値)、organize(OrganizeConfig の値)、capture(音の大きさのゲートと VAD の値)。受け付けないときは error に TuningProblem の名前",
+  "cases": [
+    {
+      "name": "項目の名前、範囲、刻み、既定値",
+      "input": {
+        "op": "keys"
+      },
+      "expected": [
+        {
+          "name": "selfThreshold",
+          "min": 0.3,
+          "max": 0.8,
+          "step": 0.01,
+          "defaultValue": 0.5
+        },
+        {
+          "name": "selfExitThreshold",
+          "min": 0.2,
+          "max": 0.8,
+          "step": 0.01,
+          "defaultValue": 0.45
+        },
+        {
+          "name": "unknownFloor",
+          "min": 0.1,
+          "max": 0.8,
+          "step": 0.01,
+          "defaultValue": 0.4
+        },
+        {
+          "name": "provisionalThreshold",
+          "min": 0.3,
+          "max": 0.8,
+          "step": 0.01,
+          "defaultValue": 0.45
+        },
+        {
+          "name": "maxProvisionalSpeakers",
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "defaultValue": 3
+        },
+        {
+          "name": "quietGateDbfs",
+          "min": -70,
+          "max": -30,
+          "step": 1,
+          "defaultValue": -55
+        },
+        {
+          "name": "vadThreshold",
+          "min": 0.2,
+          "max": 0.9,
+          "step": 0.05,
+          "defaultValue": 0.5
+        },
+        {
+          "name": "vadMinSilenceMillis",
+          "min": 300,
+          "max": 2000,
+          "step": 100,
+          "defaultValue": 800
+        },
+        {
+          "name": "minTopicLines",
+          "min": 1,
+          "max": 10,
+          "step": 1,
+          "defaultValue": 4
+        },
+        {
+          "name": "chunkGapMinutes",
+          "min": 1,
+          "max": 30,
+          "step": 1,
+          "defaultValue": 5
+        }
+      ]
+    },
+    {
+      "name": "既定値の組は各設定の既定値と同じ",
+      "input": {
+        "op": "defaults"
+      },
+      "expected": {
+        "speakerMatchesDefault": true,
+        "organizeMatchesDefault": true
+      }
+    },
+    {
+      "name": "空の保存は既定値",
+      "input": {
+        "op": "decode",
+        "text": ""
+      },
+      "expected": {
+        "changed": {},
+        "encoded": "version=1\n",
+        "speaker": {
+          "selfThreshold": 0.5,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "話者の値を変える",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.4,
+          "selfExitThreshold": 0.35,
+          "unknownFloor": 0.3,
+          "maxProvisionalSpeakers": 6
+        }
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.4,
+          "selfExitThreshold": 0.35,
+          "unknownFloor": 0.3,
+          "maxProvisionalSpeakers": 6
+        },
+        "encoded": "version=1\nselfThreshold=0.4\nselfExitThreshold=0.35\nunknownFloor=0.3\nmaxProvisionalSpeakers=6\n",
+        "speaker": {
+          "selfThreshold": 0.4,
+          "selfExitThreshold": 0.35,
+          "unknownFloor": 0.3,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 6,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "値は刻みに丸める",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.473,
+          "maxProvisionalSpeakers": 4.6
+        }
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.47,
+          "maxProvisionalSpeakers": 5
+        },
+        "encoded": "version=1\nselfThreshold=0.47\nmaxProvisionalSpeakers=5\n",
+        "speaker": {
+          "selfThreshold": 0.47,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 5,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "他人をまとめる類似度はまとめ直しにも使う",
+      "input": {
+        "op": "of",
+        "values": {
+          "provisionalThreshold": 0.55
+        }
+      },
+      "expected": {
+        "changed": {
+          "provisionalThreshold": 0.55
+        },
+        "encoded": "version=1\nprovisionalThreshold=0.55\n",
+        "speaker": {
+          "selfThreshold": 0.5,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.55,
+          "consolidationThreshold": 0.55,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "自分に入る値を強い自分の値より上げると、強い自分の値も上がる",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.7
+        }
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.7
+        },
+        "encoded": "version=1\nselfThreshold=0.7\n",
+        "speaker": {
+          "selfThreshold": 0.7,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.7,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "聞き取りと整理の値を変える",
+      "input": {
+        "op": "of",
+        "values": {
+          "chunkGapMinutes": 10,
+          "minTopicLines": 6,
+          "vadMinSilenceMillis": 1200,
+          "vadThreshold": 0.35,
+          "quietGateDbfs": -62
+        }
+      },
+      "expected": {
+        "changed": {
+          "quietGateDbfs": -62,
+          "vadThreshold": 0.35,
+          "vadMinSilenceMillis": 1200,
+          "minTopicLines": 6,
+          "chunkGapMinutes": 10
+        },
+        "encoded": "version=1\nquietGateDbfs=-62\nvadThreshold=0.35\nvadMinSilenceMillis=1200\nminTopicLines=6\nchunkGapMinutes=10\n",
+        "speaker": {
+          "selfThreshold": 0.5,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 1200
+        },
+        "organize": {
+          "minTopicLines": 6,
+          "minSilenceGapMillis": 600000
+        },
+        "capture": {
+          "quietGateDbfs": -62,
+          "vadThreshold": 0.35,
+          "vadMinSilenceSeconds": 1.2
+        }
+      }
+    },
+    {
+      "name": "既定値と同じ値は持たない",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.5,
+          "maxProvisionalSpeakers": 3
+        }
+      },
+      "expected": {
+        "changed": {},
+        "encoded": "version=1\n",
+        "speaker": {
+          "selfThreshold": 0.5,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "3 つの類似度は同じ値にできる",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.45,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.45
+        }
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.45,
+          "unknownFloor": 0.45
+        },
+        "encoded": "version=1\nselfThreshold=0.45\nunknownFloor=0.45\n",
+        "speaker": {
+          "selfThreshold": 0.45,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.45,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "上限より大きい値は受け付けない",
+      "input": {
+        "op": "of",
+        "values": {
+          "maxProvisionalSpeakers": 11
+        }
+      },
+      "expected": {
+        "error": "OUT_OF_RANGE"
+      }
+    },
+    {
+      "name": "下限より小さい値は受け付けない",
+      "input": {
+        "op": "of",
+        "values": {
+          "quietGateDbfs": -71
+        }
+      },
+      "expected": {
+        "error": "OUT_OF_RANGE"
+      }
+    },
+    {
+      "name": "知らない名前は受け付けない",
+      "input": {
+        "op": "of",
+        "values": {
+          "windowMillis": 1000
+        }
+      },
+      "expected": {
+        "error": "UNKNOWN_KEY"
+      }
+    },
+    {
+      "name": "自分から出る値は自分に入る値より高くできない",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfThreshold": 0.4
+        }
+      },
+      "expected": {
+        "error": "SELF_EXIT_ABOVE_SELF"
+      }
+    },
+    {
+      "name": "不明の帯の下端は自分から出る値より高くできない",
+      "input": {
+        "op": "of",
+        "values": {
+          "selfExitThreshold": 0.38
+        }
+      },
+      "expected": {
+        "error": "UNKNOWN_FLOOR_ABOVE_SELF_EXIT"
+      }
+    },
+    {
+      "name": "保存を読むときは読めない行を飛ばす",
+      "input": {
+        "op": "decode",
+        "text": "version=1\nselfThreshold = 0.55\nwindowMillis=1000\nmaxProvisionalSpeakers=abc\nminTopicLines=99\n\n# メモ\nprovisionalThreshold\n"
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.55
+        },
+        "encoded": "version=1\nselfThreshold=0.55\n",
+        "speaker": {
+          "selfThreshold": 0.55,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "保存を読むとき、値どうしが合わなければすべて既定値",
+      "input": {
+        "op": "decode",
+        "text": "version=1\nselfThreshold=0.4\nmaxProvisionalSpeakers=6\n"
+      },
+      "expected": {
+        "changed": {},
+        "encoded": "version=1\n",
+        "speaker": {
+          "selfThreshold": 0.5,
+          "selfExitThreshold": 0.45,
+          "unknownFloor": 0.4,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 3,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    },
+    {
+      "name": "保存した形を読み直すと同じ値",
+      "input": {
+        "op": "decode",
+        "text": "version=1\nselfThreshold=0.4\nselfExitThreshold=0.35\nunknownFloor=0.3\nmaxProvisionalSpeakers=6\n"
+      },
+      "expected": {
+        "changed": {
+          "selfThreshold": 0.4,
+          "selfExitThreshold": 0.35,
+          "unknownFloor": 0.3,
+          "maxProvisionalSpeakers": 6
+        },
+        "encoded": "version=1\nselfThreshold=0.4\nselfExitThreshold=0.35\nunknownFloor=0.3\nmaxProvisionalSpeakers=6\n",
+        "speaker": {
+          "selfThreshold": 0.4,
+          "selfExitThreshold": 0.35,
+          "unknownFloor": 0.3,
+          "provisionalThreshold": 0.45,
+          "consolidationThreshold": 0.45,
+          "maxProvisionalSpeakers": 6,
+          "strongSelfThreshold": 0.6,
+          "trailingSilenceMillis": 800
+        },
+        "organize": {
+          "minTopicLines": 4,
+          "minSilenceGapMillis": 300000
+        },
+        "capture": {
+          "quietGateDbfs": -55,
+          "vadThreshold": 0.5,
+          "vadMinSilenceSeconds": 0.8
+        }
+      }
+    }
+  ]
+}

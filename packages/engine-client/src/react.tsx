@@ -32,6 +32,8 @@ import {
   type SpeakerTarget,
   type TranscriptEngineClient,
   type TranscriptionMode,
+  type Tuning,
+  type TuningValues,
   type Utterance,
 } from "./types.ts";
 
@@ -530,6 +532,66 @@ export function useSpeakerDiagnostics(): SpeakerDiagnostics | undefined {
   }, [client]);
 
   return diagnostics;
+}
+
+export interface UseTuningResult {
+  // 最初の取得が終わるまでは undefined
+  tuning: Tuning | undefined;
+  // 保存している間は true。聞き取り中は始め直すまでかかる
+  isSaving: boolean;
+  // 最後の保存の失敗。次の保存で消える
+  error: unknown;
+  // 保存できたかどうかを返す
+  save: (values: TuningValues) => Promise<boolean>;
+}
+
+// ほかの画面での保存も tuning-changed で受け取る
+export function useTuning(): UseTuningResult {
+  const client = useEngineClient();
+  const [tuning, setTuning] = useState<Tuning>();
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<unknown>();
+
+  useEffect(() => {
+    let active = true;
+    let latest = 0;
+    const load = () => {
+      const request = ++latest;
+      client
+        .getTuning()
+        .then((current) => {
+          if (active && request === latest) setTuning(current);
+        })
+        .catch(() => undefined);
+    };
+    const unsubscribe = client.subscribe((event) => {
+      if (event.type === "tuning-changed") load();
+    });
+    load();
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, [client]);
+
+  const save = useCallback(
+    async (values: TuningValues) => {
+      setIsSaving(true);
+      setError(undefined);
+      try {
+        setTuning(await client.saveTuning(values));
+        return true;
+      } catch (e: unknown) {
+        setError(e);
+        return false;
+      } finally {
+        setIsSaving(false);
+      }
+    },
+    [client],
+  );
+
+  return { tuning, isSaving, error, save };
 }
 
 export interface UseDiagnosticsResult {

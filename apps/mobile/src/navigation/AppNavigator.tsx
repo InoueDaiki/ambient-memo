@@ -13,6 +13,7 @@ import { DiagnosticsScreen } from "../transcript/DiagnosticsScreen.tsx";
 import { SelfEnrollmentScreen } from "../transcript/SelfEnrollmentScreen.tsx";
 import { SpeakersScreen } from "../transcript/SpeakersScreen.tsx";
 import { TranscriptScreen } from "../transcript/TranscriptScreen.tsx";
+import { TuningScreen } from "../transcript/TuningScreen.tsx";
 import type { RootStackParamList } from "./types.ts";
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -62,6 +63,7 @@ export function AppNavigator() {
         <Stack.Screen name="Speakers" component={SpeakersScreen} />
         <Stack.Screen name="SelfEnrollment" component={SelfEnrollmentScreen} />
         <Stack.Screen name="Diagnostics" component={DiagnosticsScreen} />
+        <Stack.Screen name="Tuning" component={TuningScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

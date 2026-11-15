@@ -15,6 +15,8 @@ export type { ProgressBarProps } from "./ProgressBar.tsx";
 export { Screen } from "./Screen.tsx";
 export { StatusBanner } from "./StatusBanner.tsx";
 export type { StatusBannerProps, StatusBannerTone } from "./StatusBanner.tsx";
+export { Stepper } from "./Stepper.tsx";
+export type { StepperProps } from "./Stepper.tsx";
 export { TabBar } from "./TabBar.tsx";
 export type { TabBarItem, TabBarProps } from "./TabBar.tsx";
 export { Tag } from "./Tag.tsx";

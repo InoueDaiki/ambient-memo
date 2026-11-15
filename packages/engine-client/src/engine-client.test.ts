@@ -5,6 +5,7 @@ import { memo, runMemoClientContract } from "./memo-contract.ts";
 import { sampleMemos } from "./sample-memos.ts";
 import {
   SelfEnrollmentError,
+  TuningError,
   type EngineEvent,
   type SpeakerInfo,
   type TranscriptEngineClient,
@@ -51,6 +52,65 @@ describe.each<[string, () => TranscriptEngineClient]>([
 
     expect(events).toEqual([{ type: "listening-changed", status: "listening" }]);
     await client.stopListening();
+  });
+
+  it("調整の値は範囲の中の既定値から始まる", async () => {
+    const { items } = await createClient().getTuning();
+
+    expect(items.map((item) => item.key)).toContain("maxProvisionalSpeakers");
+    for (const item of items) {
+      expect(item.value).toBe(item.defaultValue);
+      expect(item.min).toBeLessThanOrEqual(item.defaultValue);
+      expect(item.defaultValue).toBeLessThanOrEqual(item.max);
+      expect(item.step).toBeGreaterThan(0);
+    }
+  });
+
+  it("調整の値を刻みに丸めて保存し、解決する前に知らせる", async () => {
+    const client = createClient();
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    const saved = await client.saveTuning({ selfThreshold: 0.473, maxProvisionalSpeakers: 6 });
+
+    expect(events).toEqual([{ type: "tuning-changed" }]);
+    const value = (key: string) => saved.items.find((item) => item.key === key)?.value;
+    expect(value("selfThreshold")).toBeCloseTo(0.47, 9);
+    expect(value("maxProvisionalSpeakers")).toBe(6);
+    expect(await client.getTuning()).toEqual(saved);
+  });
+
+  it("書かない調整の値は既定値に戻す", async () => {
+    const client = createClient();
+    await client.saveTuning({ minTopicLines: 2 });
+
+    const { items } = await client.saveTuning({});
+
+    expect(items.every((item) => item.value === item.defaultValue)).toBe(true);
+  });
+
+  it("受け付けない調整の値は理由を付けて断り、何も変えない", async () => {
+    const client = createClient();
+    await client.saveTuning({ minTopicLines: 2 });
+    const before = await client.getTuning();
+    const events: EngineEvent[] = [];
+    client.subscribe((event) => events.push(event));
+
+    await expect(client.saveTuning({ maxProvisionalSpeakers: 11 })).rejects.toEqual(
+      new TuningError("out-of-range"),
+    );
+    await expect(client.saveTuning({ selfThreshold: 0.4 })).rejects.toEqual(
+      new TuningError("self-exit-above-self"),
+    );
+    await expect(client.saveTuning({ selfExitThreshold: 0.38 })).rejects.toEqual(
+      new TuningError("unknown-floor-above-self-exit"),
+    );
+    await expect(client.saveTuning({ windowMillis: 1 } as never)).rejects.toEqual(
+      new TuningError("unknown-key"),
+    );
+
+    expect(events).toEqual([]);
+    expect(await client.getTuning()).toEqual(before);
   });
 
   it("購読をやめるとイベントが届かない", async () => {
@@ -432,6 +492,22 @@ describe("FakeEngineClient の話者", () => {
     speakerName: "話者1",
     startedAt: 0,
   };
+
+  it("仮の話者が調整の上限に達していれば、新しい話者には直せない", async () => {
+    const client = new FakeEngineClient({
+      speakers,
+      utterances: [row],
+      tuning: { maxProvisionalSpeakers: 1 },
+    });
+
+    await expect(client.setUtteranceSpeaker("10", "new")).rejects.toThrow();
+
+    await client.saveTuning({ maxProvisionalSpeakers: 2 });
+    await client.setUtteranceSpeaker("10", "new");
+    expect(
+      (await client.listSpeakers()).filter((item) => item.kind === "provisional"),
+    ).toHaveLength(2);
+  });
 
   it("発話の話者を直すと utterances-changed が届く", async () => {
     const client = new FakeEngineClient({ speakers, utterances: [row] });

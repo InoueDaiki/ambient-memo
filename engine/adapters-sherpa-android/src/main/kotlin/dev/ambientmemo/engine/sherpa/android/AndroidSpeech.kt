@@ -11,6 +11,7 @@ import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractor
 import com.k2fsa.sherpa.onnx.SpeakerEmbeddingExtractorConfig
 import com.k2fsa.sherpa.onnx.Vad
 import com.k2fsa.sherpa.onnx.VadModelConfig
+import dev.ambientmemo.engine.domain.Tuning
 import dev.ambientmemo.engine.sherpa.AsrModel
 import dev.ambientmemo.engine.sherpa.ModelFile
 import dev.ambientmemo.engine.sherpa.ModelStore
@@ -25,8 +26,13 @@ import dev.ambientmemo.engine.sherpa.SherpaVoiceActivityDetector
 import dev.ambientmemo.engine.sherpa.SpeakerModel
 import dev.ambientmemo.engine.sherpa.SpeechModels
 
-fun androidVoiceActivityDetector(store: ModelStore, models: SpeechModels): SherpaVoiceActivityDetector =
-    SherpaVoiceActivityDetector(AndroidVad(store.pathOf(models.vad.modelPackage, models.vad.model)))
+/** VAD のしきい値と区切りの無音は [tuning] から取る。 */
+fun androidVoiceActivityDetector(
+    store: ModelStore,
+    models: SpeechModels,
+    tuning: Tuning = Tuning.DEFAULT,
+): SherpaVoiceActivityDetector =
+    SherpaVoiceActivityDetector(AndroidVad(store.pathOf(models.vad.modelPackage, models.vad.model), tuning))
 
 fun androidTranscriber(store: ModelStore, models: SpeechModels): SherpaTranscriber =
     SherpaTranscriber { AndroidRecognizer(store, models.asr) }
@@ -35,13 +41,13 @@ fun androidSpeakerEmbedder(store: ModelStore, model: SpeakerModel): SherpaSpeake
     SherpaSpeakerEmbedder(model.version) { AndroidSpeakerExtractor(store.pathOf(model.modelPackage, model.model)) }
 
 // assets ではなく内部ストレージのファイルを読むので、AssetManager は渡さない
-private class AndroidVad(model: String) : NativeVad {
+private class AndroidVad(model: String, tuning: Tuning) : NativeVad {
     private val vad = Vad(
         config = VadModelConfig(
             sileroVadModelConfig = SileroVadModelConfig(
                 model = model,
-                threshold = SherpaSettings.VAD_THRESHOLD,
-                minSilenceDuration = SherpaSettings.VAD_MIN_SILENCE_SECONDS,
+                threshold = tuning.vadThreshold,
+                minSilenceDuration = tuning.vadMinSilenceSeconds,
                 minSpeechDuration = SherpaSettings.VAD_MIN_SPEECH_SECONDS,
                 windowSize = SherpaSettings.VAD_WINDOW_SAMPLES,
                 maxSpeechDuration = SherpaSettings.VAD_MAX_SPEECH_SECONDS,
